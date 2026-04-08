@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"net/http"
-	"openbook/internal/library"
+	"folio/internal/library"
 	"path/filepath"
 	"strings"
 )

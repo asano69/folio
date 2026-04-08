@@ -43,7 +43,7 @@ docker-up:
 
 .PHONY: docker-build
 docker-build:
-	docker build -t openbook:latest .
+	docker build -t folio:latest .
 
 # ─────────────────────────────────────────
 # Clean

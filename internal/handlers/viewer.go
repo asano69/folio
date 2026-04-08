@@ -3,7 +3,7 @@ package handlers
 import (
 	"html/template"
 	"net/http"
-	"openbook/internal/library"
+	"folio/internal/library"
 	"strconv"
 )
 

@@ -2,8 +2,8 @@ package main
 
 import (
 	"log"
-	"openbook/internal/config"
-	"openbook/internal/server"
+	"folio/internal/config"
+	"folio/internal/server"
 )
 
 func main() {

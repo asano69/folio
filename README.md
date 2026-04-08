@@ -11,7 +11,7 @@
 - Database: Sqlite3
 
 ## 開発戦略
-- go標準モジュールのflagで、openbookコマンドを作り、openbook serverでサーバが起動するようにする。
+- go標準モジュールのflagで、folioコマンドを作り、folio serverでサーバが起動するようにする。
 - サーバの設定は環境変数を使い宣言的に行うことができるようにする。
 
 ## 実装する機能
@@ -24,7 +24,7 @@
 ## プロジェクト構造
 実装する構造:
 ```
-openbook
+folio
 ├── cmd
 │   └── server
 │       └── main.go

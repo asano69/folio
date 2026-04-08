@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"openbook/internal/config"
-	"openbook/internal/handlers"
-	"openbook/internal/library"
+	"folio/internal/config"
+	"folio/internal/handlers"
+	"folio/internal/library"
 )
 
 type Server struct {
