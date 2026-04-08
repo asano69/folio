@@ -3,13 +3,12 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"folio/internal/store"
 )
 
-// PagesAPIHandler handles PUT /api/pages/{bookID}/{pageNumber}.
+// PagesAPIHandler handles PUT /api/pages/{bookID}/{pageHash}.
 type PagesAPIHandler struct {
 	Store *store.Store
 }
@@ -17,17 +16,13 @@ type PagesAPIHandler struct {
 func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/pages/")
 	parts := strings.SplitN(path, "/", 2)
-	if len(parts) != 2 {
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
 
 	bookID := parts[0]
-	pageNumber, err := strconv.Atoi(parts[1])
-	if err != nil || pageNumber < 1 {
-		http.Error(w, "invalid page number", http.StatusBadRequest)
-		return
-	}
+	pageHash := parts[1]
 
 	if r.Method != http.MethodPut {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -51,11 +46,11 @@ func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	note := store.Note{
-		BookID:     bookID,
-		PageNumber: pageNumber,
-		Title:      strings.TrimSpace(body.Title),
-		Attribute:  body.Attribute,
-		Body:       body.Body,
+		BookID:    bookID,
+		PageHash:  pageHash,
+		Title:     strings.TrimSpace(body.Title),
+		Attribute: body.Attribute,
+		Body:      body.Body,
 	}
 
 	if err := h.Store.UpsertNote(note); err != nil {

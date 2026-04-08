@@ -10,7 +10,9 @@
                 <span id="page-title-badge" class="page-title-badge"{{if not .Note.Title}} hidden{{end}}>{{.Note.Title}}</span>
                 <span id="page-attr-badge" class="page-attr-badge attr-{{.Note.Attribute}}"{{if not .Note.Attribute}} hidden{{end}}>{{.Note.Attribute}}</span>
             </div>
+            {{if .CurrentPage}}
             <button class="edit-toggle-btn" id="edit-toggle">✎ Edit</button>
+            {{end}}
         </div>
     </div>
 
@@ -50,9 +52,10 @@
     </div>
     {{end}}
 
+    {{if .CurrentPage}}
     <div class="edit-panel" id="edit-panel" hidden
          data-book-id="{{.Book.ID}}"
-         data-page-num="{{.PageNum}}">
+         data-page-hash="{{.CurrentPage.Hash}}">
         <div class="edit-field">
             <label for="edit-title">Title</label>
             <input type="text" id="edit-title" value="{{.Note.Title}}" placeholder="Page title">
@@ -75,6 +78,7 @@
             <button id="edit-cancel">Cancel</button>
         </div>
     </div>
+    {{end}}
 
     <div class="viewer-controls">
         <div class="page-selector">

@@ -5,7 +5,7 @@ export function initEditor(): void {
     if (!toggleBtn || !panel) return;
 
     const bookId = panel.dataset.bookId!;
-    const pageNum = parseInt(panel.dataset.pageNum!, 10);
+    const pageHash = panel.dataset.pageHash!;
 
     const titleInput = document.getElementById('edit-title') as HTMLInputElement;
     const attributeSelect = document.getElementById('edit-attribute') as HTMLSelectElement;
@@ -61,7 +61,7 @@ export function initEditor(): void {
     async function save(): Promise<void> {
         saveBtn.disabled = true;
         try {
-            const res = await fetch(`/api/pages/${bookId}/${pageNum}`, {
+            const res = await fetch(`/api/pages/${bookId}/${pageHash}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

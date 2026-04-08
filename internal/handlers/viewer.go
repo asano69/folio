@@ -51,10 +51,15 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		currentPage = &pages[pageNum-1]
 	}
 
-	note, err := h.Store.GetNote(bookID, pageNum)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// Fetch note keyed by the page's content hash, which is stable across
+	// re-scans and CBZ page deletions.
+	var note store.Note
+	if currentPage != nil {
+		note, err = h.Store.GetNote(bookID, currentPage.Hash)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	data := struct {
