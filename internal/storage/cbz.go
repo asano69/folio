@@ -117,6 +117,7 @@ func readMeta(r *zip.ReadCloser) (*folioMeta, error) {
 }
 
 // writeMeta rewrites the CBZ with folio.json added.
+// Existing entries are copied as raw compressed bytes to preserve their CRC32 values.
 func writeMeta(path string, r *zip.ReadCloser, meta *folioMeta) error {
 	data, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
@@ -127,21 +128,20 @@ func writeMeta(path string, r *zip.ReadCloser, meta *folioMeta) error {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
-	// Copy existing entries.
+	// Copy existing entries as raw bytes to preserve original CRC32 values.
 	for _, f := range r.File {
 		if f.Name == metaFile {
 			continue // will be replaced
 		}
-		fw, err := w.CreateHeader(&f.FileHeader)
+		fw, err := w.CreateRaw(&f.FileHeader)
 		if err != nil {
 			return err
 		}
-		rc, err := f.Open()
+		rc, err := f.OpenRaw()
 		if err != nil {
 			return err
 		}
 		_, copyErr := io.Copy(fw, rc)
-		rc.Close()
 		if copyErr != nil {
 			return copyErr
 		}
