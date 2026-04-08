@@ -1,6 +1,6 @@
-# .air.toml
+
 [build]
-  cmd = "make static/my-mind.js static/toast.js && go build -o ./tmp/server ./cmd/server"
+  cmd = "make static/app.js  && go build -o ./tmp/server ./cmd/server"
   bin = "./tmp/server"
   include_ext = ["go", "ts", "html"]
   include_dir = ["cmd", "internal", "src", "static"]
