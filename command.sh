@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# 開発用のコマンドリスト
 declare -A commands
 commands=(
 	["unzip -p library/book01.cbz folio.json"]="book01.cbzのfolio.jsonの確認"
