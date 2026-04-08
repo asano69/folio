@@ -7,6 +7,33 @@ import (
 	"folio/internal/storage"
 )
 
+// Page attribute constants. Stored as plain strings with no DB CHECK constraint
+// so the list can evolve without a schema migration.
+const (
+	AttrCover   = "cover"
+	AttrTOC     = "toc"
+	AttrSection = "section"
+	AttrPage    = "page"
+	AttrIndex   = "index"
+	AttrOther   = "other"
+)
+
+// AttributeOption pairs a stored value with a human-readable label for the UI.
+type AttributeOption struct {
+	Value string
+	Label string
+}
+
+// AllAttributeOptions lists every valid attribute in display order.
+var AllAttributeOptions = []AttributeOption{
+	{AttrCover, "Cover"},
+	{AttrTOC, "Table of Contents"},
+	{AttrSection, "Section"},
+	{AttrPage, "Page"},
+	{AttrIndex, "Index"},
+	{AttrOther, "Other"},
+}
+
 // Book is the DB representation of a book.
 type Book struct {
 	ID     string
@@ -20,6 +47,16 @@ type Page struct {
 	BookID   string
 	Number   int
 	Filename string
+}
+
+// Note holds user-authored metadata for a single page.
+type Note struct {
+	BookID     string
+	PageNumber int
+	Title      string
+	Attribute  string
+	Body       string
+	UpdatedAt  string
 }
 
 // UpsertBook inserts a new book or updates its title and source if it already exists.
@@ -161,4 +198,32 @@ func (s *Store) GetCoverPage(bookID string) (*Page, error) {
 		return nil, nil
 	}
 	return &p, err
+}
+
+// GetNote returns the note for a page, or a zero-value Note if none exists.
+func (s *Store) GetNote(bookID string, pageNumber int) (Note, error) {
+	var n Note
+	err := s.db.QueryRow(`
+		SELECT book_id, page_number, title, attribute, body, updated_at
+		FROM notes
+		WHERE book_id = ? AND page_number = ?
+	`, bookID, pageNumber).Scan(&n.BookID, &n.PageNumber, &n.Title, &n.Attribute, &n.Body, &n.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Note{BookID: bookID, PageNumber: pageNumber}, nil
+	}
+	return n, err
+}
+
+// UpsertNote inserts or updates the note for a page.
+func (s *Store) UpsertNote(n Note) error {
+	_, err := s.db.Exec(`
+		INSERT INTO notes (book_id, page_number, title, attribute, body, updated_at)
+		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(book_id, page_number) DO UPDATE SET
+			title      = excluded.title,
+			attribute  = excluded.attribute,
+			body       = excluded.body,
+			updated_at = CURRENT_TIMESTAMP
+	`, n.BookID, n.PageNumber, n.Title, n.Attribute, n.Body)
+	return err
 }

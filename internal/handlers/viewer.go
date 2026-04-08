@@ -51,6 +51,12 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		currentPage = &pages[pageNum-1]
 	}
 
+	note, err := h.Store.GetNote(bookID, pageNum)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	data := struct {
 		Book        *store.Book
 		CurrentPage *store.Page
@@ -59,6 +65,8 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		TotalPages  int
 		HasPrev     bool
 		HasNext     bool
+		Note        store.Note
+		Attributes  []store.AttributeOption
 	}{
 		Book:        book,
 		CurrentPage: currentPage,
@@ -67,6 +75,8 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		TotalPages:  totalPages,
 		HasPrev:     pageNum > 1,
 		HasNext:     pageNum < totalPages,
+		Note:        note,
+		Attributes:  store.AllAttributeOptions,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {

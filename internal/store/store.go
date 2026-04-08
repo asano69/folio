@@ -34,6 +34,20 @@ CREATE TABLE IF NOT EXISTS thumbnails (
     data        BLOB NOT NULL,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Notes holds user-authored metadata for a single page.
+-- Primary key is (book_id, page_number) rather than a FK to pages(id)
+-- so that data survives a re-scan, which replaces all rows in the pages
+-- table and resets its autoincrement IDs.
+CREATE TABLE IF NOT EXISTS notes (
+    book_id     TEXT    NOT NULL REFERENCES books(id),
+    page_number INTEGER NOT NULL,
+    title       TEXT    NOT NULL DEFAULT '',
+    attribute   TEXT    NOT NULL DEFAULT '',
+    body        TEXT    NOT NULL DEFAULT '',
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (book_id, page_number)
+);
 `
 
 func Open(dataPath string) (*Store, error) {
