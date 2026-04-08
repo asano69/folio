@@ -2,6 +2,8 @@ library/
 data/
 node_modules
 .js
+static/*.js
+static/*.map
 *~
 tmp/
 
