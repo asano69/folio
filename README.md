@@ -20,3 +20,49 @@
 - 各ページに、落書きとマークダウンノートを作成することができる機能
 - 各ページに、タグをつけることができる機能
 - 複数ページのコレクションを作成することができる機能
+
+## プロジェクト構造
+実装する構造:
+```
+openbook
+├── cmd
+│   └── server
+│       └── main.go
+├── go.mod
+├── internal
+│   ├── config
+│   │   └── config.go
+│   ├── handlers
+│   │   ├── books.go
+│   │   ├── images.go
+│   │   └── viewer.go
+│   └── server
+│       └── server.go
+├── src
+│   ├── main.ts
+│   ├── tsconfig.json
+│   ├── ui
+│   │   └── components.ts
+│   └── viewer
+│       ├── display.ts
+│       └── navigation.ts
+├── static
+│   ├── app.js
+│   ├── app.js.map
+│   └── style.css
+├── templates
+│   ├── books.html
+│   ├── layout.html
+│   └── viewer.html
+```
+
+TypeScriptの詳細構成:
+```
+src/
+├── main.ts              # エントリポイント
+├── viewer/
+│   ├── navigation.ts    # ページナビゲーション
+│   └── display.ts       # 画像表示制御
+└── ui/
+    └── components.ts    # UI部品・イベント処理
+```
