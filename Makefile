@@ -1,18 +1,14 @@
 MAKEOPTS := "-r"
 
 # Tools
-TSC     := tsc
 ESBUILD := esbuild
 
-# Paths (override if needed)
-JS_DIR  := .js
+# Paths
 SRC_DIR := src
 
 # App
-APP := app.js
-OUT := static/$(APP)
-
-FLAG := $(JS_DIR)/.tsflag
+ENTRY := $(SRC_DIR)/main.ts
+OUT   := static/app.js
 
 # ─────────────────────────────────────────
 # Default: build & run
@@ -24,12 +20,12 @@ all: $(OUT)
 # ─────────────────────────────────────────
 # Build
 # ─────────────────────────────────────────
-$(OUT): $(FLAG)
-	$(ESBUILD) --bundle $(JS_DIR)/$(APP) > $@
-
-$(FLAG): $(shell find $(SRC_DIR) -type f)
-	$(TSC) -p $(SRC_DIR)
-	touch $@
+$(OUT): $(shell find $(SRC_DIR) -type f)
+	$(ESBUILD) $(ENTRY) \
+		--bundle \
+		--format=esm \
+		--sourcemap \
+		--outfile=$(OUT)
 
 # ─────────────────────────────────────────
 # Development
@@ -54,8 +50,7 @@ docker-build:
 # ─────────────────────────────────────────
 .PHONY: clean
 clean:
-	rm -rf $(JS_DIR)
-	rm -f  $(OUT)
+	rm -f $(OUT)
 
 # ─────────────────────────────────────────
 # Help
@@ -63,6 +58,3 @@ clean:
 .PHONY: help
 help:
 	@echo "Usage: make [target]"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| sort \
-		| awk 'BEGIN {FS=":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
