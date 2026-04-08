@@ -3,9 +3,8 @@ data/
 *.db
 
 node_modules
-.js
-static/*.js
-static/*.map
+static/app.js
+static/app.js.map
 *~
 
 tmp/
