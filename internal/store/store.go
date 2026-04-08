@@ -67,17 +67,7 @@ func Open(dataPath string) (*Store, error) {
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
 
-	migrate(db)
-
 	return &Store{db: db}, nil
-}
-
-// migrate applies incremental schema changes to existing databases.
-// Each statement is expected to fail silently when already applied.
-func migrate(db *sql.DB) {
-	// Add hash column to pages for databases created before this column existed.
-	// SQLite returns an error if the column already exists; that is expected and ignored.
-	db.Exec(`ALTER TABLE pages ADD COLUMN hash TEXT NOT NULL DEFAULT ''`)
 }
 
 func (s *Store) Close() error {
