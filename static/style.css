@@ -1,0 +1,212 @@
+/* Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: #f5f5f5;
+}
+
+/* Header */
+header {
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+header h1 a {
+    color: #333;
+    text-decoration: none;
+}
+
+header h1 a:hover {
+    color: #666;
+}
+
+/* Main */
+main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Books Grid */
+.books-container h2 {
+    margin-bottom: 1.5rem;
+    font-size: 1.8rem;
+    color: #222;
+}
+
+.books-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.book-card {
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.book-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.book-card a {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.book-thumbnail {
+    width: 100%;
+    height: 280px;
+    overflow: hidden;
+    background: #f0f0f0;
+}
+
+.book-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.book-card h3 {
+    padding: 1rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.page-count {
+    padding: 0 1rem 1rem;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.no-books {
+    color: #666;
+    font-size: 1.1rem;
+    text-align: center;
+    padding: 3rem;
+}
+
+/* Viewer */
+.viewer-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.viewer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.viewer-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.page-info {
+    color: #666;
+    font-size: 1rem;
+}
+
+.viewer-navigation {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+}
+
+.nav-btn {
+    padding: 0.75rem 1.5rem;
+    background: #007bff;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.nav-btn:hover:not(.disabled) {
+    background: #0056b3;
+}
+
+.nav-btn.disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.nav-btn.home-btn {
+    background: #6c757d;
+}
+
+.nav-btn.home-btn:hover {
+    background: #545b62;
+}
+
+.viewer-image {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    background: #fafafa;
+    border-radius: 4px;
+    padding: 1rem;
+}
+
+.viewer-image img {
+    max-width: 100%;
+    height: auto;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.viewer-controls {
+    display: flex;
+    justify-content: center;
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.page-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.page-selector label {
+    font-weight: 500;
+}
+
+.page-selector select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.page-selector select:focus {
+    outline: none;
+    border-color: #007bff;
+}
