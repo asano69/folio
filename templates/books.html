@@ -8,11 +8,13 @@
         {{range .Books}}
         <div class="book-card">
             <a href="/viewer?book={{.ID}}">
-                {{if .CoverFilename}}
                 <div class="book-thumbnail">
-                    <img src="/images/{{.ID}}/{{.CoverFilename}}" alt="{{.Title}} cover">
+                    {{if .HasThumbnail}}
+                    <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
+                    {{else}}
+                    <div class="thumbnail-placeholder">No thumbnail</div>
+                    {{end}}
                 </div>
-                {{end}}
             </a>
             <div class="book-info">
                 <h3 class="book-title" data-book-id="{{.ID}}">

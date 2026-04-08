@@ -58,6 +58,35 @@ func (s *Store) UpsertPages(bookID string, pages []storage.Page) error {
 	return tx.Commit()
 }
 
+// UpsertThumbnail inserts or replaces a thumbnail for a book.
+func (s *Store) UpsertThumbnail(bookID string, data []byte) error {
+	_, err := s.db.Exec(`
+		INSERT INTO thumbnails (book_id, data)
+		VALUES (?, ?)
+		ON CONFLICT(book_id) DO UPDATE SET
+			data       = excluded.data,
+			created_at = CURRENT_TIMESTAMP
+	`, bookID, data)
+	return err
+}
+
+// GetThumbnail returns the JPEG thumbnail bytes for a book, or nil if not found.
+func (s *Store) GetThumbnail(bookID string) ([]byte, error) {
+	var data []byte
+	err := s.db.QueryRow(`SELECT data FROM thumbnails WHERE book_id = ?`, bookID).Scan(&data)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return data, err
+}
+
+// HasThumbnail reports whether a thumbnail exists for the given book.
+func (s *Store) HasThumbnail(bookID string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM thumbnails WHERE book_id = ?`, bookID).Scan(&count)
+	return count > 0, err
+}
+
 // UpdateBookTitle updates the title of an existing book.
 func (s *Store) UpdateBookTitle(id, title string) error {
 	_, err := s.db.Exec(`UPDATE books SET title = ? WHERE id = ?`, title, id)

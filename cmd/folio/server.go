@@ -66,6 +66,12 @@ func (s *server) setupRoutes() {
 		Store: s.store,
 	})
 
+	// Serves pre-generated JPEG thumbnails from the DB.
+	s.mux.Handle("/thumbnails/", &handlers.ThumbnailHandler{
+		Store: s.store,
+	})
+
+	// Handles PUT /api/books/{id} and POST /api/books/{id}/thumbnail.
 	s.mux.Handle("/api/books/", &handlers.APIHandler{
 		Store: s.store,
 	})

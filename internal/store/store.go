@@ -28,6 +28,12 @@ CREATE TABLE IF NOT EXISTS pages (
     filename    TEXT NOT NULL,
     UNIQUE(book_id, number)
 );
+
+CREATE TABLE IF NOT EXISTS thumbnails (
+    book_id     TEXT PRIMARY KEY REFERENCES books(id),
+    data        BLOB NOT NULL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `
 
 func Open(dataPath string) (*Store, error) {

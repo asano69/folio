@@ -14,9 +14,9 @@ type BooksHandler struct {
 
 // bookView is the template model for a single book card.
 type bookView struct {
-	ID            string
-	Title         string
-	CoverFilename string
+	ID           string
+	Title        string
+	HasThumbnail bool
 }
 
 func (h *BooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -28,11 +28,12 @@ func (h *BooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	views := make([]bookView, 0, len(books))
 	for _, b := range books {
-		bv := bookView{ID: b.ID, Title: b.Title}
-		if cover, err := h.Store.GetCoverPage(b.ID); err == nil && cover != nil {
-			bv.CoverFilename = cover.Filename
-		}
-		views = append(views, bv)
+		has, _ := h.Store.HasThumbnail(b.ID)
+		views = append(views, bookView{
+			ID:           b.ID,
+			Title:        b.Title,
+			HasThumbnail: has,
+		})
 	}
 
 	data := struct {
