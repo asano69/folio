@@ -1,0 +1,54 @@
+package store
+
+import (
+	"database/sql"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	_ "github.com/mattn/go-sqlite3"
+)
+
+type Store struct {
+	db *sql.DB
+}
+
+const schema = `
+CREATE TABLE IF NOT EXISTS books (
+    id          TEXT PRIMARY KEY,
+    title       TEXT NOT NULL,
+    source      TEXT NOT NULL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id     TEXT NOT NULL REFERENCES books(id),
+    number      INTEGER NOT NULL,
+    filename    TEXT NOT NULL,
+    UNIQUE(book_id, number)
+);
+`
+
+func Open(dataPath string) (*Store, error) {
+	if err := os.MkdirAll(dataPath, 0755); err != nil {
+		return nil, fmt.Errorf("create data dir: %w", err)
+	}
+
+	dbPath := filepath.Join(dataPath, "folio.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open db: %w", err)
+	}
+
+	if _, err := db.Exec(schema); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("init schema: %w", err)
+	}
+
+	return &Store{db: db}, nil
+}
+
+func (s *Store) Close() error {
+	return s.db.Close()
+}

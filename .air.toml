@@ -1,7 +1,7 @@
 
 [build]
-  cmd = "make static/app.js  && go build -o ./tmp/server ./cmd/server"
-  bin = "./tmp/server"
+  cmd = "make static/app.js  && CGO_ENABLED=1 go build -o ./tmp/folio ./cmd/folio"
+  bin = "./tmp/folio"
   include_ext = ["go", "ts", "html"]
   include_dir = ["cmd", "internal", "src", "static"]
   exclude_dir = ["tmp", ".js"]

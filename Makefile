@@ -15,7 +15,7 @@ OUT   := static/app.js
 # ─────────────────────────────────────────
 .PHONY: all
 all: $(OUT)
-	go run cmd/server/main.go
+		CGO_ENABLED=1 go run cmd/folio/main.go
 
 # ─────────────────────────────────────────
 # Build

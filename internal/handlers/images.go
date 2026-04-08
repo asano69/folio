@@ -1,36 +1,61 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
-	"folio/internal/library"
 	"path/filepath"
 	"strings"
+
+	"folio/internal/storage"
+	"folio/internal/store"
 )
 
 type ImageHandler struct {
-	Library *library.Library
+	Store *store.Store
 }
 
+// ServeHTTP handles /images/{bookID}/{filename}
 func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// URLパスから /images/ プレフィックスを除去
-	imagePath := strings.TrimPrefix(r.URL.Path, "/images/")
+	// Strip /images/ prefix, leaving "{bookID}/{filename}"
+	trimmed := strings.TrimPrefix(r.URL.Path, "/images/")
+	parts := strings.SplitN(trimmed, "/", 2)
+	if len(parts) != 2 {
+		http.Error(w, "invalid image path", http.StatusBadRequest)
+		return
+	}
+	bookID, filename := parts[0], parts[1]
 
-	// パストラバーサル攻撃を防ぐ
-	if strings.Contains(imagePath, "..") {
-		http.Error(w, "Invalid path", http.StatusBadRequest)
+	// Basic path safety check.
+	if strings.Contains(filename, "..") {
+		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
 
-	// 拡張子チェック
-	ext := strings.ToLower(filepath.Ext(imagePath))
+	ext := strings.ToLower(filepath.Ext(filename))
 	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
-		http.Error(w, "Invalid file type", http.StatusBadRequest)
+		http.Error(w, "invalid file type", http.StatusBadRequest)
 		return
 	}
 
-	// 実際のファイルパスを構築
-	fullPath := filepath.Join(h.Library.Path, imagePath)
+	book, err := h.Store.GetBook(bookID)
+	if err != nil || book == nil {
+		http.NotFound(w, r)
+		return
+	}
 
-	// ファイルを配信
-	http.ServeFile(w, r, fullPath)
+	rc, err := storage.OpenPage(book.Source, filename)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer rc.Close()
+
+	switch ext {
+	case ".png":
+		w.Header().Set("Content-Type", "image/png")
+	default:
+		w.Header().Set("Content-Type", "image/jpeg")
+	}
+
+	io.Copy(w, rc)
 }

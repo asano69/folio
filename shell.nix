@@ -8,6 +8,8 @@ pkgs.mkShell {
     pkgs.esbuild
     pkgs.nodePackages.less
     pkgs.air
+    pkgs.sqlite
+    pkgs.pkg-config
   ];
 
   shellHook = ''

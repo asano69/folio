@@ -31,7 +31,7 @@
 
     {{if .CurrentPage}}
     <div class="viewer-image">
-        <img src="/images/{{.CurrentPage.Path}}" alt="Page {{.PageNum}}" id="page-image">
+        <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
     </div>
     {{end}}
 
@@ -39,9 +39,9 @@
         <div class="page-selector">
             <label for="page-select">Jump to page:</label>
             <select id="page-select" data-book-id="{{.Book.ID}}">
-                {{range $i, $page := .Book.Pages}}
-                <option value="{{inc $i}}" {{if eq (inc $i) $.PageNum}}selected{{end}}>
-                    Page {{inc $i}}
+                {{range .Pages}}
+                <option value="{{.Number}}" {{if eq .Number $.PageNum}}selected{{end}}>
+                    Page {{.Number}}
                 </option>
                 {{end}}
             </select>

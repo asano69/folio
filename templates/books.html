@@ -8,13 +8,12 @@
         {{range .Books}}
         <div class="book-card">
             <a href="/viewer?book={{.ID}}">
-                {{if .Pages}}
+                {{if .CoverFilename}}
                 <div class="book-thumbnail">
-                    <img src="/images/{{(index .Pages 0).Path}}" alt="{{.Title}} cover">
+                    <img src="/images/{{.ID}}/{{.CoverFilename}}" alt="{{.Title}} cover">
                 </div>
                 {{end}}
                 <h3>{{.Title}}</h3>
-                <p class="page-count">{{len .Pages}} pages</p>
             </a>
         </div>
         {{end}}
