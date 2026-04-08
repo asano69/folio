@@ -1,4 +1,4 @@
-# Openbook Design Document
+# Folio Design Document
 
 ## Overview
 
@@ -21,7 +21,7 @@ Manages metadata only; the image files themselves are never modified.
 
 ### Library Layout
 
-The library root is specified via the `OPENBOOK_LIBRARY_PATH` environment variable.
+The library root is specified via the `FOLIO_LIBRARY_PATH` environment variable.
 Subdirectories are purely for the user's own organization and carry no meaning to the application.
 Scanning is recursive: all `.cbz` files found under the library root are registered.
 
@@ -37,11 +37,13 @@ library/
 
 ### CBZ Format
 
-CBZ is a ZIP archive. Page images and a `metadata.json` file are stored at the root of the archive.
+CBZ is a ZIP archive. Page images and a `folio.json` file are stored at the root of the archive.
+Using `folio.json` rather than a generic name like `metadata.json` avoids conflicts with other
+CBZ tools (e.g. ComicRack uses `ComicInfo.xml`).
 
 ```
 book-a.cbz (ZIP)
-├── metadata.json
+├── folio.json
 ├── 001.jpg
 ├── 002.jpg
 └── 003.jpg
@@ -64,15 +66,15 @@ so a single page can be extracted with a seek + decompress of that entry alone.
 
 ## Book Identity
 
-Book identity is managed by a UUID stored inside `metadata.json` within the CBZ.
+Book identity is managed by a UUID stored inside `folio.json` within the CBZ.
 This decouples identity from file location, so moving a CBZ between subdirectories does not lose its metadata.
 
 **Scan logic:**
 
 ```
 Open CBZ
-  ├─ metadata.json exists → read UUID
-  └─ metadata.json missing → generate UUID, write metadata.json into CBZ
+  ├─ folio.json exists → read UUID
+  └─ folio.json missing → generate UUID, write folio.json into CBZ
 
 UUID exists in DB → update source path only (file may have moved)
 UUID missing in DB → insert new record
@@ -82,13 +84,13 @@ UUID missing in DB → insert new record
 
 ## Database
 
-SQLite. The database path is specified via the `OPENBOOK_DATA_PATH` environment variable.
+SQLite. The database path is specified via the `FOLIO_DATA_PATH` environment variable.
 
 ### Phase 1 (implement now)
 
 ```sql
 CREATE TABLE books (
-    id          TEXT PRIMARY KEY,   -- UUID from metadata.json
+    id          TEXT PRIMARY KEY,   -- UUID from folio.json
     title       TEXT NOT NULL,
     source      TEXT NOT NULL,      -- path relative to library root
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -192,10 +194,10 @@ All configuration is via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENBOOK_LIBRARY_PATH` | `./library` | Root directory for CBZ files |
-| `OPENBOOK_DATA_PATH` | `./data` | Directory for SQLite database |
-| `OPENBOOK_HOST` | `0.0.0.0` | Server bind address |
-| `OPENBOOK_PORT` | `3000` | Server port |
+| `FOLIO_LIBRARY_PATH` | `./library` | Root directory for CBZ files |
+| `FOLIO_DATA_PATH` | `./data` | Directory for SQLite database |
+| `FOLIO_HOST` | `0.0.0.0` | Server bind address |
+| `FOLIO_PORT` | `3000` | Server port |
 
 ---
 
