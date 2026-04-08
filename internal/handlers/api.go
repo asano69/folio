@@ -9,16 +9,36 @@ import (
 	"folio/internal/store"
 )
 
-// APIHandler handles REST API requests under /api/.
+// APIHandler handles REST API requests under /api/books/.
+//
+// Routes:
+//
+//	PUT  /api/books/{id}           — rename a book
+//	POST /api/books/{id}/thumbnail — regenerate thumbnail
 type APIHandler struct {
 	Store *store.Store
 }
 
 func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Route: /api/books/{id}
 	path := strings.TrimPrefix(r.URL.Path, "/api/books/")
-	bookID := strings.Trim(path, "/")
 
+	// POST /api/books/{id}/thumbnail
+	if strings.HasSuffix(path, "/thumbnail") {
+		bookID := strings.TrimSuffix(path, "/thumbnail")
+		if bookID == "" || strings.Contains(bookID, "/") {
+			http.Error(w, "invalid book ID", http.StatusBadRequest)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		h.regenerateThumbnail(w, r, bookID)
+		return
+	}
+
+	// PUT /api/books/{id}
+	bookID := strings.Trim(path, "/")
 	if bookID == "" || strings.Contains(bookID, "/") {
 		http.Error(w, "invalid book ID", http.StatusBadRequest)
 		return
@@ -69,4 +89,27 @@ func (h *APIHandler) renameBook(w http.ResponseWriter, r *http.Request, bookID s
 		ID    string `json:"id"`
 		Title string `json:"title"`
 	}{ID: bookID, Title: title})
+}
+
+// regenerateThumbnail handles POST /api/books/{id}/thumbnail.
+// Generating thumbnails via an API endpoint allows future web UI integration.
+func (h *APIHandler) regenerateThumbnail(w http.ResponseWriter, r *http.Request, bookID string) {
+	book, err := h.Store.GetBook(bookID)
+	if err != nil || book == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	data, err := storage.GenerateThumbnail(book.Source)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.Store.UpsertThumbnail(bookID, data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
