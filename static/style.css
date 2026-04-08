@@ -94,14 +94,15 @@ main {
     gap: 0.5rem;
 }
 
-.book-title-link {
+.book-title {
     flex: 1;
     min-width: 0;
-}
-
-.book-title-link h3 {
     font-size: 1.1rem;
     font-weight: 500;
+}
+
+.book-title a {
+    display: block;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
