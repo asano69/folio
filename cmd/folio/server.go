@@ -65,6 +65,10 @@ func (s *server) setupRoutes() {
 	s.mux.Handle("/images/", &handlers.ImageHandler{
 		Store: s.store,
 	})
+
+	s.mux.Handle("/api/books/", &handlers.APIHandler{
+		Store: s.store,
+	})
 }
 
 func (s *server) Start() error {

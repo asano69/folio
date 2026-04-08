@@ -1,6 +1,8 @@
 import { initViewer } from './viewer/navigation';
+import { initRename } from './ui/rename';
 
-// ページロード時に初期化
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
   initViewer();
+  initRename();
 });

@@ -58,6 +58,12 @@ func (s *Store) UpsertPages(bookID string, pages []storage.Page) error {
 	return tx.Commit()
 }
 
+// UpdateBookTitle updates the title of an existing book.
+func (s *Store) UpdateBookTitle(id, title string) error {
+	_, err := s.db.Exec(`UPDATE books SET title = ? WHERE id = ?`, title, id)
+	return err
+}
+
 // ListBooks returns all books ordered by title.
 func (s *Store) ListBooks() ([]Book, error) {
 	rows, err := s.db.Query(`SELECT id, title, source FROM books ORDER BY title`)

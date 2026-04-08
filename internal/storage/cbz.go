@@ -84,6 +84,28 @@ func OpenPage(cbzPath, filename string) (io.ReadCloser, error) {
 	return nil, fmt.Errorf("page %s not found in %s", filename, cbzPath)
 }
 
+// UpdateTitle rewrites the title field in folio.json inside the CBZ archive.
+func UpdateTitle(cbzPath, newTitle string) error {
+	r, err := zip.OpenReader(cbzPath)
+	if err != nil {
+		return fmt.Errorf("open cbz %s: %w", cbzPath, err)
+	}
+
+	meta, err := readMeta(r)
+	if err != nil {
+		r.Close()
+		return err
+	}
+	if meta == nil {
+		r.Close()
+		return fmt.Errorf("folio.json not found in %s", cbzPath)
+	}
+
+	meta.Title = newTitle
+	// writeMeta closes r before overwriting the file.
+	return writeMeta(cbzPath, r, meta)
+}
+
 type pageReader struct {
 	rc  io.ReadCloser
 	zip *zip.ReadCloser

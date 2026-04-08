@@ -86,10 +86,59 @@ main {
     object-fit: cover;
 }
 
-.book-card h3 {
-    padding: 1rem;
+/* Book title row with inline rename support */
+.book-info {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    gap: 0.5rem;
+}
+
+.book-title-link {
+    flex: 1;
+    min-width: 0;
+}
+
+.book-title-link h3 {
     font-size: 1.1rem;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rename-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #bbb;
+    padding: 0.25rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.book-card:hover .rename-btn {
+    opacity: 1;
+}
+
+.rename-btn:hover {
+    color: #555;
+}
+
+.rename-input {
+    flex: 1;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 1.1rem;
+    font-weight: 500;
+    border: 1px solid #007bff;
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    outline: none;
 }
 
 .page-count {
