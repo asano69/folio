@@ -9,4 +9,4 @@ static/*.map
 *~
 
 tmp/
-foilo
+#folio
