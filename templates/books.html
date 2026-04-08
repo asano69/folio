@@ -15,9 +15,9 @@
                 {{end}}
             </a>
             <div class="book-info">
-                <a href="/viewer?book={{.ID}}" class="book-title-link">
-                    <h3 class="book-title" data-book-id="{{.ID}}">{{.Title}}</h3>
-                </a>
+                <h3 class="book-title" data-book-id="{{.ID}}">
+                    <a href="/viewer?book={{.ID}}">{{.Title}}</a>
+                </h3>
                 <button class="rename-btn" data-book-id="{{.ID}}" title="Rename">✎</button>
             </div>
         </div>

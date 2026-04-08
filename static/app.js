@@ -53,7 +53,8 @@ function initRename() {
   });
 }
 async function startRename(titleEl, bookId) {
-  const currentTitle = titleEl.textContent ?? "";
+  const linkEl = titleEl.querySelector("a");
+  const currentTitle = (linkEl ?? titleEl).textContent ?? "";
   const input = document.createElement("input");
   input.type = "text";
   input.value = currentTitle;
@@ -75,13 +76,10 @@ async function startRename(titleEl, bookId) {
           body: JSON.stringify({ title: newTitle })
         });
         if (!res.ok) throw new Error(`rename failed: ${res.status}`);
-        titleEl.textContent = newTitle;
+        (linkEl ?? titleEl).textContent = newTitle;
       } catch (err) {
         console.error(err);
-        titleEl.textContent = currentTitle;
       }
-    } else {
-      titleEl.textContent = currentTitle;
     }
     input.replaceWith(titleEl);
   };

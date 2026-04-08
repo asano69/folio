@@ -6,6 +6,9 @@ export function initRename(): void {
       const bookId = btn.dataset.bookId;
       if (!bookId) return;
 
+      // The h3 is a direct flex child of .book-info; replacing it with an
+      // input keeps the input as a flex child, avoiding the HTML restriction
+      // against placing interactive content inside <a>.
       const titleEl = document.querySelector<HTMLElement>(
         `.book-title[data-book-id="${bookId}"]`
       );
@@ -17,13 +20,16 @@ export function initRename(): void {
 }
 
 async function startRename(titleEl: HTMLElement, bookId: string): Promise<void> {
-  const currentTitle = titleEl.textContent ?? '';
+  // Read the visible text from the inner <a> if present, otherwise the element itself.
+  const linkEl = titleEl.querySelector<HTMLAnchorElement>('a');
+  const currentTitle = (linkEl ?? titleEl).textContent ?? '';
 
   const input = document.createElement('input');
   input.type = 'text';
   input.value = currentTitle;
   input.className = 'rename-input';
 
+  // Replace the h3 with the input; input becomes a flex child of .book-info.
   titleEl.replaceWith(input);
   input.focus();
   input.select();
@@ -45,13 +51,11 @@ async function startRename(titleEl: HTMLElement, bookId: string): Promise<void> 
           body: JSON.stringify({ title: newTitle }),
         });
         if (!res.ok) throw new Error(`rename failed: ${res.status}`);
-        titleEl.textContent = newTitle;
+        // Update the link text inside the h3 without touching the href.
+        (linkEl ?? titleEl).textContent = newTitle;
       } catch (err) {
         console.error(err);
-        titleEl.textContent = currentTitle;
       }
-    } else {
-      titleEl.textContent = currentTitle;
     }
 
     input.replaceWith(titleEl);
