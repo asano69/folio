@@ -71,7 +71,7 @@ func OpenPage(cbzPath, filename string) (io.ReadCloser, error) {
 				r.Close()
 				return nil, err
 			}
-			// Wrap so closing also closes the zip reader.
+			// Wrap so closing the page reader also closes the zip reader.
 			return &pageReader{rc: rc, zip: r}, nil
 		}
 	}
@@ -123,23 +123,15 @@ func writeMeta(path string, r *zip.ReadCloser, meta *folioMeta) error {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
-	// Copy existing entries.
+	// Copy existing entries using w.Copy, which transfers raw compressed
+	// bytes directly and avoids a decompress/recompress round-trip that
+	// would otherwise cause CRC32 mismatches.
 	for _, f := range r.File {
 		if f.Name == metaFile {
-			continue // will be replaced
+			continue // will be replaced below
 		}
-		fw, err := w.CreateHeader(&f.FileHeader)
-		if err != nil {
+		if err := w.Copy(f); err != nil {
 			return err
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		_, copyErr := io.Copy(fw, rc)
-		rc.Close()
-		if copyErr != nil {
-			return copyErr
 		}
 	}
 
