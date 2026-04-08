@@ -7,6 +7,7 @@ import (
 
 type Config struct {
 	LibraryPath string
+	DataPath    string
 	Host        string
 	Port        int
 }
@@ -14,6 +15,7 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		LibraryPath: getEnv("FOLIO_LIBRARY_PATH", "./library"),
+		DataPath:    getEnv("FOLIO_DATA_PATH", "./data"),
 		Host:        getEnv("FOLIO_HOST", "0.0.0.0"),
 		Port:        getEnvInt("FOLIO_PORT", 3000),
 	}
@@ -35,7 +37,7 @@ func getEnvInt(key string, defaultValue int) int {
 	return defaultValue
 }
 
-// Address returns the full server address
+// Address returns the full server address string.
 func (c *Config) Address() string {
 	return c.Host + ":" + strconv.Itoa(c.Port)
 }

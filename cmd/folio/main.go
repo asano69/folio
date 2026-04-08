@@ -31,6 +31,18 @@ func main() {
 	}
 }
 
+func runServer(cfg *config.Config) {
+	srv, err := New(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "server: %v\n", err)
+		os.Exit(1)
+	}
+	if err := srv.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "server: %v\n", err)
+		os.Exit(1)
+	}
+}
+
 func runScan(cfg *config.Config) error {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
