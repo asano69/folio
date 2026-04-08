@@ -1,13 +1,20 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
+	"log"
+	"openbook/internal/config"
+	"openbook/internal/server"
 )
 
 func main() {
-	fmt.Println("openbook server started")
+	cfg := config.Load()
 
-	http.Handle("/", http.FileServer(http.Dir("./static")))
-	http.ListenAndServe(":3000", nil)
+	srv, err := server.New(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := srv.Start(); err != nil {
+		log.Fatalf("Server error: %v", err)
+	}
 }

@@ -1,0 +1,51 @@
+{{define "title"}}{{.Book.Title}} - Openbook{{end}}
+
+{{define "content"}}
+<div class="viewer-container">
+    <div class="viewer-header">
+        <h2>{{.Book.Title}}</h2>
+        <div class="page-info">
+            Page {{.PageNum}} / {{.TotalPages}}
+        </div>
+    </div>
+
+    <div class="viewer-navigation">
+        {{if .HasPrev}}
+        <a href="/viewer?book={{.Book.ID}}&page={{sub .PageNum 1}}" class="nav-btn prev-btn">
+            ← Previous
+        </a>
+        {{else}}
+        <span class="nav-btn prev-btn disabled">← Previous</span>
+        {{end}}
+
+        <a href="/" class="nav-btn home-btn">Back to Library</a>
+
+        {{if .HasNext}}
+        <a href="/viewer?book={{.Book.ID}}&page={{add .PageNum 1}}" class="nav-btn next-btn">
+            Next →
+        </a>
+        {{else}}
+        <span class="nav-btn next-btn disabled">Next →</span>
+        {{end}}
+    </div>
+
+    {{if .CurrentPage}}
+    <div class="viewer-image">
+        <img src="/images/{{.CurrentPage.Path}}" alt="Page {{.PageNum}}" id="page-image">
+    </div>
+    {{end}}
+
+    <div class="viewer-controls">
+        <div class="page-selector">
+            <label for="page-select">Jump to page:</label>
+            <select id="page-select" data-book-id="{{.Book.ID}}">
+                {{range $i, $page := .Book.Pages}}
+                <option value="{{inc $i}}" {{if eq (inc $i) $.PageNum}}selected{{end}}>
+                    Page {{inc $i}}
+                </option>
+                {{end}}
+            </select>
+        </div>
+    </div>
+</div>
+{{end}}

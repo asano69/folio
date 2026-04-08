@@ -1,0 +1,26 @@
+{{define "title"}}Books - Openbook{{end}}
+
+{{define "content"}}
+<div class="books-container">
+    <h2>Library</h2>
+    {{if .Books}}
+    <div class="books-grid">
+        {{range .Books}}
+        <div class="book-card">
+            <a href="/viewer?book={{.ID}}">
+                {{if .Pages}}
+                <div class="book-thumbnail">
+                    <img src="/images/{{(index .Pages 0).Path}}" alt="{{.Title}} cover">
+                </div>
+                {{end}}
+                <h3>{{.Title}}</h3>
+                <p class="page-count">{{len .Pages}} pages</p>
+            </a>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="no-books">No books found in library.</p>
+    {{end}}
+</div>
+{{end}}
