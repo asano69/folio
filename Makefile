@@ -15,7 +15,7 @@ OUT   := static/app.js
 # ─────────────────────────────────────────
 .PHONY: all
 all: $(OUT)
-	go run cmd/folio/main.go server
+	go run ./cmd/folio/ server
 
 # ─────────────────────────────────────────
 # Build
