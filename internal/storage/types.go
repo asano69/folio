@@ -12,4 +12,5 @@ type Book struct {
 type Page struct {
 	Number   int
 	Filename string // entry name inside the CBZ
+	Hash     string // SHA-256 of the uncompressed image bytes
 }

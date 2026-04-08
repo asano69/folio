@@ -75,6 +75,11 @@ func (s *server) setupRoutes() {
 	s.mux.Handle("/api/books/", &handlers.APIHandler{
 		Store: s.store,
 	})
+
+	// Handles PUT /api/pages/{bookID}/{pageNumber}.
+	s.mux.Handle("/api/pages/", &handlers.PagesAPIHandler{
+		Store: s.store,
+	})
 }
 
 func (s *server) Start() error {

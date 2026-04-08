@@ -3,6 +3,8 @@ package storage
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,7 +53,10 @@ func openCBZ(path string) (Book, error) {
 		meta = m
 	}
 
-	pages := listPages(r)
+	pages, err := listPages(r)
+	if err != nil {
+		return Book{}, err
+	}
 
 	return Book{
 		ID:     meta.ID,
@@ -189,7 +194,8 @@ func writeMeta(path string, r *zip.ReadCloser, meta *folioMeta) error {
 }
 
 // listPages returns image entries from an open zip, sorted by filename.
-func listPages(r *zip.ReadCloser) []Page {
+// Each page's Hash is computed as the SHA-256 of its uncompressed bytes.
+func listPages(r *zip.ReadCloser) ([]Page, error) {
 	var pages []Page
 	for _, f := range r.File {
 		if f.FileInfo().IsDir() {
@@ -199,7 +205,13 @@ func listPages(r *zip.ReadCloser) []Page {
 		if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
 			continue
 		}
-		pages = append(pages, Page{Filename: f.Name})
+
+		hash, err := hashEntry(f)
+		if err != nil {
+			return nil, fmt.Errorf("hash %s: %w", f.Name, err)
+		}
+
+		pages = append(pages, Page{Filename: f.Name, Hash: hash})
 	}
 
 	sort.Slice(pages, func(i, j int) bool {
@@ -210,5 +222,20 @@ func listPages(r *zip.ReadCloser) []Page {
 		pages[i].Number = i + 1
 	}
 
-	return pages
+	return pages, nil
+}
+
+// hashEntry computes the SHA-256 of a zip entry's uncompressed bytes.
+func hashEntry(f *zip.File) (string, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return "", err
+	}
+	defer rc.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, rc); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

@@ -51,6 +51,17 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		currentPage = &pages[pageNum-1]
 	}
 
+	// Fetch note keyed by the page's content hash, which is stable across
+	// re-scans and CBZ page deletions.
+	var note store.Note
+	if currentPage != nil {
+		note, err = h.Store.GetNote(bookID, currentPage.Hash)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	data := struct {
 		Book        *store.Book
 		CurrentPage *store.Page
@@ -59,6 +70,8 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		TotalPages  int
 		HasPrev     bool
 		HasNext     bool
+		Note        store.Note
+		Attributes  []store.AttributeOption
 	}{
 		Book:        book,
 		CurrentPage: currentPage,
@@ -67,6 +80,8 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		TotalPages:  totalPages,
 		HasPrev:     pageNum > 1,
 		HasNext:     pageNum < totalPages,
+		Note:        note,
+		Attributes:  store.AllAttributeOptions,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {

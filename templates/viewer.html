@@ -4,8 +4,15 @@
 <div class="viewer-container">
     <div class="viewer-header">
         <h2>{{.Book.Title}}</h2>
-        <div class="page-info">
-            Page {{.PageNum}} / {{.TotalPages}}
+        <div class="viewer-header-right">
+            <div class="page-info">
+                Page {{.PageNum}} / {{.TotalPages}}
+                <span id="page-title-badge" class="page-title-badge"{{if not .Note.Title}} hidden{{end}}>{{.Note.Title}}</span>
+                <span id="page-attr-badge" class="page-attr-badge attr-{{.Note.Attribute}}"{{if not .Note.Attribute}} hidden{{end}}>{{.Note.Attribute}}</span>
+            </div>
+            {{if .CurrentPage}}
+            <button class="edit-toggle-btn" id="edit-toggle">✎ Edit</button>
+            {{end}}
         </div>
     </div>
 
@@ -32,6 +39,44 @@
     {{if .CurrentPage}}
     <div class="viewer-image">
         <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
+    </div>
+    {{end}}
+
+    {{if .Note.Body}}
+    <div class="page-note" id="page-note">
+        <pre class="note-body" id="note-body">{{.Note.Body}}</pre>
+    </div>
+    {{else}}
+    <div class="page-note" id="page-note" hidden>
+        <pre class="note-body" id="note-body"></pre>
+    </div>
+    {{end}}
+
+    {{if .CurrentPage}}
+    <div class="edit-panel" id="edit-panel" hidden
+         data-book-id="{{.Book.ID}}"
+         data-page-hash="{{.CurrentPage.Hash}}">
+        <div class="edit-field">
+            <label for="edit-title">Title</label>
+            <input type="text" id="edit-title" value="{{.Note.Title}}" placeholder="Page title">
+        </div>
+        <div class="edit-field">
+            <label for="edit-attribute">Attribute</label>
+            <select id="edit-attribute">
+                <option value="">— none —</option>
+                {{range .Attributes}}
+                <option value="{{.Value}}" {{if eq .Value $.Note.Attribute}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+            </select>
+        </div>
+        <div class="edit-field">
+            <label for="edit-body">Comment</label>
+            <textarea id="edit-body" rows="4" placeholder="Notes for this page...">{{.Note.Body}}</textarea>
+        </div>
+        <div class="edit-actions">
+            <button id="edit-save">Save</button>
+            <button id="edit-cancel">Cancel</button>
+        </div>
     </div>
     {{end}}
 

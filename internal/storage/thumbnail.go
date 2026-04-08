@@ -22,7 +22,10 @@ func GenerateThumbnail(cbzPath string) ([]byte, error) {
 	}
 	defer r.Close()
 
-	pages := listPages(r)
+	pages, err := listPages(r)
+	if err != nil {
+		return nil, fmt.Errorf("list pages %s: %w", cbzPath, err)
+	}
 	if len(pages) == 0 {
 		return nil, fmt.Errorf("no image pages in %s", cbzPath)
 	}
