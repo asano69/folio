@@ -45,12 +45,13 @@ func (s *Server) setupRoutes() {
 	}
 
 	// テンプレート読み込み
-	booksTemplate := template.Must(template.New("").Funcs(funcMap).ParseFiles(
+
+	booksTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
 		"templates/layout.html",
 		"templates/books.html",
 	))
 
-	viewerTemplate := template.Must(template.New("").Funcs(funcMap).ParseFiles(
+	viewerTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
 		"templates/layout.html",
 		"templates/viewer.html",
 	))
