@@ -25,35 +25,46 @@
 実装する構造:
 ```
 folio
-├── cmd
-│   └── server
-│       └── main.go
+├── cmd/folio/
+│   ├── main.go        # エントリポイント。server / scan / thumbnail <uuid> サブコマンド
+│   └── server.go      # サーバ初期化・ルーティング
+├── internal/
+│   ├── config/
+│   │   └── config.go  # 環境変数ロード
+│   ├── storage/       # ファイルシステム・CBZ操作（DBの知識なし）
+│   │   ├── types.go   # Book / Page 型
+│   │   ├── cbz.go     # CBZ open / scan / folio.json read-write
+│   │   ├── scan.go    # ライブラリルートを再帰walk
+│   │   └── thumbnail.go # CBZからサムネイルJPEG生成
+│   ├── store/         # SQLite操作（ファイルシステムの知識なし）
+│   │   ├── store.go   # DB初期化・スキーマ定義
+│   │   └── queries.go # books / pages / thumbnails テーブルのCRUD
+│   └── handlers/      # HTTPハンドラ（storageとstoreを組み合わせる）
+│       ├── books.go   # GET /
+│       ├── viewer.go  # GET /viewer
+│       ├── images.go  # GET /images/{bookID}/{filename}
+│       ├── thumbnail.go # GET /thumbnails/{bookID}
+│       └── api.go     # PUT /api/books/{id}
+│                      # POST /api/books/{id}/thumbnail
+├── templates/
+│   ├── layout.html
+│   ├── books.html
+│   └── viewer.html
+├── static/
+│   ├── style.css
+│   ├── app.js
+│   └── app.js.map
+├── src/               # TypeScriptソース
+│   ├── main.ts
+│   ├── viewer/
+│   │   ├── navigation.ts
+│   │   └── display.ts
+│   └── ui/
+│       ├── components.ts
+│       └── rename.ts
 ├── go.mod
-├── internal
-│   ├── config
-│   │   └── config.go
-│   ├── handlers
-│   │   ├── books.go
-│   │   ├── images.go
-│   │   └── viewer.go
-│   └── server
-│       └── server.go
-├── src
-│   ├── main.ts
-│   ├── tsconfig.json
-│   ├── ui
-│   │   └── components.ts
-│   └── viewer
-│       ├── display.ts
-│       └── navigation.ts
-├── static
-│   ├── app.js
-│   ├── app.js.map
-│   └── style.css
-├── templates
-│   ├── books.html
-│   ├── layout.html
-│   └── viewer.html
+├── Makefile
+└── folio.env
 ```
 
 TypeScriptの詳細構成:
