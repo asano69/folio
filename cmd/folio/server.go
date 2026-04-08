@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"os"
 
 	"folio/internal/config"
 	"folio/internal/handlers"
@@ -15,18 +14,6 @@ type server struct {
 	config *config.Config
 	store  *store.Store
 	mux    *http.ServeMux
-}
-
-func runServer(cfg *config.Config) {
-	s, err := newServer(cfg)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "server: %v\n", err)
-		os.Exit(1)
-	}
-	if err := s.start(); err != nil {
-		fmt.Fprintf(os.Stderr, "server: %v\n", err)
-		os.Exit(1)
-	}
 }
 
 func newServer(cfg *config.Config) (*server, error) {
@@ -80,7 +67,7 @@ func (s *server) setupRoutes() {
 	})
 }
 
-func (s *server) start() error {
+func (s *server) Start() error {
 	addr := s.config.Address()
 	fmt.Printf("Starting server at %s\n", addr)
 	return http.ListenAndServe(addr, s.mux)

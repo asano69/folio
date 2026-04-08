@@ -27,6 +27,9 @@ $(OUT): $(shell find $(SRC_DIR) -type f)
 		--sourcemap \
 		--outfile=$(OUT)
 
+.PHONY: build
+build:
+	go build  ./cmd/folio
 # ─────────────────────────────────────────
 # Development
 # ─────────────────────────────────────────
@@ -51,7 +54,7 @@ docker-build:
 .PHONY: clean
 clean:
 	rm -f $(OUT)
-
+	rm folio
 # ─────────────────────────────────────────
 # Help
 # ─────────────────────────────────────────

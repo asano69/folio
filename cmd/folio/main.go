@@ -32,7 +32,7 @@ func main() {
 }
 
 func runServer(cfg *config.Config) {
-	srv, err := New(cfg)
+	srv, err := newServer(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "server: %v\n", err)
 		os.Exit(1)
