@@ -67,13 +67,9 @@ folio
 └── folio.env
 ```
 
-TypeScriptの詳細構成:
+DBテーブル
 ```
-src/
-├── main.ts              # エントリポイント
-├── viewer/
-│   ├── navigation.ts    # ページナビゲーション
-│   └── display.ts       # 画像表示制御
-└── ui/
-    └── components.ts    # UI部品・イベント処理
+books      — id / title / source
+pages      — id / book_id / number / filename
+thumbnails — book_id / data(BLOB) / created_at
 ```
