@@ -6,4 +6,4 @@ static/*.js
 static/*.map
 *~
 tmp/
-
+*.db

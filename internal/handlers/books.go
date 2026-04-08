@@ -20,12 +20,6 @@ type bookView struct {
 }
 
 func (h *BooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Only serve the root path; let the mux handle everything else.
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-
 	books, err := h.Store.ListBooks()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -34,14 +28,19 @@ func (h *BooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	views := make([]bookView, 0, len(books))
 	for _, b := range books {
-		v := bookView{ID: b.ID, Title: b.Title}
-		if p, err := h.Store.GetFirstPage(b.ID); err == nil && p != nil {
-			v.CoverFilename = p.Filename
+		bv := bookView{ID: b.ID, Title: b.Title}
+		if cover, err := h.Store.GetCoverPage(b.ID); err == nil && cover != nil {
+			bv.CoverFilename = cover.Filename
 		}
-		views = append(views, v)
+		views = append(views, bv)
 	}
 
-	data := struct{ Books []bookView }{Books: views}
+	data := struct {
+		Books []bookView
+	}{
+		Books: views,
+	}
+
 	if err := h.Template.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

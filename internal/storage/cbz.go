@@ -22,7 +22,7 @@ type folioMeta struct {
 }
 
 // openCBZ opens a CBZ file and returns its metadata and page list.
-// If folio.json is missing, a new UUID is generated and written into the archive.
+// If folio.json is missing, a new UUID v7 is generated and written into the archive.
 func openCBZ(path string) (Book, error) {
 	r, err := zip.OpenReader(path)
 	if err != nil {
@@ -37,8 +37,12 @@ func openCBZ(path string) (Book, error) {
 
 	// If no folio.json found, generate one and write it back.
 	if meta == nil {
+		id, err := uuid.NewV7()
+		if err != nil {
+			return Book{}, fmt.Errorf("generate uuid: %w", err)
+		}
 		m := &folioMeta{
-			ID:    uuid.NewString(),
+			ID:    id.String(),
 			Title: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
 		}
 		if err := writeMeta(path, r, m); err != nil {
@@ -71,7 +75,7 @@ func OpenPage(cbzPath, filename string) (io.ReadCloser, error) {
 				r.Close()
 				return nil, err
 			}
-			// Wrap so closing the page reader also closes the zip reader.
+			// Wrap so closing also closes the zip reader.
 			return &pageReader{rc: rc, zip: r}, nil
 		}
 	}
@@ -123,15 +127,23 @@ func writeMeta(path string, r *zip.ReadCloser, meta *folioMeta) error {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
-	// Copy existing entries using w.Copy, which transfers raw compressed
-	// bytes directly and avoids a decompress/recompress round-trip that
-	// would otherwise cause CRC32 mismatches.
+	// Copy existing entries.
 	for _, f := range r.File {
 		if f.Name == metaFile {
-			continue // will be replaced below
+			continue // will be replaced
 		}
-		if err := w.Copy(f); err != nil {
+		fw, err := w.CreateHeader(&f.FileHeader)
+		if err != nil {
 			return err
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		_, copyErr := io.Copy(fw, rc)
+		rc.Close()
+		if copyErr != nil {
+			return copyErr
 		}
 	}
 

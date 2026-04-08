@@ -4,38 +4,50 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 
 	"folio/internal/config"
 	"folio/internal/handlers"
 	"folio/internal/store"
 )
 
-type Server struct {
-	Config *config.Config
-	Store  *store.Store
-	Mux    *http.ServeMux
+type server struct {
+	config *config.Config
+	store  *store.Store
+	mux    *http.ServeMux
 }
 
-func New(cfg *config.Config) (*Server, error) {
+func runServer(cfg *config.Config) {
+	s, err := newServer(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "server: %v\n", err)
+		os.Exit(1)
+	}
+	if err := s.start(); err != nil {
+		fmt.Fprintf(os.Stderr, "server: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func newServer(cfg *config.Config) (*server, error) {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
 		return nil, fmt.Errorf("open store: %w", err)
 	}
 
-	s := &Server{
-		Config: cfg,
-		Store:  db,
-		Mux:    http.NewServeMux(),
+	s := &server{
+		config: cfg,
+		store:  db,
+		mux:    http.NewServeMux(),
 	}
 
 	s.setupRoutes()
 	return s, nil
 }
 
-func (s *Server) setupRoutes() {
-	// Static files.
+func (s *server) setupRoutes() {
 	fs := http.FileServer(http.Dir("./static"))
-	s.Mux.Handle("/static/", http.StripPrefix("/static/", fs))
+	s.mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
@@ -53,23 +65,23 @@ func (s *Server) setupRoutes() {
 		"templates/viewer.html",
 	))
 
-	s.Mux.Handle("/", &handlers.BooksHandler{
-		Store:    s.Store,
+	s.mux.Handle("/", &handlers.BooksHandler{
+		Store:    s.store,
 		Template: booksTemplate,
 	})
 
-	s.Mux.Handle("/viewer", &handlers.ViewerHandler{
-		Store:    s.Store,
+	s.mux.Handle("/viewer", &handlers.ViewerHandler{
+		Store:    s.store,
 		Template: viewerTemplate,
 	})
 
-	s.Mux.Handle("/images/", &handlers.ImageHandler{
-		Store: s.Store,
+	s.mux.Handle("/images/", &handlers.ImageHandler{
+		Store: s.store,
 	})
 }
 
-func (s *Server) Start() error {
-	addr := s.Config.Address()
+func (s *server) start() error {
+	addr := s.config.Address()
 	fmt.Printf("Starting server at %s\n", addr)
-	return http.ListenAndServe(addr, s.Mux)
+	return http.ListenAndServe(addr, s.mux)
 }

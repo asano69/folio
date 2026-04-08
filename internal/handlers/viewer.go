@@ -34,42 +34,39 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	totalPages := len(pages)
+
 	pageNum := 1
 	if pageNumStr != "" {
 		if n, err := strconv.Atoi(pageNumStr); err == nil && n > 0 {
 			pageNum = n
 		}
 	}
-
-	// Clamp page number to valid range.
-	if pageNum < 1 {
-		pageNum = 1
-	}
-	if pageNum > len(pages) {
-		pageNum = len(pages)
+	if pageNum > totalPages {
+		pageNum = totalPages
 	}
 
 	var currentPage *store.Page
-	if pageNum > 0 && pageNum <= len(pages) {
+	if totalPages > 0 {
 		currentPage = &pages[pageNum-1]
 	}
 
 	data := struct {
 		Book        *store.Book
-		Pages       []store.Page
 		CurrentPage *store.Page
+		Pages       []store.Page
 		PageNum     int
 		TotalPages  int
 		HasPrev     bool
 		HasNext     bool
 	}{
 		Book:        book,
-		Pages:       pages,
 		CurrentPage: currentPage,
+		Pages:       pages,
 		PageNum:     pageNum,
-		TotalPages:  len(pages),
+		TotalPages:  totalPages,
 		HasPrev:     pageNum > 1,
-		HasNext:     pageNum < len(pages),
+		HasNext:     pageNum < totalPages,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {
