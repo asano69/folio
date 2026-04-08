@@ -13,9 +13,9 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		LibraryPath: getEnv("OPENBOOK_LIBRARY_PATH", "./library"),
-		Host:        getEnv("OPENBOOK_HOST", "0.0.0.0"),
-		Port:        getEnvInt("OPENBOOK_PORT", 3000),
+		LibraryPath: getEnv("FOLIO_LIBRARY_PATH", "./library"),
+		Host:        getEnv("FOLIO_HOST", "0.0.0.0"),
+		Port:        getEnvInt("FOLIO_PORT", 3000),
 	}
 }
 
