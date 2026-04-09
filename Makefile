@@ -64,7 +64,7 @@ docker-build:
 # ─────────────────────────────────────────
 .PHONY: icon
 icon:
-	magick -background none src/leaf.svg \
+	magick -background none src/folio.svg \
 	  \( -clone 0 -resize 16x16 \) \
 	  \( -clone 0 -resize 32x32 \) \
 	  \( -clone 0 -resize 48x48 \) \
