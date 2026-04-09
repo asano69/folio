@@ -1,0 +1,117 @@
+/* Books grid */
+.books-container h2 {
+    margin-bottom: 1.5rem;
+    font-size: 1.8rem;
+    color: #222;
+}
+
+.books-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.book-card {
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.book-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.book-card a {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.book-thumbnail {
+    width: 100%;
+    height: 280px;
+    overflow: hidden;
+    background: #f0f0f0;
+}
+
+.book-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.thumbnail-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #aaa;
+    font-size: 0.9rem;
+}
+
+/* Book title row with inline rename support */
+.book-info {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    gap: 0.5rem;
+}
+
+.book-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.book-title a {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rename-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #bbb;
+    padding: 0.25rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.book-card:hover .rename-btn {
+    opacity: 1;
+}
+
+.rename-btn:hover {
+    color: #555;
+}
+
+.rename-input {
+    flex: 1;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 1.1rem;
+    font-weight: 500;
+    border: 1px solid #007bff;
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    outline: none;
+}
+
+.no-books {
+    color: #666;
+    font-size: 1.1rem;
+    text-align: center;
+    padding: 3rem;
+}

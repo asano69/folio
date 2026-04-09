@@ -6,30 +6,40 @@ ESBUILD := esbuild
 # Paths
 SRC_DIR := src
 
-# App
-ENTRY := $(SRC_DIR)/main.ts
-OUT   := static/app.js
+# JavaScript
+JS_ENTRY  := $(SRC_DIR)/main.ts
+JS_OUT    := static/app.js
+
+# CSS
+CSS_ENTRY := $(SRC_DIR)/style.css
+CSS_OUT   := static/style.css
 
 # ─────────────────────────────────────────
 # Default: build & run
 # ─────────────────────────────────────────
 .PHONY: all
-all: $(OUT)
+all: $(JS_OUT) $(CSS_OUT)
 	go run ./cmd/folio/ server
 
 # ─────────────────────────────────────────
 # Build
 # ─────────────────────────────────────────
-$(OUT): $(shell find $(SRC_DIR) -type f)
-	$(ESBUILD) $(ENTRY) \
+$(JS_OUT): $(shell find $(SRC_DIR) -name "*.ts")
+	$(ESBUILD) $(JS_ENTRY) \
 		--bundle \
 		--format=esm \
 		--sourcemap \
-		--outfile=$(OUT)
+		--outfile=$(JS_OUT)
+
+$(CSS_OUT): $(shell find $(SRC_DIR) -name "*.css")
+	$(ESBUILD) $(CSS_ENTRY) \
+		--bundle \
+		--outfile=$(CSS_OUT)
 
 .PHONY: build
 build:
-	go build  ./cmd/folio
+	go build ./cmd/folio
+
 # ─────────────────────────────────────────
 # Development
 # ─────────────────────────────────────────
@@ -53,8 +63,9 @@ docker-build:
 # ─────────────────────────────────────────
 .PHONY: clean
 clean:
-	rm -f $(OUT)
-	rm folio
+	rm -f $(JS_OUT) $(CSS_OUT)
+	rm -f folio
+
 # ─────────────────────────────────────────
 # Help
 # ─────────────────────────────────────────

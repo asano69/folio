@@ -5,6 +5,7 @@ data/
 node_modules
 .js
 static/app.js
+static/style.css
 static/app.js.map
 *~
 

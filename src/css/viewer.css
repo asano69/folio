@@ -1,0 +1,136 @@
+/* Viewer layout */
+.viewer-layout {
+    position: relative;
+}
+
+.viewer-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.viewer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.viewer-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.viewer-header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.page-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #666;
+    font-size: 1rem;
+}
+
+.viewer-navigation {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.nav-btn {
+    padding: 0.75rem 1.5rem;
+    background: #007bff;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.nav-btn:hover:not(.disabled) {
+    background: #0056b3;
+}
+
+.nav-btn.disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.nav-btn.home-btn {
+    background: #6c757d;
+}
+
+.nav-btn.home-btn:hover {
+    background: #545b62;
+}
+
+.viewer-image {
+    text-align: center;
+    margin-bottom: 1rem;
+    background: #fafafa;
+    border-radius: 4px;
+    padding: 0.25rem;
+}
+
+.viewer-image img {
+    max-width: 100%;
+    height: auto;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Page note display */
+.page-note {
+    margin-bottom: 1rem;
+    padding: 1rem 1.25rem;
+    background: #f8f9fa;
+    border-left: 3px solid #ccc;
+    border-radius: 0 4px 4px 0;
+}
+
+.note-body {
+    font-family: inherit;
+    font-size: 0.95rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    color: #444;
+}
+
+.viewer-controls {
+    display: flex;
+    justify-content: center;
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.page-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.page-selector label {
+    font-weight: 500;
+}
+
+.page-selector select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.page-selector select:focus {
+    outline: none;
+    border-color: #007bff;
+}
