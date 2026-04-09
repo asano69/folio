@@ -73,7 +73,7 @@
     cursor: pointer;
     text-align: left;
     font-family: inherit;
-    font-size: 0.85rem;
+    font-size: 1rem;
     color: #888;
     flex-shrink: 0;
     transition: background 0.15s, color 0.15s;
@@ -92,7 +92,7 @@
     border: none;
     border-top: 2px solid #007bff;
     font-family: inherit;
-    font-size: 0.85rem;
+    font-size: 1rem;
     outline: none;
     background: #f8f9ff;
     flex-shrink: 0;
@@ -104,7 +104,7 @@
 .collection-item {
     display: flex;
     align-items: center;
-    padding: 0.5rem 0.75rem;
+    padding: 1.0rem 0.75rem;
     color: #444;
     text-decoration: none;
     font-size: 1.2rem;
