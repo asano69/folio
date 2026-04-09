@@ -30,7 +30,21 @@
 
     <div class="books-main">
         <div class="books-container">
-            <h2>{{if .ActiveCollectionTitle}}{{.ActiveCollectionTitle}}{{else}}Library{{end}}</h2>
+            <div class="library-header">
+                <h2>{{if .ActiveCollectionTitle}}{{.ActiveCollectionTitle}}{{else}}Library{{end}}</h2>
+                {{if .Books}}
+                <div class="search-bar">
+                    <input
+                        type="search"
+                        id="search-title"
+                        class="search-input"
+                        placeholder="Search by title…"
+                        autocomplete="off"
+                        aria-label="Search books by title">
+                    <button id="search-clear" class="search-clear-btn" hidden aria-label="Clear search">✕</button>
+                </div>
+                {{end}}
+            </div>
             {{if .Books}}
             <div class="books-grid">
                 {{range .Books}}
@@ -59,6 +73,7 @@
                 </div>
                 {{end}}
             </div>
+            <p id="search-no-results" class="no-books" hidden>No books match your search.</p>
             {{else}}
             <p class="no-books">
                 {{if .ActiveCollectionID}}No books in this collection yet. Drag books here from All Books.{{else}}No books found in library.{{end}}
