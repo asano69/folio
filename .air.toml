@@ -3,5 +3,5 @@
   bin = "./tmp/folio"
   args_bin = ["server"]
   include_ext = ["go", "ts", "css", "html"]
-  include_dir = ["cmd", "internal", "src"]
+  include_dir = ["cmd", "internal", "src", "templates"]
   exclude_dir = ["tmp", ".js"]
