@@ -1,117 +1,113 @@
 {{define "title"}}{{.Book.Title}} - folio{{end}}
 
 {{define "content"}}
-{{if .TOC}}
-<div id="toc-pane" class="toc-pane">
-    <div class="toc-header">
-        <span class="toc-heading">Contents</span>
-        <button class="toc-close-btn" id="toc-close">✕</button>
-    </div>
-    <nav class="toc-nav">
-				{{range $i, $e := .TOC}}
-				<a href="/viewer?book={{$.Book.ID}}&page={{$e.PageNum}}"
-				   class="toc-entry{{if eq $i $.ActiveTocIdx}} toc-entry-active{{end}}">
-				    {{$e.Title}}
-				</a>
-				{{end}}
-    </nav>
-</div>
-{{end}}
 <div class="viewer-layout">
-<div class="viewer-container">
-    <div class="viewer-header">
-        <h2>{{.Book.Title}}</h2>
-        <div class="viewer-header-right">
-            <div class="page-info">
-                Page {{.PageNum}} / {{.TotalPages}}
-                <span id="page-title-badge" class="page-title-badge"{{if not .Note.Title}} hidden{{end}}>{{.Note.Title}}</span>
-                <span id="page-attr-badge" class="page-attr-badge attr-{{.Note.Attribute}}"{{if not .Note.Attribute}} hidden{{end}}>{{.Note.Attribute}}</span>
+    {{if .TOC}}
+    <div id="toc-pane" class="toc-pane">
+        <div class="toc-header">
+            <span class="toc-heading">Contents</span>
+            <button class="toc-close-btn" id="toc-close">✕</button>
+        </div>
+        <nav class="toc-nav">
+            {{range $i, $e := .TOC}}
+            <a href="/viewer?book={{$.Book.ID}}&page={{$e.PageNum}}"
+               class="toc-entry{{if eq $i $.ActiveTocIdx}} toc-entry-active{{end}}">
+                {{$e.Title}}
+            </a>
+            {{end}}
+        </nav>
+    </div>
+    {{end}}
+    <div class="viewer-container">
+        <div class="viewer-header">
+            <h2>{{.Book.Title}}</h2>
+            <div class="viewer-header-right">
+                <div class="page-info">
+                    Page {{.PageNum}} / {{.TotalPages}}
+                    <span id="page-title-badge" class="page-title-badge"{{if not .Note.Title}} hidden{{end}}>{{.Note.Title}}</span>
+                    <span id="page-attr-badge" class="page-attr-badge attr-{{.Note.Attribute}}"{{if not .Note.Attribute}} hidden{{end}}>{{.Note.Attribute}}</span>
+                </div>
+                {{if .TOC}}
+                <button class="toc-toggle-btn" id="toc-toggle">☰ Contents</button>
+                {{end}}
+                {{if .CurrentPage}}
+                <button class="edit-toggle-btn" id="edit-toggle">✎ Edit</button>
+                {{end}}
             </div>
-            {{if .TOC}}
-            <button class="toc-toggle-btn" id="toc-toggle">☰ Contents</button>
+        </div>
+
+        <div class="viewer-navigation">
+            {{if .HasPrev}}
+            <a href="/viewer?book={{.Book.ID}}&page={{sub .PageNum 1}}" class="nav-btn prev-btn">← Previous</a>
+            {{else}}
+            <span class="nav-btn prev-btn disabled">← Previous</span>
             {{end}}
-            {{if .CurrentPage}}
-            <button class="edit-toggle-btn" id="edit-toggle">✎ Edit</button>
+
+            <a href="/" class="nav-btn home-btn">Back to Library</a>
+
+            {{if .HasNext}}
+            <a href="/viewer?book={{.Book.ID}}&page={{add .PageNum 1}}" class="nav-btn next-btn">Next →</a>
+            {{else}}
+            <span class="nav-btn next-btn disabled">Next →</span>
             {{end}}
         </div>
-    </div>
 
-    <div class="viewer-navigation">
-        {{if .HasPrev}}
-        <a href="/viewer?book={{.Book.ID}}&page={{sub .PageNum 1}}" class="nav-btn prev-btn">
-            ← Previous
-        </a>
-        {{else}}
-        <span class="nav-btn prev-btn disabled">← Previous</span>
+        {{if .CurrentPage}}
+        <div class="viewer-image">
+            <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
+        </div>
         {{end}}
 
-        <a href="/" class="nav-btn home-btn">Back to Library</a>
-
-        {{if .HasNext}}
-        <a href="/viewer?book={{.Book.ID}}&page={{add .PageNum 1}}" class="nav-btn next-btn">
-            Next →
-        </a>
+        {{if .Note.Body}}
+        <div class="page-note" id="page-note">
+            <pre class="note-body" id="note-body">{{.Note.Body}}</pre>
+        </div>
         {{else}}
-        <span class="nav-btn next-btn disabled">Next →</span>
+        <div class="page-note" id="page-note" hidden>
+            <pre class="note-body" id="note-body"></pre>
+        </div>
         {{end}}
-    </div>
 
-    {{if .CurrentPage}}
-    <div class="viewer-image">
-        <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
-    </div>
-    {{end}}
+        {{if .CurrentPage}}
+        <div class="edit-panel" id="edit-panel" hidden
+             data-book-id="{{.Book.ID}}"
+             data-page-hash="{{.CurrentPage.Hash}}">
+            <div class="edit-field">
+                <label for="edit-title">Title</label>
+                <input type="text" id="edit-title" value="{{.Note.Title}}" placeholder="Page title">
+            </div>
+            <div class="edit-field">
+                <label for="edit-attribute">Attribute</label>
+                <select id="edit-attribute">
+                    <option value="">— none —</option>
+                    {{range .Attributes}}
+                    <option value="{{.Value}}" {{if eq .Value $.Note.Attribute}}selected{{end}}>{{.Label}}</option>
+                    {{end}}
+                </select>
+            </div>
+            <div class="edit-field">
+                <label for="edit-body">Comment</label>
+                <textarea id="edit-body" rows="4" placeholder="Notes for this page...">{{.Note.Body}}</textarea>
+            </div>
+            <div class="edit-actions">
+                <button id="edit-save">Save</button>
+                <button id="edit-cancel">Cancel</button>
+            </div>
+        </div>
+        {{end}}
 
-    {{if .Note.Body}}
-    <div class="page-note" id="page-note">
-        <pre class="note-body" id="note-body">{{.Note.Body}}</pre>
-    </div>
-    {{else}}
-    <div class="page-note" id="page-note" hidden>
-        <pre class="note-body" id="note-body"></pre>
-    </div>
-    {{end}}
-
-    {{if .CurrentPage}}
-    <div class="edit-panel" id="edit-panel" hidden
-         data-book-id="{{.Book.ID}}"
-         data-page-hash="{{.CurrentPage.Hash}}">
-        <div class="edit-field">
-            <label for="edit-title">Title</label>
-            <input type="text" id="edit-title" value="{{.Note.Title}}" placeholder="Page title">
-        </div>
-        <div class="edit-field">
-            <label for="edit-attribute">Attribute</label>
-            <select id="edit-attribute">
-                <option value="">— none —</option>
-                {{range .Attributes}}
-                <option value="{{.Value}}" {{if eq .Value $.Note.Attribute}}selected{{end}}>{{.Label}}</option>
-                {{end}}
-            </select>
-        </div>
-        <div class="edit-field">
-            <label for="edit-body">Comment</label>
-            <textarea id="edit-body" rows="4" placeholder="Notes for this page...">{{.Note.Body}}</textarea>
-        </div>
-        <div class="edit-actions">
-            <button id="edit-save">Save</button>
-            <button id="edit-cancel">Cancel</button>
+        <div class="viewer-controls">
+            <div class="page-selector">
+                <label for="page-select">Jump to page:</label>
+                <select id="page-select" data-book-id="{{.Book.ID}}">
+                    {{range .Pages}}
+                    <option value="{{.Number}}" {{if eq .Number $.PageNum}}selected{{end}}>
+                        Page {{.Number}}
+                    </option>
+                    {{end}}
+                </select>
+            </div>
         </div>
     </div>
-    {{end}}
-
-    <div class="viewer-controls">
-        <div class="page-selector">
-            <label for="page-select">Jump to page:</label>
-            <select id="page-select" data-book-id="{{.Book.ID}}">
-                {{range .Pages}}
-                <option value="{{.Number}}" {{if eq .Number $.PageNum}}selected{{end}}>
-                    Page {{.Number}}
-                </option>
-                {{end}}
-            </select>
-        </div>
-    </div>
-</div>
 </div>
 {{end}}
