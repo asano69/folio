@@ -23,35 +23,44 @@ type folioMeta struct {
 	Title string `json:"title"`
 }
 
-// openCBZ opens a CBZ file and returns its metadata and page list.
-// If folio.json is missing, a new UUID v7 is generated and written into the archive.
 func openCBZ(path string) (Book, error) {
 	r, err := zip.OpenReader(path)
 	if err != nil {
 		return Book{}, fmt.Errorf("open cbz %s: %w", path, err)
 	}
-	defer r.Close()
 
 	meta, err := readMeta(r)
 	if err != nil {
+		r.Close()
 		return Book{}, err
 	}
 
 	// If no folio.json found, generate one and write it back.
+	// writeMeta closes r before overwriting the file (ZIP structure requires a full rewrite),
+	// so we must reopen the archive afterwards to read page entries.
 	if meta == nil {
 		id, err := uuid.NewV7()
 		if err != nil {
+			r.Close()
 			return Book{}, fmt.Errorf("generate uuid: %w", err)
 		}
 		m := &folioMeta{
 			ID:    id.String(),
 			Title: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
 		}
+		// writeMeta closes r as a side effect.
 		if err := writeMeta(path, r, m); err != nil {
 			return Book{}, fmt.Errorf("write folio.json: %w", err)
 		}
 		meta = m
+
+		// Reopen after the rewrite so listPages can read the updated archive.
+		r, err = zip.OpenReader(path)
+		if err != nil {
+			return Book{}, fmt.Errorf("reopen cbz after write %s: %w", path, err)
+		}
 	}
+	defer r.Close()
 
 	pages, err := listPages(r)
 	if err != nil {
