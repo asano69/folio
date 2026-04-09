@@ -15,13 +15,16 @@ import (
 // It returns all successfully scanned books. Errors for individual files are
 // printed to stderr and skipped so a single bad file does not abort the scan.
 func Scan(libraryPath string) ([]Book, error) {
-	if _, err := os.Stat(libraryPath); err != nil {
-		return nil, fmt.Errorf("library path %q not accessible: %w", libraryPath, err)
+	absPath, err := filepath.Abs(libraryPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve library path: %w", err)
+	}
+	if _, err := os.Stat(absPath); err != nil {
+		return nil, fmt.Errorf("library path %q not accessible: %w", absPath, err)
 	}
 
-	// Collect paths first so the total work is known before spawning workers.
 	var paths []string
-	if err := filepath.WalkDir(libraryPath, func(path string, d fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(absPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

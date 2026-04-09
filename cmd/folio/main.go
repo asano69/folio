@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"runtime"
-	"sync"
-
 	"folio/internal/config"
 	"folio/internal/storage"
 	"folio/internal/store"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sync"
 )
 
 func main() {
@@ -23,10 +23,15 @@ func main() {
 	case "server":
 		runServer(cfg)
 	case "scan":
-		if err := runScan(cfg); err != nil {
+		scanPath := cfg.LibraryPath
+		if len(os.Args) >= 3 {
+			scanPath = os.Args[2]
+		}
+		if err := runScan(cfg, scanPath); err != nil {
 			fmt.Fprintf(os.Stderr, "scan: %v\n", err)
 			os.Exit(1)
 		}
+
 	case "thumbnail":
 		if len(os.Args) < 3 {
 			fmt.Fprintf(os.Stderr, "usage: folio thumbnail <book-uuid>\n")
@@ -63,21 +68,30 @@ func runServer(cfg *config.Config) {
 	}
 }
 
-func runScan(cfg *config.Config) error {
+func runScan(cfg *config.Config, scanPath string) error {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	// Snapshot all known books before scanning so we can detect removals.
-	allBooks, err := db.ListBooks()
+	// Resolve to absolute path so it matches the absolute paths stored in
+	// the DB (storage.Scan always writes absolute paths).
+	absScanPath, err := filepath.Abs(scanPath)
+	if err != nil {
+		return fmt.Errorf("resolve scan path: %w", err)
+	}
+
+	// Restrict missing-book detection to books under the scanned directory.
+	// A partial scan must not mark books outside the scan path as missing.
+	allBooks, err := db.ListBooksUnderPath(absScanPath)
 	if err != nil {
 		return fmt.Errorf("list books: %w", err)
 	}
 
-	fmt.Printf("Scanning %s\n", cfg.LibraryPath)
-	books, err := storage.Scan(cfg.LibraryPath)
+	fmt.Printf("Scanning %s\n", absScanPath)
+	books, err := storage.Scan(absScanPath)
+
 	if err != nil {
 		return err
 	}
@@ -248,5 +262,5 @@ func runHash(cfg *config.Config, bookID string) error {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: folio [server|scan|thumbnail <uuid>|hash <uuid>]\n")
+	fmt.Fprintf(os.Stderr, "usage: folio [server|scan [path]|thumbnail <uuid>|hash <uuid>]\n")
 }

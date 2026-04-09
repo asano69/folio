@@ -200,6 +200,32 @@ func (s *Store) ListBooks() ([]Book, error) {
 	return books, rows.Err()
 }
 
+// ListBooksUnderPath returns books whose source path is under the given
+// directory. Used by partial scans to restrict missing-book detection to
+// the scanned subtree only.
+func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
+	// Match source paths that start with dirPath followed by a separator,
+	// e.g. "/library/manga/book.cbz" matches dirPath="/library/manga".
+	rows, err := s.db.Query(
+		`SELECT id, title, source, missing_since FROM books WHERE source LIKE ? || '/%'`,
+		dirPath,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var books []Book
+	for rows.Next() {
+		var b Book
+		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.MissingSince); err != nil {
+			return nil, err
+		}
+		books = append(books, b)
+	}
+	return books, rows.Err()
+}
+
 // GetBook returns a single book by ID, or nil if not found.
 func (s *Store) GetBook(id string) (*Book, error) {
 	var b Book
