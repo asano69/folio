@@ -87,7 +87,7 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		HasNext      bool
 		Note         store.Note
 		Attributes   []store.AttributeOption
-		TOC          []store.TOCEntry
+		TOC          []store.TocEntry
 		ActiveTocIdx int
 	}{
 		Book:         book,
