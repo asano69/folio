@@ -279,6 +279,9 @@ main {
     display: flex;
     flex-direction: column;
     padding: 0.5rem 0;
+    flex: 1;          /* pane の残り高さを占有する */
+    min-height: 0;    /* flex子要素の高さ縮小を許可する */
+    overflow-y: auto; /* pane の overflow:hidden でクリップされずスクロール可能にする */
 }
 
 .toc-entry {
