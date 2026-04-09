@@ -67,9 +67,3 @@ folio
 └── folio.env
 ```
 
-DBテーブル
-```
-books      — id / title / source
-pages      — id / book_id / number / filename
-thumbnails — book_id / data(BLOB) / created_at
-```
