@@ -50,6 +50,20 @@ CREATE TABLE IF NOT EXISTS notes (
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (book_id, page_hash)
 );
+
+CREATE TABLE IF NOT EXISTS collections (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    title      TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- collection_books is a many-to-many join between collections and books.
+-- Rows are deleted manually when a collection is removed (no FK cascade).
+CREATE TABLE IF NOT EXISTS collection_books (
+    collection_id INTEGER NOT NULL REFERENCES collections(id),
+    book_id       TEXT    NOT NULL REFERENCES books(id),
+    PRIMARY KEY (collection_id, book_id)
+);
 `
 
 func Open(dataPath string) (*Store, error) {

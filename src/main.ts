@@ -4,6 +4,7 @@ import { initRename } from './ui/rename';
 import { initEditor } from './viewer/editor';
 import { initTOC } from './viewer/toc';
 import { initSearch } from './ui/search';
+import { initCollections } from './ui/collections';
 
 document.addEventListener('DOMContentLoaded', () => {
     initViewer();
@@ -12,4 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initEditor();
     initTOC();
     initSearch();
+    initCollections();
+
 });
+

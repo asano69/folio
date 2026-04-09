@@ -80,6 +80,11 @@ func (s *server) setupRoutes() {
 	s.mux.Handle("/api/pages/", &handlers.PagesAPIHandler{
 		Store: s.store,
 	})
+
+	// Handles collection CRUD and book membership under /api/collections/.
+	cHandler := &handlers.CollectionsAPIHandler{Store: s.store}
+	s.mux.Handle("/api/collections", cHandler)  // exact match for POST (create)
+	s.mux.Handle("/api/collections/", cHandler) // prefix match for /{id} and /{id}/books/{bookID}
 }
 
 func (s *server) Start() error {
