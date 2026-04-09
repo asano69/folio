@@ -14,6 +14,12 @@ type Store struct {
 }
 
 const schema = `
+-- Enable foreign key enforcement. Must be set per connection.
+PRAGMA foreign_keys = ON;
+
+-- WAL mode allows concurrent reads during writes.
+PRAGMA journal_mode = WAL;
+
 CREATE TABLE IF NOT EXISTS books (
     id            TEXT PRIMARY KEY,
     title         TEXT NOT NULL,
@@ -85,6 +91,7 @@ CREATE TABLE IF NOT EXISTS page_ocr (
 
 -- Sections as independent entities derived from notes where attribute = 'section'.
 -- end_page is not stored; it is derived as the next section's start_page - 1.
+-- status is preserved across rebuilds (ON CONFLICT only updates title).
 CREATE TABLE IF NOT EXISTS sections (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id    TEXT    NOT NULL REFERENCES books(id),
@@ -156,6 +163,15 @@ CREATE TABLE IF NOT EXISTS collection_books (
     book_id       TEXT    NOT NULL REFERENCES books(id),
     PRIMARY KEY(collection_id, book_id)
 );
+
+-- Indexes for "find all entities with tag X" queries.
+CREATE INDEX IF NOT EXISTS idx_book_tags_tag       ON book_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_page_tags_tag       ON page_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_note_tags_tag       ON note_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_collection_tags_tag ON collection_tags(tag_id);
+
+-- Index for listing sections by book (PK is id, not book_id).
+CREATE INDEX IF NOT EXISTS idx_sections_book ON sections(book_id);
 `
 
 func Open(dataPath string) (*Store, error) {
@@ -168,6 +184,10 @@ func Open(dataPath string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
+
+	// SQLite only supports one concurrent writer. Limiting to a single
+	// connection avoids "database is locked" errors under concurrent requests.
+	db.SetMaxOpenConns(1)
 
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()

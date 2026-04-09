@@ -30,9 +30,10 @@ func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Title     string `json:"title"`
-		Attribute string `json:"attribute"`
-		Body      string `json:"body"`
+		Title      string  `json:"title"`
+		Attribute  string  `json:"attribute"`
+		Body       string  `json:"body"`
+		SvgDrawing *string `json:"svg_drawing"` // null clears the drawing
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -46,11 +47,12 @@ func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	note := store.Note{
-		BookID:    bookID,
-		PageHash:  pageHash,
-		Title:     strings.TrimSpace(body.Title),
-		Attribute: body.Attribute,
-		Body:      body.Body,
+		BookID:     bookID,
+		PageHash:   pageHash,
+		Title:      strings.TrimSpace(body.Title),
+		Attribute:  body.Attribute,
+		Body:       body.Body,
+		SvgDrawing: body.SvgDrawing,
 	}
 
 	if err := h.Store.UpsertNote(note); err != nil {
