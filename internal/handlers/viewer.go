@@ -62,26 +62,45 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	toc, err := h.Store.GetTOC(bookID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// ActiveTocIdx is the index of the last section whose page number is <= current page.
+	// -1 means no section is active (current page precedes all sections).
+	activeTocIdx := -1
+	for i, e := range toc {
+		if e.PageNum <= pageNum {
+			activeTocIdx = i
+		}
+	}
+
 	data := struct {
-		Book        *store.Book
-		CurrentPage *store.Page
-		Pages       []store.Page
-		PageNum     int
-		TotalPages  int
-		HasPrev     bool
-		HasNext     bool
-		Note        store.Note
-		Attributes  []store.AttributeOption
+		Book         *store.Book
+		CurrentPage  *store.Page
+		Pages        []store.Page
+		PageNum      int
+		TotalPages   int
+		HasPrev      bool
+		HasNext      bool
+		Note         store.Note
+		Attributes   []store.AttributeOption
+		TOC          []store.TOCEntry
+		ActiveTocIdx int
 	}{
-		Book:        book,
-		CurrentPage: currentPage,
-		Pages:       pages,
-		PageNum:     pageNum,
-		TotalPages:  totalPages,
-		HasPrev:     pageNum > 1,
-		HasNext:     pageNum < totalPages,
-		Note:        note,
-		Attributes:  store.AllAttributeOptions,
+		Book:         book,
+		CurrentPage:  currentPage,
+		Pages:        pages,
+		PageNum:      pageNum,
+		TotalPages:   totalPages,
+		HasPrev:      pageNum > 1,
+		HasNext:      pageNum < totalPages,
+		Note:         note,
+		Attributes:   store.AllAttributeOptions,
+		TOC:          toc,
+		ActiveTocIdx: activeTocIdx,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {
