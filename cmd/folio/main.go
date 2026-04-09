@@ -34,6 +34,15 @@ func main() {
 			fmt.Fprintf(os.Stderr, "thumbnail: %v\n", err)
 			os.Exit(1)
 		}
+	case "hash":
+		if len(os.Args) < 3 {
+			fmt.Fprintf(os.Stderr, "usage: folio hash <book-uuid>\n")
+			os.Exit(1)
+		}
+		if err := runHash(cfg, os.Args[2]); err != nil {
+			fmt.Fprintf(os.Stderr, "hash: %v\n", err)
+			os.Exit(1)
+		}
 	default:
 		usage()
 		os.Exit(1)
@@ -69,8 +78,17 @@ func runScan(cfg *config.Config) error {
 		if err := db.UpsertBook(b); err != nil {
 			return fmt.Errorf("upsert book %s: %w", b.ID, err)
 		}
-		if err := db.UpsertPages(b.ID, b.Pages); err != nil {
-			return fmt.Errorf("upsert pages %s: %w", b.ID, err)
+
+		// Skip page registration if already present. Use "folio hash <uuid>"
+		// to force a recalculation when the CBZ contents have changed.
+		hasPages, err := db.HasPages(b.ID)
+		if err != nil {
+			return fmt.Errorf("check pages %s: %w", b.ID, err)
+		}
+		if !hasPages {
+			if err := db.UpsertPages(b.ID, b.Pages); err != nil {
+				return fmt.Errorf("upsert pages %s: %w", b.ID, err)
+			}
 		}
 
 		// Generate thumbnail only when one does not yet exist.
@@ -123,6 +141,36 @@ func runThumbnail(cfg *config.Config, bookID string) error {
 	return nil
 }
 
+// runHash recomputes page hashes for a single book identified by UUID and
+// updates the DB. Use this when the CBZ contents have changed since the last scan.
+func runHash(cfg *config.Config, bookID string) error {
+	db, err := store.Open(cfg.DataPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	book, err := db.GetBook(bookID)
+	if err != nil {
+		return err
+	}
+	if book == nil {
+		return fmt.Errorf("book %s not found", bookID)
+	}
+
+	b, err := storage.OpenBook(book.Source)
+	if err != nil {
+		return err
+	}
+
+	if err := db.UpsertPages(bookID, b.Pages); err != nil {
+		return err
+	}
+
+	fmt.Printf("Pages updated for %s (%s): %d pages\n", book.Title, bookID, len(b.Pages))
+	return nil
+}
+
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: folio [server|scan|thumbnail <uuid>]\n")
+	fmt.Fprintf(os.Stderr, "usage: folio [server|scan|thumbnail <uuid>|hash <uuid>]\n")
 }

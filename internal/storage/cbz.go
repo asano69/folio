@@ -66,6 +66,13 @@ func openCBZ(path string) (Book, error) {
 	}, nil
 }
 
+// OpenBook opens a single CBZ file and returns its book data including pages
+// with hashes. It is the exported equivalent of openCBZ, intended for use by
+// commands that operate on one book at a time (e.g. "folio hash <uuid>").
+func OpenBook(path string) (Book, error) {
+	return openCBZ(path)
+}
+
 // OpenPage returns a reader for a single page inside a CBZ.
 func OpenPage(cbzPath, filename string) (io.ReadCloser, error) {
 	r, err := zip.OpenReader(cbzPath)
