@@ -98,6 +98,13 @@ func (s *Store) UpsertPages(bookID string, pages []storage.Page) error {
 	return tx.Commit()
 }
 
+// HasPages reports whether any pages are registered for the given book.
+func (s *Store) HasPages(bookID string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&count)
+	return count > 0, err
+}
+
 // UpsertThumbnail inserts or replaces a thumbnail for a book.
 func (s *Store) UpsertThumbnail(bookID string, data []byte) error {
 	_, err := s.db.Exec(`
