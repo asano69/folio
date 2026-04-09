@@ -1,13 +1,13 @@
+/folio
+tmp/
+
 library/
 data/
 *.db
+*~
 
 node_modules
 .js
+
 static/
-
-*~
-
-tmp/
-
-/folio
+!static/favicon.ico

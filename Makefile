@@ -58,6 +58,18 @@ docker-up:
 docker-build:
 	docker build -t folio:latest .
 
+
+# ─────────────────────────────────────────
+# icon
+# ─────────────────────────────────────────
+.PHONY: icon
+icon:
+	magick -background none src/leaf.svg \
+	  \( -clone 0 -resize 16x16 \) \
+	  \( -clone 0 -resize 32x32 \) \
+	  \( -clone 0 -resize 48x48 \) \
+	  -delete 0 static/favicon.ico
+
 # ─────────────────────────────────────────
 # Clean
 # ─────────────────────────────────────────
