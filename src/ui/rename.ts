@@ -1,4 +1,6 @@
 // Inline rename handler for book titles on the library page.
+import { renameBook } from '../api';
+
 export function initRename(): void {
   document.querySelectorAll<HTMLButtonElement>('.rename-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -45,12 +47,7 @@ async function startRename(titleEl: HTMLElement, bookId: string): Promise<void> 
 
     if (!cancelled && newTitle && newTitle !== currentTitle) {
       try {
-        const res = await fetch(`/api/books/${bookId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: newTitle }),
-        });
-        if (!res.ok) throw new Error(`rename failed: ${res.status}`);
+        await renameBook(bookId, newTitle);
         // Update the link text inside the h3 without touching the href.
         (linkEl ?? titleEl).textContent = newTitle;
       } catch (err) {

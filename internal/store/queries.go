@@ -76,7 +76,6 @@ type TocEntry struct {
 }
 
 // GetTOC returns all section-attributed pages for a book, ordered by page number.
-// Pages without a title are included; the caller is responsible for fallback display.
 func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	rows, err := s.db.Query(`
 		SELECT p.number, n.title
@@ -159,10 +158,7 @@ func (s *Store) UpsertPages(bookID string, pages []storage.Page) error {
 // rebuildSections re-derives the sections table from notes where attribute = 'section'.
 // Sections whose source page no longer exists are removed. Existing section status
 // values are preserved via ON CONFLICT DO UPDATE (only title is overwritten).
-// Called within a transaction from UpsertPages to keep start_page correct after
-// any page replacement.
 func rebuildSections(tx *sql.Tx, bookID string) error {
-	// Remove sections that no longer have a matching section-attributed note+page.
 	_, err := tx.Exec(`
 		DELETE FROM sections
 		WHERE book_id = ?
@@ -177,7 +173,6 @@ func rebuildSections(tx *sql.Tx, bookID string) error {
 		return err
 	}
 
-	// Insert or update sections from current notes, preserving status.
 	_, err = tx.Exec(`
 		INSERT INTO sections (book_id, title, start_page)
 		SELECT n.book_id, n.title, p.number
@@ -338,9 +333,10 @@ func (s *Store) GetNote(bookID, pageHash string) (Note, error) {
 	return n, err
 }
 
-// UpsertNote inserts or updates the note for a page, then synchronises the
-// sections table to reflect any change to the 'section' attribute.
-// Both operations run in a single transaction so they stay consistent.
+// UpsertNote inserts or updates the text fields of a page note (title, attribute,
+// body), then synchronises the sections table. svg_drawing is intentionally
+// excluded so that saving text annotations never clobbers an existing drawing.
+// Use UpsertDrawing to update the SVG drawing independently.
 func (s *Store) UpsertNote(n Note) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -349,15 +345,14 @@ func (s *Store) UpsertNote(n Note) error {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(`
-		INSERT INTO notes (book_id, page_hash, title, attribute, body, svg_drawing, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO notes (book_id, page_hash, title, attribute, body, updated_at)
+		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(book_id, page_hash) DO UPDATE SET
-			title       = excluded.title,
-			attribute   = excluded.attribute,
-			body        = excluded.body,
-			svg_drawing = excluded.svg_drawing,
-			updated_at  = CURRENT_TIMESTAMP
-	`, n.BookID, n.PageHash, n.Title, n.Attribute, n.Body, n.SvgDrawing)
+			title      = excluded.title,
+			attribute  = excluded.attribute,
+			body       = excluded.body,
+			updated_at = CURRENT_TIMESTAMP
+	`, n.BookID, n.PageHash, n.Title, n.Attribute, n.Body)
 	if err != nil {
 		return err
 	}
@@ -369,17 +364,30 @@ func (s *Store) UpsertNote(n Note) error {
 	return tx.Commit()
 }
 
+// UpsertDrawing inserts or updates only the svg_drawing field of a page note.
+// Passing nil clears an existing drawing. Text fields (title, attribute, body)
+// are not touched.
+func (s *Store) UpsertDrawing(bookID, pageHash string, svg *string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO notes (book_id, page_hash, svg_drawing, updated_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(book_id, page_hash) DO UPDATE SET
+			svg_drawing = excluded.svg_drawing,
+			updated_at  = CURRENT_TIMESTAMP
+	`, bookID, pageHash, svg)
+	return err
+}
+
 // syncSection keeps the sections table in sync with notes where attribute = 'section'.
 // Called within a transaction whenever a note is saved.
-// If the page hash cannot be resolved to a page number (e.g. after a re-scan that
-// has not yet been committed), the sync is skipped silently.
+// If the page hash cannot be resolved to a page number the sync is skipped silently.
 func syncSection(tx *sql.Tx, bookID, pageHash, attribute, title string) error {
 	var pageNum int
 	err := tx.QueryRow(
 		`SELECT number FROM pages WHERE book_id = ? AND hash = ?`, bookID, pageHash,
 	).Scan(&pageNum)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil // page not found; skip silently
+		return nil
 	}
 	if err != nil {
 		return err
@@ -470,12 +478,17 @@ func (s *Store) DeleteCollection(id int) error {
 	return tx.Commit()
 }
 
-// AddBookToCollection adds a book to a collection. Duplicate inserts are ignored.
-func (s *Store) AddBookToCollection(collectionID int, bookID string) error {
-	_, err := s.db.Exec(`
+// AddBookToCollection adds a book to a collection.
+// Reports whether the book was newly added (false means it was already a member).
+func (s *Store) AddBookToCollection(collectionID int, bookID string) (added bool, err error) {
+	res, err := s.db.Exec(`
 		INSERT OR IGNORE INTO collection_books (collection_id, book_id) VALUES (?, ?)
 	`, collectionID, bookID)
-	return err
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // RemoveBookFromCollection removes a book from a collection.

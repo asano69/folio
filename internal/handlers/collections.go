@@ -136,11 +136,18 @@ func (h *CollectionsAPIHandler) deleteCollection(w http.ResponseWriter, r *http.
 }
 
 func (h *CollectionsAPIHandler) addBook(w http.ResponseWriter, _ *http.Request, collectionID int, bookID string) {
-	if err := h.Store.AddBookToCollection(collectionID, bookID); err != nil {
+	added, err := h.Store.AddBookToCollection(collectionID, bookID)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	// Return whether the book was newly added so the client can decide
+	// whether to increment the displayed count.
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(struct {
+		Added bool `json:"added"`
+	}{Added: added})
 }
 
 func (h *CollectionsAPIHandler) removeBook(w http.ResponseWriter, _ *http.Request, collectionID int, bookID string) {

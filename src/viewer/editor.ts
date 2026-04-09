@@ -1,3 +1,6 @@
+import { saveNote } from '../api';
+import type { NotePayload } from '../types';
+
 export function initEditor(): void {
   const toggleBtn = document.getElementById('edit-toggle') as HTMLButtonElement | null;
   const pane = document.getElementById('edit-pane') as HTMLElement | null;
@@ -52,7 +55,7 @@ export function initEditor(): void {
     close();
   });
 
-  function captureValues() {
+  function captureValues(): NotePayload {
     return {
       title: titleInput?.value ?? '',
       attribute: attributeSelect?.value ?? '',
@@ -70,19 +73,10 @@ export function initEditor(): void {
     if (!saveBtn) return;
     saveBtn.disabled = true;
     try {
-      const res = await fetch(`/api/pages/${bookId}/${pageHash}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: titleInput.value.trim(),
-          attribute: attributeSelect.value,
-          body: bodyTextarea.value,
-        }),
-      });
-      if (!res.ok) throw new Error(`save failed: ${res.status}`);
-
-      snapshot = captureValues();
-      updateNoteDisplay(snapshot.body);
+      const payload = captureValues();
+      await saveNote(bookId, pageHash, payload);
+      snapshot = payload;
+      updateNoteDisplay(payload.body);
       close();
     } catch (err) {
       console.error(err);
