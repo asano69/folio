@@ -1,5 +1,5 @@
 export function initViewer() {
-  // ページセレクタの処理
+  // Page selector handler
   const pageSelect = document.getElementById('page-select') as HTMLSelectElement;
 
   if (pageSelect) {
@@ -14,13 +14,30 @@ export function initViewer() {
     });
   }
 
-  // キーボードショートカット
+  // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboardNavigation);
 }
 
 function handleKeyboardNavigation(e: KeyboardEvent) {
-  // ビューアページでのみ動作
+  // Only active on viewer pages
   if (!document.querySelector('.viewer-container')) {
+    return;
+  }
+
+  // Ctrl+H: return to library
+  if (e.ctrlKey && e.key === 'h') {
+    e.preventDefault();
+    window.location.href = '/';
+    return;
+  }
+
+  // Suppress page navigation when focus is inside a form element
+  const active = document.activeElement;
+  if (active && (
+    active.tagName === 'INPUT' ||
+    active.tagName === 'TEXTAREA' ||
+    active.tagName === 'SELECT'
+  )) {
     return;
   }
 

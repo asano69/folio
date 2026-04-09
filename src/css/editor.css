@@ -22,34 +22,77 @@
 .attr-index   { background: #ffefd6; color: #640; }
 .attr-other   { background: #ede0ff; color: #408; }
 
-/* Edit toggle button */
-.edit-toggle-btn {
-    padding: 0.4rem 0.8rem;
+/* Edit pane - right sidebar, mirrors TOC pane on the left */
+.edit-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 99;
+}
+
+.edit-backdrop.visible {
+    display: block;
+}
+
+.edit-pane {
+    position: fixed;
+    right: 0;
+    top: 0;
+    height: 100vh;
+    width: 50%;
+    z-index: 100;
+    background: #fff;
+    box-shadow: -2px 0 16px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    overflow: hidden;
+}
+
+.edit-pane.open {
+    transform: translateX(0);
+}
+
+.edit-pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
+}
+
+.edit-pane-heading {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.edit-close-btn {
     background: none;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    border: none;
     cursor: pointer;
-    font-size: 0.9rem;
-    color: #555;
-    transition: border-color 0.15s, color 0.15s;
-    white-space: nowrap;
+    font-size: 1rem;
+    color: #888;
+    padding: 0.25rem;
+    line-height: 1;
 }
 
-.edit-toggle-btn:hover,
-.edit-toggle-btn.active {
-    border-color: #007bff;
-    color: #007bff;
+.edit-close-btn:hover {
+    color: #333;
 }
 
-/* Edit panel */
-.edit-panel {
-    background: #f8f9fa;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
+.edit-pane-body {
+    flex: 1;
+    overflow-y: auto;
     padding: 1.25rem 1.5rem;
-    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
+/* Edit form fields */
 .edit-field {
     display: flex;
     flex-direction: column;
@@ -83,6 +126,8 @@
 
 .edit-field textarea {
     resize: vertical;
+    flex: 1;
+    min-height: 8rem;
 }
 
 .edit-actions {
