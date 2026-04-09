@@ -137,3 +137,10 @@ main:has(.viewer-layout) {
     outline: none;
     border-color: #007bff;
 }
+
+/* Zoom-capable page image */
+#page-image {
+    cursor: grab;
+    user-select: none;
+    transform-origin: center;
+}
