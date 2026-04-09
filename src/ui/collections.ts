@@ -1,11 +1,39 @@
-// Collections sidebar: drag-and-drop, create, rename, and delete.
+// Collections sidebar: drag-and-drop, create, rename, delete, and filter.
 
 export function initCollections(): void {
-		setupSidebarToggle();
+    setupCollectionFilter();
     setupDragAndDrop();
     setupCreateCollection();
     setupCollectionActions();
     setupRemoveFromCollection();
+}
+
+// ── Collection filter ─────────────────────────────────────────
+
+// Filters the named collection entries as the user types.
+// "All Books" is always visible because it lacks the .collection-drop-zone class.
+function setupCollectionFilter(): void {
+    const input = document.getElementById('collection-search') as HTMLInputElement | null;
+    if (!input) return;
+
+    const applyFilter = (): void => {
+        const query = input.value.trim().toLowerCase();
+        document.querySelectorAll<HTMLElement>('.collection-drop-zone').forEach(item => {
+            const title = item.querySelector<HTMLElement>('.collection-title')?.textContent ?? '';
+            // Use style.display directly to avoid the CSS display:flex override on [hidden].
+            item.style.display = (!query || title.toLowerCase().includes(query)) ? '' : 'none';
+        });
+    };
+
+    input.addEventListener('input', applyFilter);
+
+    // Escape clears the filter.
+    input.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            input.value = '';
+            applyFilter();
+        }
+    });
 }
 
 // ── Drag and drop ────────────────────────────────────────────
@@ -221,24 +249,5 @@ function setupRemoveFromCollection(): void {
                 console.error(err);
             }
         });
-    });
-}
-
-// ── Sidebar toggle ────────────────────────────────────────────
-
-function setupSidebarToggle(): void {
-    const sidebar = document.getElementById('collection-sidebar');
-    const btn = document.getElementById('sidebar-toggle');
-    if (!sidebar || !btn) return;
-
-    const STORAGE_KEY = 'folio:sidebar-collapsed';
-    const collapsed = localStorage.getItem(STORAGE_KEY) === 'true';
-    if (collapsed) {
-        sidebar.classList.add('collection-sidebar--collapsed');
-    }
-
-    btn.addEventListener('click', () => {
-        const isCollapsed = sidebar.classList.toggle('collection-sidebar--collapsed');
-        localStorage.setItem(STORAGE_KEY, String(isCollapsed));
     });
 }

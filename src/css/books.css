@@ -1,3 +1,14 @@
+/* Hide the site header on the library page to match the full-bleed layout */
+body:has(.library-layout) header {
+    display: none;
+}
+
+/* Remove max-width and padding from main on the library page */
+main:has(.library-layout) {
+    padding: 0;
+    max-width: none;
+}
+
 /* Library header: title + search bar side by side */
 .library-header {
     display: flex;
@@ -13,7 +24,7 @@
     white-space: nowrap;
 }
 
-/* Search bar */
+/* Book title search bar */
 .search-bar {
     position: relative;
     display: flex;
@@ -30,7 +41,6 @@
     font-family: inherit;
     font-size: 0.95rem;
     background: #fff;
-    /* Remove the browser's native clear button to use our own */
     -webkit-appearance: none;
 }
 
@@ -39,7 +49,6 @@
     border-color: #007bff;
 }
 
-/* Hide the native × that appears in type="search" inputs */
 .search-input::-webkit-search-cancel-button {
     display: none;
 }
@@ -240,234 +249,6 @@ details[open] .missing-summary::before {
     white-space: nowrap;
 }
 
-/* ─── Library two-column layout ─────────────────────────── */
-
-.library-layout {
-    display: flex;
-    gap: 1.5rem;
-    align-items: flex-start;
-}
-
-.books-main {
-    flex: 1;
-    min-width: 0;
-}
-
-/* ─── Collection sidebar ─────────────────────────────────── */
-/* ─── Collection sidebar ─────────────────────────────────── */
-
-.collection-sidebar {
-    width: 220px;
-    flex-shrink: 0;
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    position: sticky;
-    top: 1rem;
-    overflow: hidden;
-    transition: width 0.2s ease;
-}
-
-.sidebar-body {
-    overflow: hidden;
-}
-
-/* Toggle button — sits at the top of the sidebar */
-.sidebar-toggle {
-    display: block;
-    width: 100%;
-    padding: 0.4rem 0.75rem;
-    background: none;
-    border: none;
-    border-bottom: 1px solid #e8e8e8;
-    cursor: pointer;
-    text-align: right;
-    font-size: 1.1rem;
-    color: #aaa;
-    line-height: 1;
-    transition: color 0.15s, background 0.15s;
-}
-
-.sidebar-toggle:hover {
-    color: #555;
-    background: #f5f5f5;
-}
-
-/* Collapsed state */
-.collection-sidebar--collapsed {
-    width: 36px;
-}
-
-.collection-sidebar--collapsed .sidebar-body {
-    display: none;
-}
-
-.collection-sidebar--collapsed .sidebar-toggle {
-    text-align: center;
-    border-bottom: none;
-    padding: 0.5rem 0;
-    /* Flip the arrow to point right */
-    transform: rotate(180deg);
-}
-
-
-/* Shared base for both <a> and <div> collection items */
-.collection-item {
-    display: flex;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    color: #444;
-    text-decoration: none;
-    font-size: 0.9rem;
-    gap: 0;
-    transition: background 0.15s;
-    cursor: pointer;
-}
-
-.collection-item:hover {
-    background: #f5f5f5;
-}
-
-.collection-item--active {
-    background: #f0f6ff;
-    color: #007bff;
-    font-weight: 500;
-}
-
-/* The <a> inside a <div> collection item */
-.collection-link {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    min-width: 0;
-    text-decoration: none;
-    color: inherit;
-    gap: 0.4rem;
-}
-
-.collection-icon {
-    flex-shrink: 0;
-    font-size: 1rem;
-    line-height: 1;
-}
-
-.collection-title {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.collection-count {
-    flex-shrink: 0;
-    font-size: 0.78rem;
-    color: #aaa;
-    margin-left: 0.2rem;
-}
-
-.collection-item--active .collection-count {
-    color: #7ab3f7;
-}
-
-/* Rename / delete buttons — hidden until hover */
-.collection-actions {
-    display: flex;
-    gap: 0.15rem;
-    opacity: 0;
-    flex-shrink: 0;
-    transition: opacity 0.15s;
-}
-
-.collection-item:hover .collection-actions {
-    opacity: 1;
-}
-
-.collection-rename-btn,
-.collection-delete-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #bbb;
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-    font-size: 0.85rem;
-    line-height: 1;
-    transition: color 0.15s;
-}
-
-.collection-rename-btn:hover { color: #555; }
-.collection-delete-btn:hover { color: #c00; }
-
-/* "+ New Collection" button */
-.collection-new-btn {
-    display: block;
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    background: none;
-    border: none;
-    border-top: 1px solid #e8e8e8;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
-    font-size: 0.85rem;
-    color: #888;
-    transition: background 0.15s, color 0.15s;
-}
-
-.collection-new-btn:hover {
-    background: #f5f5f5;
-    color: #333;
-}
-
-/* Inline input shown when creating a new collection */
-.collection-new-input {
-    display: block;
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    border: none;
-    border-top: 2px solid #007bff;
-    font-family: inherit;
-    font-size: 0.85rem;
-    outline: none;
-    background: #f8f9ff;
-}
-
-/* Inline input shown when renaming a collection */
-.collection-rename-input {
-    flex: 1;
-    min-width: 0;
-    border: none;
-    border-bottom: 1px solid #007bff;
-    background: transparent;
-    font-family: inherit;
-    font-size: 0.9rem;
-    outline: none;
-    padding: 0;
-    color: inherit;
-}
-
-/* ─── Drag and drop ──────────────────────────────────────── */
-
-.book-card[draggable="true"] {
-    cursor: grab;
-}
-
-.book-card.dragging {
-    opacity: 0.45;
-}
-
-.collection-drop-zone.drag-over {
-    background: #e8f0fe;
-    outline: 2px dashed #4285f4;
-    outline-offset: -2px;
-}
-
-.collection-drop-zone.drop-success {
-    background: #e6f7e6;
-    transition: background 0.4s;
-}
-
 /* Remove-from-collection button on book cards */
 .collection-remove-btn {
     flex-shrink: 0;
@@ -489,16 +270,4 @@ details[open] .missing-summary::before {
 
 .collection-remove-btn:hover {
     color: #c00;
-}
-
-/* Responsive: stack sidebar above grid on narrow viewports */
-@media (max-width: 680px) {
-    .library-layout {
-        flex-direction: column;
-    }
-
-    .collection-sidebar {
-        width: 100%;
-        position: static;
-    }
 }
