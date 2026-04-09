@@ -1,71 +1,93 @@
 {{define "title"}}Books - folio{{end}}
 
 {{define "content"}}
-<div class="books-container">
-    <div class="library-header">
-        <h2>Library</h2>
-        {{if .Books}}
-        <div class="search-bar">
-            <input
-                type="search"
-                id="search-title"
-                class="search-input"
-                placeholder="Search by title…"
-                autocomplete="off"
-                aria-label="Search books by title">
-            <button id="search-clear" class="search-clear-btn" hidden aria-label="Clear search">✕</button>
-        </div>
-        {{end}}
-    </div>
-
-    {{if .Books}}
-    <div class="books-grid">
-        {{range .Books}}
-        <div class="book-card">
-            <a href="/viewer?book={{.ID}}">
-                <div class="book-thumbnail">
-                    {{if .HasThumbnail}}
-                    <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
-                    {{else}}
-                    <div class="thumbnail-placeholder">No thumbnail</div>
-                    {{end}}
-                </div>
+<div class="library-layout">
+    <aside class="collection-sidebar">
+        <nav class="collection-nav">
+            {{/* "All Books" is always the first entry and is not a drop zone */}}
+            <a href="/" class="collection-item{{if eq .ActiveCollectionID 0}} collection-item--active{{end}}">
+                <span class="collection-icon">📚</span>
+                <span class="collection-title">All Books</span>
+                <span class="collection-count">({{.TotalBookCount}})</span>
             </a>
-            <div class="book-info">
-                <h3 class="book-title" data-book-id="{{.ID}}">
-                    <a href="/viewer?book={{.ID}}">{{.Title}}</a>
-                </h3>
-                <button class="rename-btn" data-book-id="{{.ID}}" title="Rename">✎</button>
-            </div>
-        </div>
-        {{end}}
-    </div>
-    <p id="search-no-results" class="no-books" hidden>No books match your search.</p>
-    {{else}}
-    <p class="no-books">No books found in library.</p>
-    {{end}}
-
-    {{if .MissingBooks}}
-    <details class="missing-section">
-        <summary class="missing-summary">Missing books ({{len .MissingBooks}})</summary>
-        <div class="books-grid missing-grid">
-            {{range .MissingBooks}}
-            <div class="book-card book-card--missing">
-                <div class="book-thumbnail">
-                    {{if .HasThumbnail}}
-                    <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
-                    {{else}}
-                    <div class="thumbnail-placeholder">No thumbnail</div>
-                    {{end}}
-                </div>
-                <div class="book-info">
-                    <h3 class="book-title book-title--missing">{{.Title}}</h3>
-                    <span class="missing-badge" title="Missing since {{.MissingSince}}">Missing</span>
+            {{range .Collections}}
+            <div class="collection-item collection-drop-zone{{if eq .ID $.ActiveCollectionID}} collection-item--active{{end}}"
+                 data-collection-id="{{.ID}}">
+                <a href="/?collection={{.ID}}" class="collection-link">
+                    <span class="collection-icon">📁</span>
+                    <span class="collection-title">{{.Title}}</span>
+                    <span class="collection-count">({{.BookCount}})</span>
+                </a>
+                <div class="collection-actions">
+                    <button class="collection-rename-btn" title="Rename">✎</button>
+                    <button class="collection-delete-btn" title="Delete">✕</button>
                 </div>
             </div>
             {{end}}
+        </nav>
+        <button class="collection-new-btn" id="collection-new-btn">+ New Collection</button>
+    </aside>
+
+    <div class="books-main">
+        <div class="books-container">
+            <h2>{{if .ActiveCollectionTitle}}{{.ActiveCollectionTitle}}{{else}}Library{{end}}</h2>
+            {{if .Books}}
+            <div class="books-grid">
+                {{range .Books}}
+                <div class="book-card" draggable="true" data-book-id="{{.ID}}">
+                    <a href="/viewer?book={{.ID}}">
+                        <div class="book-thumbnail">
+                            {{if .HasThumbnail}}
+                            <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
+                            {{else}}
+                            <div class="thumbnail-placeholder">No thumbnail</div>
+                            {{end}}
+                        </div>
+                    </a>
+                    <div class="book-info">
+                        <h3 class="book-title" data-book-id="{{.ID}}">
+                            <a href="/viewer?book={{.ID}}">{{.Title}}</a>
+                        </h3>
+                        <button class="rename-btn" data-book-id="{{.ID}}" title="Rename">✎</button>
+                        {{if $.ActiveCollectionID}}
+                        <button class="collection-remove-btn"
+                                data-book-id="{{.ID}}"
+                                data-collection-id="{{$.ActiveCollectionID}}"
+                                title="Remove from collection">✕</button>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+            {{else}}
+            <p class="no-books">
+                {{if .ActiveCollectionID}}No books in this collection yet. Drag books here from All Books.{{else}}No books found in library.{{end}}
+            </p>
+            {{end}}
+
+            {{if .MissingBooks}}
+            <details class="missing-section">
+                <summary class="missing-summary">Missing books ({{len .MissingBooks}})</summary>
+                <div class="books-grid missing-grid">
+                    {{range .MissingBooks}}
+                    <div class="book-card book-card--missing">
+                        <div class="book-thumbnail">
+                            {{if .HasThumbnail}}
+                            <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
+                            {{else}}
+                            <div class="thumbnail-placeholder">No thumbnail</div>
+                            {{end}}
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title book-title--missing">{{.Title}}</h3>
+                            <span class="missing-badge" title="Missing since {{.MissingSince}}">Missing</span>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </details>
+            {{end}}
         </div>
-    </details>
-    {{end}}
+    </div>
 </div>
 {{end}}

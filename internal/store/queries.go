@@ -286,3 +286,115 @@ func (s *Store) HasPages(bookID string) (bool, error) {
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&count)
 	return count > 0, err
 }
+
+// Collection is the DB representation of a user-defined book list.
+type Collection struct {
+	ID        int
+	Title     string
+	BookCount int
+}
+
+// ListCollections returns all collections ordered by title, with book counts.
+func (s *Store) ListCollections() ([]Collection, error) {
+	rows, err := s.db.Query(`
+		SELECT c.id, c.title, COUNT(cb.book_id)
+		FROM collections c
+		LEFT JOIN collection_books cb ON cb.collection_id = c.id
+		GROUP BY c.id
+		ORDER BY c.title
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cols []Collection
+	for rows.Next() {
+		var c Collection
+		if err := rows.Scan(&c.ID, &c.Title, &c.BookCount); err != nil {
+			return nil, err
+		}
+		cols = append(cols, c)
+	}
+	return cols, rows.Err()
+}
+
+// CreateCollection inserts a new collection and returns its ID.
+func (s *Store) CreateCollection(title string) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO collections (title) VALUES (?)`, title)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// RenameCollection updates the title of an existing collection.
+func (s *Store) RenameCollection(id int, title string) error {
+	_, err := s.db.Exec(`UPDATE collections SET title = ? WHERE id = ?`, title, id)
+	return err
+}
+
+// DeleteCollection removes a collection and all its book memberships.
+func (s *Store) DeleteCollection(id int) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM collection_books WHERE collection_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM collections WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// AddBookToCollection adds a book to a collection. Duplicate inserts are ignored.
+func (s *Store) AddBookToCollection(collectionID int, bookID string) error {
+	_, err := s.db.Exec(`
+		INSERT OR IGNORE INTO collection_books (collection_id, book_id) VALUES (?, ?)
+	`, collectionID, bookID)
+	return err
+}
+
+// RemoveBookFromCollection removes a book from a collection.
+func (s *Store) RemoveBookFromCollection(collectionID int, bookID string) error {
+	_, err := s.db.Exec(`
+		DELETE FROM collection_books WHERE collection_id = ? AND book_id = ?
+	`, collectionID, bookID)
+	return err
+}
+
+// ListBooksInCollection returns books belonging to a collection, ordered by title.
+func (s *Store) ListBooksInCollection(collectionID int) ([]Book, error) {
+	rows, err := s.db.Query(`
+		SELECT b.id, b.title, b.source, b.missing_since
+		FROM books b
+		JOIN collection_books cb ON cb.book_id = b.id
+		WHERE cb.collection_id = ?
+		ORDER BY b.title
+	`, collectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var books []Book
+	for rows.Next() {
+		var b Book
+		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.MissingSince); err != nil {
+			return nil, err
+		}
+		books = append(books, b)
+	}
+	return books, rows.Err()
+}
+
+// CountAllBooks returns the number of non-missing books in the library.
+func (s *Store) CountAllBooks() (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM books WHERE missing_since IS NULL`).Scan(&n)
+	return n, err
+}
