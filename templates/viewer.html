@@ -2,10 +2,10 @@
 
 {{define "content"}}
 <div class="viewer-layout">
+    {{/* TOC pane - slides in from left */}}
     {{if .TOC}}
     <div id="toc-backdrop" class="toc-backdrop"></div>
     <div id="toc-pane" class="toc-pane">
-
         <div class="toc-header">
             <span class="toc-heading">Contents</span>
             <button class="toc-close-btn" id="toc-close">✕</button>
@@ -20,60 +20,18 @@
         </nav>
     </div>
     {{end}}
-    <div class="viewer-container">
-        <div class="viewer-header">
-            <h2>{{.Book.Title}}</h2>
-            <div class="viewer-header-right">
-                <div class="page-info">
-                    Page {{.PageNum}} / {{.TotalPages}}
-                    <span id="page-title-badge" class="page-title-badge"{{if not .Note.Title}} hidden{{end}}>{{.Note.Title}}</span>
-                    <span id="page-attr-badge" class="page-attr-badge attr-{{.Note.Attribute}}"{{if not .Note.Attribute}} hidden{{end}}>{{.Note.Attribute}}</span>
-                </div>
-                {{if .TOC}}
-                <button class="toc-toggle-btn" id="toc-toggle">☰ Contents</button>
-                {{end}}
-                {{if .CurrentPage}}
-                <button class="edit-toggle-btn" id="edit-toggle">✎ Edit</button>
-                {{end}}
-            </div>
+
+    {{/* Edit pane - slides in from right */}}
+    {{if .CurrentPage}}
+    <div id="edit-backdrop" class="edit-backdrop"></div>
+    <div id="edit-pane" class="edit-pane"
+         data-book-id="{{.Book.ID}}"
+         data-page-hash="{{.CurrentPage.Hash}}">
+        <div class="edit-pane-header">
+            <span class="edit-pane-heading">Edit Page</span>
+            <button class="edit-close-btn" id="edit-close">✕</button>
         </div>
-
-        <div class="viewer-navigation">
-            {{if .HasPrev}}
-            <a href="/viewer?book={{.Book.ID}}&page={{sub .PageNum 1}}" class="nav-btn prev-btn">← Previous</a>
-            {{else}}
-            <span class="nav-btn prev-btn disabled">← Previous</span>
-            {{end}}
-
-            <a href="/" class="nav-btn home-btn">Back to Library</a>
-
-            {{if .HasNext}}
-            <a href="/viewer?book={{.Book.ID}}&page={{add .PageNum 1}}" class="nav-btn next-btn">Next →</a>
-            {{else}}
-            <span class="nav-btn next-btn disabled">Next →</span>
-            {{end}}
-        </div>
-
-        {{if .CurrentPage}}
-        <div class="viewer-image">
-            <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
-        </div>
-        {{end}}
-
-        {{if .Note.Body}}
-        <div class="page-note" id="page-note">
-            <pre class="note-body" id="note-body">{{.Note.Body}}</pre>
-        </div>
-        {{else}}
-        <div class="page-note" id="page-note" hidden>
-            <pre class="note-body" id="note-body"></pre>
-        </div>
-        {{end}}
-
-        {{if .CurrentPage}}
-        <div class="edit-panel" id="edit-panel" hidden
-             data-book-id="{{.Book.ID}}"
-             data-page-hash="{{.CurrentPage.Hash}}">
+        <div class="edit-pane-body">
             <div class="edit-field">
                 <label for="edit-title">Title</label>
                 <input type="text" id="edit-title" value="{{.Note.Title}}" placeholder="Page title">
@@ -89,12 +47,50 @@
             </div>
             <div class="edit-field">
                 <label for="edit-body">Comment</label>
-                <textarea id="edit-body" rows="4" placeholder="Notes for this page...">{{.Note.Body}}</textarea>
+                <textarea id="edit-body" rows="8" placeholder="Notes for this page...">{{.Note.Body}}</textarea>
             </div>
             <div class="edit-actions">
                 <button id="edit-save">Save</button>
                 <button id="edit-cancel">Cancel</button>
             </div>
+        </div>
+    </div>
+    {{end}}
+
+    {{/* Overlay buttons - fixed position, sit on top of the image */}}
+    {{if .TOC}}
+    <button class="viewer-overlay-btn viewer-overlay-btn--left" id="toc-toggle">☰ Contents</button>
+    {{end}}
+    {{if .CurrentPage}}
+    <button class="viewer-overlay-btn viewer-overlay-btn--right" id="edit-toggle">✎ Edit</button>
+    {{end}}
+
+    <div class="viewer-container">
+        {{/* Hidden anchors provide hrefs for keyboard navigation without occupying layout space */}}
+        {{if .HasPrev}}
+        <a href="/viewer?book={{.Book.ID}}&page={{sub .PageNum 1}}" class="prev-btn" hidden></a>
+        {{else}}
+        <span class="prev-btn disabled" hidden></span>
+        {{end}}
+        {{if .HasNext}}
+        <a href="/viewer?book={{.Book.ID}}&page={{add .PageNum 1}}" class="next-btn" hidden></a>
+        {{else}}
+        <span class="next-btn disabled" hidden></span>
+        {{end}}
+
+        {{if .CurrentPage}}
+        <div class="viewer-image">
+            <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
+        </div>
+        {{end}}
+
+        {{if .Note.Body}}
+        <div class="page-note" id="page-note">
+            <pre class="note-body" id="note-body">{{.Note.Body}}</pre>
+        </div>
+        {{else}}
+        <div class="page-note" id="page-note" hidden>
+            <pre class="note-body" id="note-body"></pre>
         </div>
         {{end}}
 

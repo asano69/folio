@@ -1,95 +1,72 @@
+/* Remove main padding when the viewer is active so the image reaches the top */
+main:has(.viewer-layout) {
+    padding: 0;
+    max-width: none;
+}
+
 /* Viewer layout */
 .viewer-layout {
     position: relative;
 }
 
+/* The container holds the image and bottom controls with no card decoration */
 .viewer-container {
-    background: #fff;
-    border-radius: 8px;
-    padding: 1rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
 }
 
-.viewer-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.viewer-header h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-
-.viewer-header-right {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.page-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #666;
-    font-size: 1rem;
-}
-
-.viewer-navigation {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    margin-bottom: 1rem;
-}
-
-.nav-btn {
-    padding: 0.75rem 1.5rem;
-    background: #007bff;
-    color: #fff;
-    text-decoration: none;
+/* Fixed overlay buttons - sit on top of the image at the corners */
+.viewer-overlay-btn {
+    position: fixed;
+    top: 1rem;
+    z-index: 101;
+    padding: 0.4rem 0.8rem;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(4px);
+    border: 1px solid #ccc;
     border-radius: 4px;
-    font-weight: 500;
-    transition: background 0.2s;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #555;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
 }
 
-.nav-btn:hover:not(.disabled) {
-    background: #0056b3;
+.viewer-overlay-btn:hover,
+.viewer-overlay-btn.active {
+    border-color: #007bff;
+    color: #007bff;
+    background: rgba(255, 255, 255, 0.97);
 }
 
-.nav-btn.disabled {
-    background: #ccc;
-    cursor: not-allowed;
-    opacity: 0.6;
+.viewer-overlay-btn--left {
+    left: 1rem;
 }
 
-.nav-btn.home-btn {
-    background: #6c757d;
+.viewer-overlay-btn--right {
+    right: 1rem;
 }
 
-.nav-btn.home-btn:hover {
-    background: #545b62;
-}
-
+/* Page image - fills the full content width, flush to the top */
 .viewer-image {
     text-align: center;
-    margin-bottom: 1rem;
     background: #fafafa;
-    border-radius: 4px;
-    padding: 0.25rem;
+    margin: 0;
+    padding: 0;
 }
 
 .viewer-image img {
     max-width: 100%;
     height: auto;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    display: block;
+    margin: 0 auto;
 }
 
 /* Page note display */
 .page-note {
-    margin-bottom: 1rem;
+    margin: 1rem 2rem;
     padding: 1rem 1.25rem;
     background: #f8f9fa;
     border-left: 3px solid #ccc;
@@ -105,11 +82,13 @@
     color: #444;
 }
 
+/* Page selector at the bottom */
 .viewer-controls {
     display: flex;
     justify-content: center;
-    padding-top: 1rem;
+    padding: 1rem 2rem;
     border-top: 1px solid #e0e0e0;
+    margin-top: 1rem;
 }
 
 .page-selector {
