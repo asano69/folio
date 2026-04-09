@@ -1,4 +1,9 @@
-/* Remove main padding when the viewer is active so the image reaches the top */
+/* Hide the site header on the viewer page to maximize vertical image space */
+body:has(.viewer-layout) header {
+    display: none;
+}
+
+/* Remove main padding and width cap when the viewer is active */
 main:has(.viewer-layout) {
     padding: 0;
     max-width: none;
@@ -9,7 +14,7 @@ main:has(.viewer-layout) {
     position: relative;
 }
 
-/* The container holds the image and bottom controls with no card decoration */
+/* The container holds the image and below-fold elements with no card decoration */
 .viewer-container {
     background: transparent;
     border-radius: 0;
@@ -49,22 +54,27 @@ main:has(.viewer-layout) {
     right: 1rem;
 }
 
-/* Page image - fills the full content width, flush to the top */
+/* Image: height-first sizing — fills the viewport height and
+   lets width scale proportionally, never exceeding the viewport width */
 .viewer-image {
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    height: 100vh;
     background: #fafafa;
     margin: 0;
     padding: 0;
+    overflow: hidden;
 }
 
 .viewer-image img {
+    height: 100%;
+    width: auto;
     max-width: 100%;
-    height: auto;
     display: block;
-    margin: 0 auto;
 }
 
-/* Page note display */
+/* Page note display - visible below the image when scrolled */
 .page-note {
     margin: 1rem 2rem;
     padding: 1rem 1.25rem;
@@ -82,13 +92,25 @@ main:has(.viewer-layout) {
     color: #444;
 }
 
-/* Page selector at the bottom */
+/* Page jump overlay - hidden by default, toggled by Ctrl+J */
 .viewer-controls {
+    display: none;
+    position: fixed;
+    bottom: 2.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 101;
+    background: rgba(255, 255, 255, 0.93);
+    backdrop-filter: blur(6px);
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 0.6rem 1.25rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.viewer-controls.visible {
     display: flex;
-    justify-content: center;
-    padding: 1rem 2rem;
-    border-top: 1px solid #e0e0e0;
-    margin-top: 1rem;
+    align-items: center;
 }
 
 .page-selector {
@@ -99,13 +121,15 @@ main:has(.viewer-layout) {
 
 .page-selector label {
     font-weight: 500;
+    font-size: 0.9rem;
+    color: #555;
 }
 
 .page-selector select {
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 0.75rem;
     border: 1px solid #ccc;
     border-radius: 4px;
-    font-size: 1rem;
+    font-size: 0.95rem;
     cursor: pointer;
 }
 
