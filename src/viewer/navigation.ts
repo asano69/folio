@@ -31,6 +31,22 @@ function handleKeyboardNavigation(e: KeyboardEvent) {
     return;
   }
 
+  // Ctrl+J: toggle the page jump overlay
+  if (e.ctrlKey && e.key === 'j') {
+    e.preventDefault();
+    const controls = document.querySelector('.viewer-controls') as HTMLElement | null;
+    if (controls) {
+      const opening = !controls.classList.contains('visible');
+      controls.classList.toggle('visible');
+      if (opening) {
+        // Focus the select immediately so the user can type/arrow without extra clicks
+        const sel = controls.querySelector('select') as HTMLSelectElement | null;
+        sel?.focus();
+      }
+    }
+    return;
+  }
+
   // Suppress page navigation when focus is inside a form element
   const active = document.activeElement;
   if (active && (
@@ -59,6 +75,11 @@ function handleKeyboardNavigation(e: KeyboardEvent) {
         e.preventDefault();
         window.location.href = nextBtn.href;
       }
+      break;
+
+    case 'Escape':
+      // Close the jump overlay if it is open
+      document.querySelector('.viewer-controls')?.classList.remove('visible');
       break;
   }
 }
