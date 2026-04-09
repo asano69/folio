@@ -17,6 +17,7 @@ type bookView struct {
 	ID           string
 	Title        string
 	HasThumbnail bool
+	MissingSince string // empty means present; non-empty is the missing-since timestamp
 }
 
 func (h *BooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -26,20 +27,28 @@ func (h *BooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	views := make([]bookView, 0, len(books))
+	var present, missing []bookView
 	for _, b := range books {
 		has, _ := h.Store.HasThumbnail(b.ID)
-		views = append(views, bookView{
+		view := bookView{
 			ID:           b.ID,
 			Title:        b.Title,
 			HasThumbnail: has,
-		})
+		}
+		if b.MissingSince != nil {
+			view.MissingSince = *b.MissingSince
+			missing = append(missing, view)
+		} else {
+			present = append(present, view)
+		}
 	}
 
 	data := struct {
-		Books []bookView
+		Books        []bookView
+		MissingBooks []bookView
 	}{
-		Books: views,
+		Books:        present,
+		MissingBooks: missing,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {

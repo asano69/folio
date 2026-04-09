@@ -28,5 +28,28 @@
     {{else}}
     <p class="no-books">No books found in library.</p>
     {{end}}
+
+    {{if .MissingBooks}}
+    <details class="missing-section">
+        <summary class="missing-summary">Missing books ({{len .MissingBooks}})</summary>
+        <div class="books-grid missing-grid">
+            {{range .MissingBooks}}
+            <div class="book-card book-card--missing">
+                <div class="book-thumbnail">
+                    {{if .HasThumbnail}}
+                    <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
+                    {{else}}
+                    <div class="thumbnail-placeholder">No thumbnail</div>
+                    {{end}}
+                </div>
+                <div class="book-info">
+                    <h3 class="book-title book-title--missing">{{.Title}}</h3>
+                    <span class="missing-badge" title="Missing since {{.MissingSince}}">Missing</span>
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </details>
+    {{end}}
 </div>
 {{end}}

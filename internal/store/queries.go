@@ -35,10 +35,12 @@ var AllAttributeOptions = []AttributeOption{
 }
 
 // Book is the DB representation of a book.
+// MissingSince is non-nil when the CBZ file was not found during the last scan.
 type Book struct {
-	ID     string
-	Title  string
-	Source string
+	ID           string
+	Title        string
+	Source       string
+	MissingSince *string
 }
 
 // Page is the DB representation of a page.
@@ -94,15 +96,29 @@ func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	return entries, rows.Err()
 }
 
-// UpsertBook inserts a new book or updates its title and source if it already exists.
+// UpsertBook inserts a new book or updates its title, source, and clears
+// missing_since if it already exists. Clearing missing_since on upsert
+// marks the book as present again after it reappears on disk.
 func (s *Store) UpsertBook(b storage.Book) error {
 	_, err := s.db.Exec(`
 		INSERT INTO books (id, title, source)
 		VALUES (?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
-			title  = excluded.title,
-			source = excluded.source
+			title         = excluded.title,
+			source        = excluded.source,
+			missing_since = NULL
 	`, b.ID, b.Title, b.Source)
+	return err
+}
+
+// MarkBookMissing sets missing_since to the current time for a book whose
+// CBZ file was not found during a scan. It is a no-op if missing_since is
+// already set, so the original disappearance time is preserved across scans.
+func (s *Store) MarkBookMissing(id string) error {
+	_, err := s.db.Exec(`
+		UPDATE books SET missing_since = CURRENT_TIMESTAMP
+		WHERE id = ? AND missing_since IS NULL
+	`, id)
 	return err
 }
 
@@ -165,9 +181,9 @@ func (s *Store) UpdateBookTitle(id, title string) error {
 	return err
 }
 
-// ListBooks returns all books ordered by title.
+// ListBooks returns all books ordered by title, including missing ones.
 func (s *Store) ListBooks() ([]Book, error) {
-	rows, err := s.db.Query(`SELECT id, title, source FROM books ORDER BY title`)
+	rows, err := s.db.Query(`SELECT id, title, source, missing_since FROM books ORDER BY title`)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +192,7 @@ func (s *Store) ListBooks() ([]Book, error) {
 	var books []Book
 	for rows.Next() {
 		var b Book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Source); err != nil {
+		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.MissingSince); err != nil {
 			return nil, err
 		}
 		books = append(books, b)
@@ -187,8 +203,8 @@ func (s *Store) ListBooks() ([]Book, error) {
 // GetBook returns a single book by ID, or nil if not found.
 func (s *Store) GetBook(id string) (*Book, error) {
 	var b Book
-	err := s.db.QueryRow(`SELECT id, title, source FROM books WHERE id = ?`, id).
-		Scan(&b.ID, &b.Title, &b.Source)
+	err := s.db.QueryRow(`SELECT id, title, source, missing_since FROM books WHERE id = ?`, id).
+		Scan(&b.ID, &b.Title, &b.Source, &b.MissingSince)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}

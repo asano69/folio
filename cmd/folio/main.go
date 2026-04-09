@@ -68,13 +68,24 @@ func runScan(cfg *config.Config) error {
 	}
 	defer db.Close()
 
+	// Snapshot all known books before scanning so we can detect removals.
+	allBooks, err := db.ListBooks()
+	if err != nil {
+		return fmt.Errorf("list books: %w", err)
+	}
+
 	fmt.Printf("Scanning %s\n", cfg.LibraryPath)
 	books, err := storage.Scan(cfg.LibraryPath)
 	if err != nil {
 		return err
 	}
 
+	// Track which book IDs were found on disk in this scan.
+	foundIDs := make(map[string]struct{}, len(books))
+
 	for _, b := range books {
+		foundIDs[b.ID] = struct{}{}
+
 		if err := db.UpsertBook(b); err != nil {
 			return fmt.Errorf("upsert book %s: %w", b.ID, err)
 		}
@@ -108,7 +119,20 @@ func runScan(cfg *config.Config) error {
 		fmt.Printf("  %s (%d pages)\n", b.Title, len(b.Pages))
 	}
 
-	fmt.Printf("Done. %d books registered.\n", len(books))
+	// Mark books that were in the DB but not found on disk.
+	// MarkBookMissing only sets missing_since on books where it is still NULL,
+	// preserving the original disappearance time across subsequent scans.
+	var missingCount int
+	for _, b := range allBooks {
+		if _, found := foundIDs[b.ID]; !found {
+			missingCount++
+			if err := db.MarkBookMissing(b.ID); err != nil {
+				return fmt.Errorf("mark missing %s: %w", b.ID, err)
+			}
+		}
+	}
+
+	fmt.Printf("Done. %d books found, %d missing.\n", len(books), missingCount)
 	return nil
 }
 

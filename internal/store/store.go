@@ -15,10 +15,11 @@ type Store struct {
 
 const schema = `
 CREATE TABLE IF NOT EXISTS books (
-    id          TEXT PRIMARY KEY,
-    title       TEXT NOT NULL,
-    source      TEXT NOT NULL,
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    id            TEXT PRIMARY KEY,
+    title         TEXT NOT NULL,
+    source        TEXT NOT NULL,
+    missing_since DATETIME,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS pages (
@@ -66,6 +67,10 @@ func Open(dataPath string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
+
+	// Migration: add missing_since to existing databases that predate this column.
+	// The error is intentionally ignored; it fires only when the column already exists.
+	_, _ = db.Exec(`ALTER TABLE books ADD COLUMN missing_since DATETIME`)
 
 	return &Store{db: db}, nil
 }

@@ -115,3 +115,71 @@
     text-align: center;
     padding: 3rem;
 }
+
+/* Missing books section */
+.missing-section {
+    margin-top: 2.5rem;
+}
+
+.missing-summary {
+    display: inline-block;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #888;
+    padding: 0.4rem 0;
+    user-select: none;
+    list-style: none; /* hide default marker in some browsers */
+}
+
+.missing-summary::-webkit-details-marker {
+    display: none;
+}
+
+.missing-summary::before {
+    content: '▶ ';
+    font-size: 0.75rem;
+}
+
+details[open] .missing-summary::before {
+    content: '▼ ';
+}
+
+.missing-grid {
+    margin-top: 1rem;
+}
+
+.book-card--missing {
+    opacity: 0.55;
+    box-shadow: none;
+    border: 1px solid #e0e0e0;
+}
+
+.book-card--missing:hover {
+    transform: none;
+    box-shadow: none;
+    opacity: 0.7;
+}
+
+.book-card--missing .book-thumbnail img {
+    filter: grayscale(60%);
+}
+
+.book-title--missing {
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.missing-badge {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #b05000;
+    background: #fff0e0;
+    border: 1px solid #f0c080;
+    border-radius: 3px;
+    padding: 0.1rem 0.4rem;
+    white-space: nowrap;
+}
