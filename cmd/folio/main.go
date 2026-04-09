@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"sync"
 
 	"folio/internal/config"
 	"folio/internal/storage"
@@ -83,6 +85,7 @@ func runScan(cfg *config.Config) error {
 	// Track which book IDs were found on disk in this scan.
 	foundIDs := make(map[string]struct{}, len(books))
 
+	// Phase 1: update book and page records (sequential DB writes).
 	for _, b := range books {
 		foundIDs[b.ID] = struct{}{}
 
@@ -102,21 +105,70 @@ func runScan(cfg *config.Config) error {
 			}
 		}
 
-		// Generate thumbnail only when one does not yet exist.
+		fmt.Printf("  %s (%d pages)\n", b.Title, len(b.Pages))
+	}
+
+	// Phase 2: generate missing thumbnails concurrently, then write to DB.
+	// Thumbnail generation (image decode + resize) is CPU-bound and safe to
+	// parallelise because each goroutine reads from a different CBZ file.
+	// DB writes remain sequential to stay within SQLite's single-writer model.
+	type thumbJob struct {
+		bookID string
+		source string
+		title  string
+	}
+	var thumbJobs []thumbJob
+	for _, b := range books {
 		exists, err := db.HasThumbnail(b.ID)
 		if err != nil {
 			return fmt.Errorf("check thumbnail %s: %w", b.ID, err)
 		}
 		if !exists {
-			data, err := storage.GenerateThumbnail(b.Source)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "  thumbnail skip %s: %v\n", b.Title, err)
-			} else if err := db.UpsertThumbnail(b.ID, data); err != nil {
-				return fmt.Errorf("store thumbnail %s: %w", b.ID, err)
-			}
+			thumbJobs = append(thumbJobs, thumbJob{b.ID, b.Source, b.Title})
+		}
+	}
+
+	if len(thumbJobs) > 0 {
+		type thumbResult struct {
+			bookID string
+			title  string
+			data   []byte
+			err    error
 		}
 
-		fmt.Printf("  %s (%d pages)\n", b.Title, len(b.Pages))
+		jobs := make(chan thumbJob, len(thumbJobs))
+		for _, j := range thumbJobs {
+			jobs <- j
+		}
+		close(jobs)
+
+		results := make(chan thumbResult, len(thumbJobs))
+
+		var wg sync.WaitGroup
+		for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := range jobs {
+					data, err := storage.GenerateThumbnail(j.source)
+					results <- thumbResult{bookID: j.bookID, title: j.title, data: data, err: err}
+				}
+			}()
+		}
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		for r := range results {
+			if r.err != nil {
+				fmt.Fprintf(os.Stderr, "  thumbnail skip %s: %v\n", r.title, r.err)
+				continue
+			}
+			if err := db.UpsertThumbnail(r.bookID, r.data); err != nil {
+				return fmt.Errorf("store thumbnail %s: %w", r.bookID, err)
+			}
+		}
 	}
 
 	// Mark books that were in the DB but not found on disk.

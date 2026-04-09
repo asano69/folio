@@ -5,10 +5,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 )
 
 // Scan walks the library root recursively and opens every .cbz file found.
+// CBZ files are processed concurrently using a worker pool sized to GOMAXPROCS.
 // It returns all successfully scanned books. Errors for individual files are
 // printed to stderr and skipped so a single bad file does not abort the scan.
 func Scan(libraryPath string) ([]Book, error) {
@@ -16,28 +19,61 @@ func Scan(libraryPath string) ([]Book, error) {
 		return nil, fmt.Errorf("library path %q not accessible: %w", libraryPath, err)
 	}
 
-	var books []Book
-
-	err := filepath.WalkDir(libraryPath, func(path string, d fs.DirEntry, err error) error {
+	// Collect paths first so the total work is known before spawning workers.
+	var paths []string
+	if err := filepath.WalkDir(libraryPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
-			return nil
+		if !d.IsDir() && strings.ToLower(filepath.Ext(path)) == ".cbz" {
+			paths = append(paths, path)
 		}
-		if strings.ToLower(filepath.Ext(path)) != ".cbz" {
-			return nil
-		}
-
-		book, err := openCBZ(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "scan: skip %s: %v\n", path, err)
-			return nil
-		}
-
-		books = append(books, book)
 		return nil
-	})
+	}); err != nil {
+		return nil, err
+	}
 
-	return books, err
+	if len(paths) == 0 {
+		return nil, nil
+	}
+
+	jobs := make(chan string, len(paths))
+	for _, p := range paths {
+		jobs <- p
+	}
+	close(jobs)
+
+	type result struct {
+		book Book
+		path string
+		err  error
+	}
+	results := make(chan result, len(paths))
+
+	var wg sync.WaitGroup
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for path := range jobs {
+				book, err := openCBZ(path)
+				results <- result{book: book, path: path, err: err}
+			}
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var books []Book
+	for r := range results {
+		if r.err != nil {
+			fmt.Fprintf(os.Stderr, "scan: skip %s: %v\n", r.path, r.err)
+			continue
+		}
+		books = append(books, r.book)
+	}
+
+	return books, nil
 }
