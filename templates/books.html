@@ -2,30 +2,33 @@
 
 {{define "content"}}
 <div class="library-layout">
-    <aside class="collection-sidebar">
-        <nav class="collection-nav">
-            {{/* "All Books" is always the first entry and is not a drop zone */}}
-            <a href="/" class="collection-item{{if eq .ActiveCollectionID 0}} collection-item--active{{end}}">
-                <span class="collection-icon">📚</span>
-                <span class="collection-title">All Books</span>
-                <span class="collection-count">({{.TotalBookCount}})</span>
-            </a>
-            {{range .Collections}}
-            <div class="collection-item collection-drop-zone{{if eq .ID $.ActiveCollectionID}} collection-item--active{{end}}"
-                 data-collection-id="{{.ID}}">
-                <a href="/?collection={{.ID}}" class="collection-link">
-                    <span class="collection-icon">📁</span>
-                    <span class="collection-title">{{.Title}}</span>
-                    <span class="collection-count">({{.BookCount}})</span>
-                </a>
-                <div class="collection-actions">
-                    <button class="collection-rename-btn" title="Rename">✎</button>
-                    <button class="collection-delete-btn" title="Delete">✕</button>
-                </div>
-            </div>
-            {{end}}
-        </nav>
-        <button class="collection-new-btn" id="collection-new-btn">+ New Collection</button>
+    <aside class="collection-sidebar" id="collection-sidebar">
+    <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">&#8249;</button>
+    		<div class="sidebar-body">
+		        <nav class="collection-nav">
+		            {{/* "All Books" is always the first entry and is not a drop zone */}}
+		            <a href="/" class="collection-item{{if eq .ActiveCollectionID 0}} collection-item--active{{end}}">
+		                <span class="collection-icon">📚</span>
+		                <span class="collection-title">All Books</span>
+		                <span class="collection-count">({{.TotalBookCount}})</span>
+		            </a>
+		            {{range .Collections}}
+		            <div class="collection-item collection-drop-zone{{if eq .ID $.ActiveCollectionID}} collection-item--active{{end}}"
+		                 data-collection-id="{{.ID}}">
+		                <a href="/?collection={{.ID}}" class="collection-link">
+		                    <span class="collection-icon">📁</span>
+		                    <span class="collection-title">{{.Title}}</span>
+		                    <span class="collection-count">({{.BookCount}})</span>
+		                </a>
+		                <div class="collection-actions">
+		                    <button class="collection-rename-btn" title="Rename">✎</button>
+		                    <button class="collection-delete-btn" title="Delete">✕</button>
+		                </div>
+		            </div>
+		            {{end}}
+		        </nav>
+		        <button class="collection-new-btn" id="collection-new-btn">+ New Collection</button>
+        </div>
     </aside>
 
     <div class="books-main">

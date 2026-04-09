@@ -1,6 +1,7 @@
 // Collections sidebar: drag-and-drop, create, rename, and delete.
 
 export function initCollections(): void {
+		setupSidebarToggle();
     setupDragAndDrop();
     setupCreateCollection();
     setupCollectionActions();
@@ -220,5 +221,24 @@ function setupRemoveFromCollection(): void {
                 console.error(err);
             }
         });
+    });
+}
+
+// ── Sidebar toggle ────────────────────────────────────────────
+
+function setupSidebarToggle(): void {
+    const sidebar = document.getElementById('collection-sidebar');
+    const btn = document.getElementById('sidebar-toggle');
+    if (!sidebar || !btn) return;
+
+    const STORAGE_KEY = 'folio:sidebar-collapsed';
+    const collapsed = localStorage.getItem(STORAGE_KEY) === 'true';
+    if (collapsed) {
+        sidebar.classList.add('collection-sidebar--collapsed');
+    }
+
+    btn.addEventListener('click', () => {
+        const isCollapsed = sidebar.classList.toggle('collection-sidebar--collapsed');
+        localStorage.setItem(STORAGE_KEY, String(isCollapsed));
     });
 }

@@ -254,6 +254,7 @@ details[open] .missing-summary::before {
 }
 
 /* ─── Collection sidebar ─────────────────────────────────── */
+/* ─── Collection sidebar ─────────────────────────────────── */
 
 .collection-sidebar {
     width: 220px;
@@ -264,11 +265,51 @@ details[open] .missing-summary::before {
     position: sticky;
     top: 1rem;
     overflow: hidden;
+    transition: width 0.2s ease;
 }
 
-.collection-nav {
-    padding: 0.4rem 0;
+.sidebar-body {
+    overflow: hidden;
 }
+
+/* Toggle button — sits at the top of the sidebar */
+.sidebar-toggle {
+    display: block;
+    width: 100%;
+    padding: 0.4rem 0.75rem;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #e8e8e8;
+    cursor: pointer;
+    text-align: right;
+    font-size: 1.1rem;
+    color: #aaa;
+    line-height: 1;
+    transition: color 0.15s, background 0.15s;
+}
+
+.sidebar-toggle:hover {
+    color: #555;
+    background: #f5f5f5;
+}
+
+/* Collapsed state */
+.collection-sidebar--collapsed {
+    width: 36px;
+}
+
+.collection-sidebar--collapsed .sidebar-body {
+    display: none;
+}
+
+.collection-sidebar--collapsed .sidebar-toggle {
+    text-align: center;
+    border-bottom: none;
+    padding: 0.5rem 0;
+    /* Flip the arrow to point right */
+    transform: rotate(180deg);
+}
+
 
 /* Shared base for both <a> and <div> collection items */
 .collection-item {
