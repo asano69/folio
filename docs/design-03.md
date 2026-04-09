@@ -1,19 +1,31 @@
-package store
+# Folio Design Document 03
 
-import (
-	"database/sql"
-	"fmt"
-	"os"
-	"path/filepath"
+## Schema (Phase 3)
 
-	_ "modernc.org/sqlite"
-)
+This document supersedes design-01.md and design-02.md where they conflict.
 
-type Store struct {
-	db *sql.DB
-}
+---
 
-const schema = `
+## Key Design Principles
+
+### Re-scan Safety
+
+`UpsertPages` deletes and re-inserts all page rows, so `pages(id)` (integer PK)
+changes on every scan. Any table that holds per-page user data must therefore be
+keyed by `(book_id, page_hash)` — not by `pages(id)` — so that data survives a
+re-scan. This applies to: `notes`, `page_thumbnails`, `page_status`, `page_ocr`,
+`page_tags`.
+
+### Data Ownership (unchanged from design-02)
+
+- **folio.json** — immutable, book-intrinsic data (id, title)
+- **SQLite DB** — mutable, user-subjective data and derived caches
+
+---
+
+## Full Schema
+
+```sql
 CREATE TABLE IF NOT EXISTS books (
     id            TEXT PRIMARY KEY,
     title         TEXT NOT NULL,
@@ -85,6 +97,7 @@ CREATE TABLE IF NOT EXISTS page_ocr (
 
 -- Sections as independent entities derived from notes where attribute = 'section'.
 -- end_page is not stored; it is derived as the next section's start_page - 1.
+-- Synced automatically when a page's attribute is set to 'section'.
 CREATE TABLE IF NOT EXISTS sections (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id    TEXT    NOT NULL REFERENCES books(id),
@@ -156,27 +169,76 @@ CREATE TABLE IF NOT EXISTS collection_books (
     book_id       TEXT    NOT NULL REFERENCES books(id),
     PRIMARY KEY(collection_id, book_id)
 );
-`
+```
 
-func Open(dataPath string) (*Store, error) {
-	if err := os.MkdirAll(dataPath, 0755); err != nil {
-		return nil, fmt.Errorf("create data dir: %w", err)
-	}
+---
 
-	dbPath := filepath.Join(dataPath, "folio.db")
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("open db: %w", err)
-	}
+## Table Reference
 
-	if _, err := db.Exec(schema); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("init schema: %w", err)
-	}
+| Table | Key | Notes |
+|-------|-----|-------|
+| `books` | `id` (UUID from folio.json) | Added `status` column |
+| `pages` | `(book_id, number)` | Integer PK changes on re-scan — do not FK from user data |
+| `thumbnails` | `book_id` | Book-level JPEG thumbnail |
+| `page_thumbnails` | `(book_id, page_hash)` | Page-level JPEG thumbnail |
+| `notes` | `(book_id, page_hash)` | Has integer PK for note_tags; includes `svg_drawing` |
+| `page_status` | `(book_id, page_hash)` | unread / reading / read / skip |
+| `page_ocr` | `(book_id, page_hash)` | Raw OCR text |
+| `sections` | `(book_id, start_page)` | Synced from `attribute = 'section'`; has own `status` |
+| `book_notes` | `book_id` | One memo per book |
+| `collection_notes` | `collection_id` | One memo per collection |
+| `tags` | `(scope, name)` | Scoped to book / page / note / collection |
+| `book_tags` | `(book_id, tag_id)` | |
+| `page_tags` | `(book_id, page_hash, tag_id)` | Re-scan safe |
+| `note_tags` | `(note_id, tag_id)` | Uses notes integer PK |
+| `collection_tags` | `(collection_id, tag_id)` | |
+| `collections` | `id` | |
+| `collection_books` | `(collection_id, book_id)` | |
 
-	return &Store{db: db}, nil
-}
+---
 
-func (s *Store) Close() error {
-	return s.db.Close()
-}
+## Design Decisions
+
+### Status values
+
+Used on `books.status`, `page_status.status`, and `sections.status`:
+
+| Value | Meaning |
+|-------|---------|
+| `unread` | Not yet read |
+| `reading` | Currently in progress |
+| `read` | Finished |
+| `skip` | Intentionally skipped |
+
+### Tags
+
+Tags are **not shared** across entity types. A tag named "important" in scope
+`page` is a different entity from one named "important" in scope `book`. This
+keeps queries simple and avoids cross-entity coupling.
+
+Each tag has a `color` (CSS hex string) and a `name`. No grouping.
+
+### Sections
+
+Sections are independent entities with their own `status`. They are derived from
+pages whose `notes.attribute = 'section'`, but stored separately so that:
+
+- Section-level read status can be tracked independently.
+- Knowing which section a page belongs to can be computed from `sections.start_page`
+  without scanning all notes.
+- The derivation rule: when a note's attribute is set to or removed from `'section'`,
+  the `sections` table should be updated (upsert / delete) to stay in sync.
+
+`end_page` is not stored. It is derived dynamically as `next_section.start_page - 1`
+(or the last page of the book for the final section).
+
+### Notes and SVG
+
+A page has at most one note row. The note holds both a text `body` and an
+optional `svg_drawing` (raw SVG markup). The two coexist in the same row.
+`svg_drawing` is NULL when no drawing has been saved.
+
+### book_notes / collection_notes
+
+One memo per book and one memo per collection. Simple text, no title field.
+Separate from the `notes` table (which is page-scoped).
