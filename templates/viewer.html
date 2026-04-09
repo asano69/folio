@@ -3,7 +3,9 @@
 {{define "content"}}
 <div class="viewer-layout">
     {{if .TOC}}
+    <div id="toc-backdrop" class="toc-backdrop"></div>
     <div id="toc-pane" class="toc-pane">
+
         <div class="toc-header">
             <span class="toc-heading">Contents</span>
             <button class="toc-close-btn" id="toc-close">✕</button>
