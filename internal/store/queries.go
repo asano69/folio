@@ -62,6 +62,38 @@ type Note struct {
 	UpdatedAt string
 }
 
+// TocEntry is a single entry in the table of contents derived from section-attributed pages.
+type TocEntry struct {
+	PageNum int
+	Title   string
+}
+
+// GetTOC returns all section-attributed pages for a book, ordered by page number.
+// Pages without a title are included; the caller is responsible for fallback display.
+func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
+	rows, err := s.db.Query(`
+		SELECT p.number, n.title
+		FROM pages p
+		JOIN notes n ON n.book_id = p.book_id AND n.page_hash = p.hash
+		WHERE p.book_id = ? AND n.attribute = 'section'
+		ORDER BY p.number
+	`, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []TocEntry
+	for rows.Next() {
+		var e TocEntry
+		if err := rows.Scan(&e.PageNum, &e.Title); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
 // UpsertBook inserts a new book or updates its title and source if it already exists.
 func (s *Store) UpsertBook(b storage.Book) error {
 	_, err := s.db.Exec(`
@@ -96,13 +128,6 @@ func (s *Store) UpsertPages(bookID string, pages []storage.Page) error {
 	}
 
 	return tx.Commit()
-}
-
-// HasPages reports whether any pages are registered for the given book.
-func (s *Store) HasPages(bookID string) (bool, error) {
-	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&count)
-	return count > 0, err
 }
 
 // UpsertThumbnail inserts or replaces a thumbnail for a book.
@@ -237,4 +262,11 @@ func (s *Store) UpsertNote(n Note) error {
 			updated_at = CURRENT_TIMESTAMP
 	`, n.BookID, n.PageHash, n.Title, n.Attribute, n.Body)
 	return err
+}
+
+// HasPages reports whether any pages are registered for the given book.
+func (s *Store) HasPages(bookID string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&count)
+	return count > 0, err
 }

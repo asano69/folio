@@ -1,6 +1,23 @@
 {{define "title"}}{{.Book.Title}} - folio{{end}}
 
 {{define "content"}}
+{{if .TOC}}
+<div id="toc-pane" class="toc-pane" hidden>
+    <div class="toc-header">
+        <span class="toc-heading">Contents</span>
+        <button class="toc-close-btn" id="toc-close">✕</button>
+    </div>
+    <nav class="toc-nav">
+				{{range $i, $e := .TOC}}
+				<a href="/viewer?book={{$.Book.ID}}&page={{$e.PageNum}}"
+				   class="toc-entry{{if eq $i $.ActiveTocIdx}} toc-entry-active{{end}}">
+				    {{$e.Title}}
+				</a>
+				{{end}}
+    </nav>
+</div>
+{{end}}
+<div class="viewer-layout">
 <div class="viewer-container">
     <div class="viewer-header">
         <h2>{{.Book.Title}}</h2>
@@ -10,6 +27,9 @@
                 <span id="page-title-badge" class="page-title-badge"{{if not .Note.Title}} hidden{{end}}>{{.Note.Title}}</span>
                 <span id="page-attr-badge" class="page-attr-badge attr-{{.Note.Attribute}}"{{if not .Note.Attribute}} hidden{{end}}>{{.Note.Attribute}}</span>
             </div>
+            {{if .TOC}}
+            <button class="toc-toggle-btn" id="toc-toggle">☰ Contents</button>
+            {{end}}
             {{if .CurrentPage}}
             <button class="edit-toggle-btn" id="edit-toggle">✎ Edit</button>
             {{end}}
@@ -92,5 +112,6 @@
             </select>
         </div>
     </div>
+</div>
 </div>
 {{end}}
