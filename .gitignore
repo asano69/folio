@@ -9,4 +9,5 @@ static/
 *~
 
 tmp/
-folio
+
+./folio
