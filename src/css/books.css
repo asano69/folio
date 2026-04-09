@@ -1,10 +1,66 @@
-/* Books grid */
-.books-container h2 {
+/* Library header: title + search bar side by side */
+.library-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
     margin-bottom: 1.5rem;
-    font-size: 1.8rem;
-    color: #222;
+    flex-wrap: wrap;
 }
 
+.library-header h2 {
+    font-size: 1.8rem;
+    color: #222;
+    white-space: nowrap;
+}
+
+/* Search bar */
+.search-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    max-width: 360px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.45rem 2rem 0.45rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    background: #fff;
+    /* Remove the browser's native clear button to use our own */
+    -webkit-appearance: none;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #007bff;
+}
+
+/* Hide the native × that appears in type="search" inputs */
+.search-input::-webkit-search-cancel-button {
+    display: none;
+}
+
+.search-clear-btn {
+    position: absolute;
+    right: 0.4rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #aaa;
+    font-size: 0.85rem;
+    padding: 0.2rem 0.3rem;
+    line-height: 1;
+}
+
+.search-clear-btn:hover {
+    color: #555;
+}
+
+/* Books grid */
 .books-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -129,7 +185,7 @@
     color: #888;
     padding: 0.4rem 0;
     user-select: none;
-    list-style: none; /* hide default marker in some browsers */
+    list-style: none;
 }
 
 .missing-summary::-webkit-details-marker {
