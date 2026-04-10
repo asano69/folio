@@ -245,8 +245,11 @@ func runThumbnail(cfg *config.Config, bookID string) error {
 
 // runPageThumbnails generates page-level thumbnails for a single book (when
 // bookID is non-empty) or for all non-missing books in the library. Pages that
-// already have a thumbnail in page_thumbnails are skipped by default.
-// Generation is parallelised across GOMAXPROCS workers; DB writes are sequential.
+// already have a thumbnail in page_thumbnails are skipped.
+//
+// Jobs are batched per book: each worker opens a CBZ once and processes all
+// pages that need thumbnails in a single pass, avoiding repeated ZIP central
+// directory reads. DB writes remain sequential.
 func runPageThumbnails(cfg *config.Config, bookID string) error {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
@@ -254,7 +257,6 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 	}
 	defer db.Close()
 
-	// Resolve the target book list.
 	var books []store.Book
 	if bookID != "" {
 		book, err := db.GetBook(bookID)
@@ -272,14 +274,14 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 		}
 	}
 
-	// Collect pages that are missing a thumbnail.
-	type pageJob struct {
+	// Collect one job per book containing only pages that need thumbnails.
+	type bookJob struct {
 		bookID   string
 		source   string
-		pageHash string
-		filename string
+		reqCount int
+		reqs     []storage.PageThumbnailRequest
 	}
-	var jobs []pageJob
+	var jobs []bookJob
 
 	for _, b := range books {
 		if b.MissingSince != nil {
@@ -289,14 +291,22 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 		if err != nil {
 			return fmt.Errorf("list pages %s: %w", b.ID, err)
 		}
+		var reqs []storage.PageThumbnailRequest
 		for _, p := range pages {
+			if p.Hash == "" {
+				fmt.Fprintf(os.Stderr, "  skip page %d of %s: no hash (run folio hash <uuid>)\n", p.Number, b.ID)
+				continue
+			}
 			exists, err := db.HasPageThumbnail(b.ID, p.Hash)
 			if err != nil {
 				return fmt.Errorf("check page thumbnail %s/%s: %w", b.ID, p.Hash, err)
 			}
 			if !exists {
-				jobs = append(jobs, pageJob{b.ID, b.Source, p.Hash, p.Filename})
+				reqs = append(reqs, storage.PageThumbnailRequest{Filename: p.Filename, Hash: p.Hash})
 			}
+		}
+		if len(reqs) > 0 {
+			jobs = append(jobs, bookJob{b.ID, b.Source, len(reqs), reqs})
 		}
 	}
 
@@ -305,22 +315,26 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 		return nil
 	}
 
-	fmt.Printf("Generating %d page thumbnails...\n", len(jobs))
+	total := 0
+	for _, j := range jobs {
+		total += j.reqCount
+	}
+	fmt.Printf("Generating %d page thumbnails across %d books...\n", total, len(jobs))
 
-	type thumbResult struct {
+	type bookResult struct {
 		bookID   string
-		pageHash string
-		data     []byte
+		reqCount int
+		results  []storage.PageThumbnailResult
 		err      error
 	}
 
-	jobCh := make(chan pageJob, len(jobs))
+	jobCh := make(chan bookJob, len(jobs))
 	for _, j := range jobs {
 		jobCh <- j
 	}
 	close(jobCh)
 
-	results := make(chan thumbResult, len(jobs))
+	resultCh := make(chan bookResult, len(jobs))
 
 	var wg sync.WaitGroup
 	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
@@ -328,27 +342,29 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 		go func() {
 			defer wg.Done()
 			for j := range jobCh {
-				data, err := storage.GeneratePageThumbnail(j.source, j.filename)
-				results <- thumbResult{j.bookID, j.pageHash, data, err}
+				res, err := storage.GeneratePageThumbnails(j.source, j.reqs)
+				resultCh <- bookResult{j.bookID, j.reqCount, res, err}
 			}
 		}()
 	}
 	go func() {
 		wg.Wait()
-		close(results)
+		close(resultCh)
 	}()
 
 	var done, skipped int
-	for r := range results {
+	for r := range resultCh {
 		if r.err != nil {
-			fmt.Fprintf(os.Stderr, "  skip: %v\n", r.err)
-			skipped++
+			fmt.Fprintf(os.Stderr, "  skip book %s: %v\n", r.bookID, r.err)
+			skipped += r.reqCount
 			continue
 		}
-		if err := db.UpsertPageThumbnail(r.bookID, r.pageHash, r.data); err != nil {
-			return fmt.Errorf("store page thumbnail: %w", err)
+		for _, pt := range r.results {
+			if err := db.UpsertPageThumbnail(r.bookID, pt.Hash, pt.Data); err != nil {
+				return fmt.Errorf("store page thumbnail: %w", err)
+			}
+			done++
 		}
-		done++
 	}
 
 	fmt.Printf("Done. %d generated, %d skipped.\n", done, skipped)

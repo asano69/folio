@@ -64,7 +64,9 @@ docker-build:
 # ─────────────────────────────────────────
 .PHONY: db
 reset-db:  ## (*) Deploy stack via Komodo
-	rm -fr /data
+	rm -f data/folio.db
+	rm -f data/folio.db-shm
+	rm -f data/folio.db-wal
 	docker exec -it komodo km x -y destroy-stack dbgate
 	#docker exec -it komodo km x -y pull-stack   my-mind
 	docker exec -it komodo km x -y deploy-stack dbgate
