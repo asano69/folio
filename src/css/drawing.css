@@ -19,7 +19,6 @@
   left: 0;
   width: 100%;
   height: 100%;
-  isolation: isolate;
   pointer-events: none;
   overflow: visible; /* allow strokes near the edge to be fully visible */
 }

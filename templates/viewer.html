@@ -123,13 +123,7 @@
 								     data-page-hash="{{.CurrentImage.Hash}}"
 								     {{if .Note.SvgDrawing}}data-drawing="{{.Note.SvgDrawing}}"{{end}}
 								     xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">
-								    <defs>
-								        <mask id="ink-mask" maskUnits="userSpaceOnUse">
-								            <rect fill="white" x="-99999" y="-99999" width="199999" height="199999"/>
-								            <g id="drawing-erase"></g>
-								        </mask>
-								    </defs>
-								    <g id="drawing-ink" mask="url(#ink-mask)"></g>
+								    <g id="drawing-ink"></g>
 								</svg>
             </div>
         </div>
