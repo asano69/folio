@@ -1,4 +1,5 @@
 @import "./css/base.css";
+@import "./css/pane.css";
 @import "./css/books.css";
 @import "./css/sidebar.css";
 @import "./css/viewer.css";

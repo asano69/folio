@@ -1,0 +1,91 @@
+/* ── Shared slide-in pane ─────────────────────────────────────
+   Used by both the TOC pane (left) and the Edit pane (right).
+
+   Required HTML structure:
+
+     <div id="…-backdrop" class="pane-backdrop"></div>
+     <div id="…-pane"     class="pane pane--left | pane--right">
+       <div class="pane-header">
+         <span class="pane-heading">Title</span>
+         <button class="pane-close-btn" id="…-close">✕</button>
+       </div>
+       <div class="pane-body">…</div>
+     </div>
+
+   Open/close by toggling the `open` class on .pane and the
+   `visible` class on .pane-backdrop.
+──────────────────────────────────────────────────────────────── */
+
+.pane-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: var(--z-backdrop);
+}
+
+.pane-backdrop.visible {
+  display: block;
+}
+
+.pane {
+  position: fixed;
+  top: 0;
+  height: 100vh;
+  z-index: var(--z-pane);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--transition-pane);
+  overflow: hidden;
+}
+
+.pane--left {
+  left: 0;
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.15);
+  transform: translateX(-100%);
+}
+
+.pane--right {
+  right: 0;
+  box-shadow: -2px 0 16px rgba(0, 0, 0, 0.15);
+  transform: translateX(100%);
+}
+
+.pane.open {
+  transform: translateX(0);
+}
+
+.pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.pane-heading {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.pane-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-muted);
+  padding: 0.25rem;
+  line-height: 1;
+}
+
+.pane-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}

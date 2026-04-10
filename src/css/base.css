@@ -1,42 +1,95 @@
-/* Reset */
+/* ── Design tokens ────────────────────────────────────────────
+   Single source of truth for colors, shadows, spacing, and
+   z-index layers. Edit here to change the look site-wide.
+──────────────────────────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --color-primary:       #007bff;
+  --color-primary-dark:  #0056b3;
+  --color-primary-bg:    #f0f6ff;   /* light tint for active/hover states */
+  --color-primary-muted: #7ab3f7;   /* muted for secondary accents */
+  --color-danger:        #c00;
+
+  /* Text scale */
+  --text-primary:   #333;
+  --text-secondary: #444;
+  --text-tertiary:  #555;
+  --text-light:     #666;
+  --text-muted:     #888;
+  --text-faint:     #aaa;
+  --text-disabled:  #bbb;
+
+  /* Surfaces */
+  --bg-page:    #f5f5f5;
+  --bg-surface: #fff;
+  --bg-subtle:  #f8f9fa;
+  --bg-hover:   #f5f5f5;
+
+  /* Borders */
+  --border:        #e0e0e0;
+  --border-light:  #e8e8e8;
+  --border-medium: #ccc;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  /* Z-index layers */
+  --z-backdrop: 99;
+  --z-pane:     100;
+  --z-overlay:  101;
+
+  /* Motion */
+  --transition-fast: 0.15s;
+  --transition-pane: 0.25s ease;
+
+  /* Shape */
+  --radius-sm: 3px;
+  --radius:    4px;
+  --radius-lg: 8px;
+}
+
+/* ── Reset ────────────────────────────────────────────────────── */
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
+/* ── Base ─────────────────────────────────────────────────────── */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
-    line-height: 1.6;
-    color: #333;
-    background: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-page);
 }
 
-/* Header */
+/* ── Site header ──────────────────────────────────────────────── */
 header {
-    background: #fff;
-    border-bottom: 1px solid #e0e0e0;
-    padding: 1rem 2rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 2rem;
+  box-shadow: var(--shadow-sm);
 }
 
 header h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
 header h1 a {
-    color: #333;
-    text-decoration: none;
+  color: var(--text-primary);
+  text-decoration: none;
 }
 
 header h1 a:hover {
-    color: #666;
+  color: var(--text-light);
 }
 
-/* Main */
+/* ── Main content area ────────────────────────────────────────── */
 main {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
 }

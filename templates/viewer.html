@@ -3,13 +3,13 @@
 {{define "content"}}
 <div class="viewer-layout">
     {{/* TOC pane - slides in from left */}}
-    <div id="toc-backdrop" class="toc-backdrop"></div>
-    <div id="toc-pane" class="toc-pane">
-        <div class="toc-header">
-            <span class="toc-heading">Contents</span>
-            <button class="toc-close-btn" id="toc-close">✕</button>
+    <div id="toc-backdrop" class="pane-backdrop"></div>
+    <div id="toc-pane" class="pane pane--left">
+        <div class="pane-header">
+            <span class="pane-heading">Contents</span>
+            <button class="pane-close-btn" id="toc-close">✕</button>
         </div>
-        <nav class="toc-nav">
+        <nav class="toc-nav pane-body">
             {{if .TOC}}
             {{range $i, $e := .TOC}}
             <a href="/viewer?book={{$.Book.ID}}&page={{$e.PageNum}}"
@@ -27,15 +27,15 @@
 
     {{/* Edit pane - slides in from right */}}
     {{if .CurrentPage}}
-    <div id="edit-backdrop" class="edit-backdrop"></div>
-    <div id="edit-pane" class="edit-pane"
+    <div id="edit-backdrop" class="pane-backdrop"></div>
+    <div id="edit-pane" class="pane pane--right"
          data-book-id="{{.Book.ID}}"
          data-page-hash="{{.CurrentPage.Hash}}">
-        <div class="edit-pane-header">
-            <span class="edit-pane-heading">Edit Page</span>
-            <button class="edit-close-btn" id="edit-close">✕</button>
+        <div class="pane-header">
+            <span class="pane-heading">Edit Page</span>
+            <button class="pane-close-btn" id="edit-close">✕</button>
         </div>
-        <div class="edit-pane-body">
+        <div class="edit-pane-body pane-body">
             <div class="edit-field">
                 <label for="edit-title">Title</label>
                 <input type="text" id="edit-title" value="{{.Note.Title}}" placeholder="Page title">

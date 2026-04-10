@@ -1,273 +1,268 @@
 /* Hide the site header on the library page to match the full-bleed layout */
 body:has(.library-layout) header {
-    display: none;
+  display: none;
 }
 
 /* Remove max-width and padding from main on the library page */
 main:has(.library-layout) {
-    padding: 0;
-    max-width: none;
+  padding: 0;
+  max-width: none;
 }
 
-/* Library header: title + search bar side by side */
+/* ── Library header ───────────────────────────────────────────── */
 .library-header {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .library-header h2 {
-    font-size: 1.8rem;
-    color: #222;
-    white-space: nowrap;
+  font-size: 1.8rem;
+  color: #222;
+  white-space: nowrap;
 }
 
-/* Book title search bar */
+/* ── Search bar ───────────────────────────────────────────────── */
 .search-bar {
-    position: relative;
-    display: flex;
-    align-items: center;
-    flex: 1;
-    max-width: 360px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 360px;
 }
 
 .search-input {
-    width: 100%;
-    padding: 0.45rem 2rem 0.45rem 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: 0.95rem;
-    background: #fff;
-    -webkit-appearance: none;
+  width: 100%;
+  padding: 0.45rem 2rem 0.45rem 0.75rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: var(--bg-surface);
+  -webkit-appearance: none;
 }
 
 .search-input:focus {
-    outline: none;
-    border-color: #007bff;
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .search-input::-webkit-search-cancel-button {
-    display: none;
+  display: none;
 }
 
 .search-clear-btn {
-    position: absolute;
-    right: 0.4rem;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #aaa;
-    font-size: 0.85rem;
-    padding: 0.2rem 0.3rem;
-    line-height: 1;
+  position: absolute;
+  right: 0.4rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  padding: 0.2rem 0.3rem;
+  line-height: 1;
 }
 
 .search-clear-btn:hover {
-    color: #555;
+  color: var(--text-tertiary);
 }
 
-/* Books grid */
+/* ── Books grid ───────────────────────────────────────────────── */
 .books-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
 }
 
 .book-card {
-    background: #fff;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .book-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
 }
 
 .book-card a {
-    text-decoration: none;
-    color: inherit;
-    display: block;
+  text-decoration: none;
+  color: inherit;
+  display: block;
 }
 
+/* ── Book thumbnail ───────────────────────────────────────────── */
 .book-thumbnail {
-    width: 100%;
-    height: 280px;
-    overflow: hidden;
-    background: #f0f0f0;
+  width: 100%;
+  height: 280px;
+  overflow: hidden;
+  background: #f0f0f0;
 }
 
 .book-thumbnail img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .thumbnail-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #aaa;
-    font-size: 0.9rem;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  font-size: 0.9rem;
 }
 
-/* Book title row with inline rename support */
+/* ── Book title row ───────────────────────────────────────────── */
 .book-info {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    gap: 0.5rem;
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  gap: 0.5rem;
 }
 
 .book-title {
-    flex: 1;
-    min-width: 0;
-    font-size: 1.1rem;
-    font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
 .book-title a {
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rename-btn {
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #bbb;
-    padding: 0.25rem;
-    border-radius: 4px;
-    font-size: 1rem;
-    line-height: 1;
-    opacity: 0;
-    transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-disabled);
+  padding: 0.25rem;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
 }
 
 .book-card:hover .rename-btn {
-    opacity: 1;
+  opacity: 1;
 }
 
 .rename-btn:hover {
-    color: #555;
+  color: var(--text-tertiary);
 }
 
 .rename-input {
-    flex: 1;
-    min-width: 0;
-    font-family: inherit;
-    font-size: 1.1rem;
-    font-weight: 500;
-    border: 1px solid #007bff;
-    border-radius: 4px;
-    padding: 0.15rem 0.4rem;
-    outline: none;
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: 500;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius);
+  padding: 0.15rem 0.4rem;
+  outline: none;
 }
 
 .no-books {
-    color: #666;
-    font-size: 1.1rem;
-    text-align: center;
-    padding: 3rem;
+  color: var(--text-light);
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 3rem;
 }
 
-/* Missing books section */
+/* ── Missing books section ────────────────────────────────────── */
 .missing-section {
-    margin-top: 2.5rem;
+  margin-top: 2.5rem;
 }
 
 .missing-summary {
-    display: inline-block;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: #888;
-    padding: 0.4rem 0;
-    user-select: none;
-    list-style: none;
+  display: inline-block;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 0.4rem 0;
+  user-select: none;
+  list-style: none;
 }
 
 .missing-summary::-webkit-details-marker {
-    display: none;
+  display: none;
 }
 
-.missing-summary::before {
-    content: '▶ ';
-    font-size: 0.75rem;
-}
-
-details[open] .missing-summary::before {
-    content: '▼ ';
-}
+.missing-summary::before         { content: '▶ '; font-size: 0.75rem; }
+details[open] .missing-summary::before { content: '▼ '; }
 
 .missing-grid {
-    margin-top: 1rem;
+  margin-top: 1rem;
 }
 
 .book-card--missing {
-    opacity: 0.55;
-    box-shadow: none;
-    border: 1px solid #e0e0e0;
+  opacity: 0.55;
+  box-shadow: none;
+  border: 1px solid var(--border);
 }
 
 .book-card--missing:hover {
-    transform: none;
-    box-shadow: none;
-    opacity: 0.7;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.7;
 }
 
 .book-card--missing .book-thumbnail img {
-    filter: grayscale(60%);
+  filter: grayscale(60%);
 }
 
 .book-title--missing {
-    color: #999;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  color: #999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .missing-badge {
-    flex-shrink: 0;
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #b05000;
-    background: #fff0e0;
-    border: 1px solid #f0c080;
-    border-radius: 3px;
-    padding: 0.1rem 0.4rem;
-    white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #b05000;
+  background: #fff0e0;
+  border: 1px solid #f0c080;
+  border-radius: var(--radius-sm);
+  padding: 0.1rem 0.4rem;
+  white-space: nowrap;
 }
 
-/* Remove-from-collection button on book cards */
+/* ── Remove-from-collection button ───────────────────────────── */
 .collection-remove-btn {
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #bbb;
-    padding: 0.25rem;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    line-height: 1;
-    opacity: 0;
-    transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-disabled);
+  padding: 0.25rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
 }
 
 .book-card:hover .collection-remove-btn {
-    opacity: 1;
+  opacity: 1;
 }
 
 .collection-remove-btn:hover {
-    color: #c00;
+  color: var(--color-danger);
 }

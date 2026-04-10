@@ -1,146 +1,141 @@
 /* Hide the site header on the viewer page to maximize vertical image space */
 body:has(.viewer-layout) header {
-    display: none;
+  display: none;
 }
 
 /* Remove main padding and width cap when the viewer is active */
 main:has(.viewer-layout) {
-    padding: 0;
-    max-width: none;
+  padding: 0;
+  max-width: none;
 }
 
-/* Viewer layout */
+/* ── Viewer layout ────────────────────────────────────────────── */
 .viewer-layout {
-    position: relative;
+  position: relative;
 }
 
-/* The container holds the image and below-fold elements with no card decoration */
 .viewer-container {
-    background: transparent;
-    border-radius: 0;
-    padding: 0;
-    box-shadow: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 
-/* Fixed overlay buttons - sit on top of the image at the corners */
+/* ── Fixed overlay buttons ────────────────────────────────────── */
 .viewer-overlay-btn {
-    position: fixed;
-    top: 1rem;
-    z-index: 101;
-    padding: 0.4rem 0.8rem;
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(4px);
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    color: #555;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
-    white-space: nowrap;
+  position: fixed;
+  top: 1rem;
+  z-index: var(--z-overlay);
+  padding: 0.4rem 0.8rem;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  white-space: nowrap;
 }
 
 .viewer-overlay-btn:hover,
 .viewer-overlay-btn.active {
-    border-color: #007bff;
-    color: #007bff;
-    background: rgba(255, 255, 255, 0.97);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.97);
 }
 
-.viewer-overlay-btn--left {
-    left: 1rem;
-}
+.viewer-overlay-btn--left  { left: 1rem; }
+.viewer-overlay-btn--right { right: 1rem; }
 
-.viewer-overlay-btn--right {
-    right: 1rem;
-}
+/* ── Page image ───────────────────────────────────────────────── */
 
-/* Image: height-first sizing — fills the viewport height and
-   lets width scale proportionally, never exceeding the viewport width */
+/* Height-first: fills viewport height, width scales proportionally */
 .viewer-image {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    height: 100vh;
-    background: #fafafa;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  height: 100vh;
+  background: #fafafa;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 .viewer-image img {
-    height: 100%;
-    width: auto;
-    max-width: 100%;
-    display: block;
-}
-
-/* Page note display - visible below the image when scrolled */
-.page-note {
-    margin: 1rem 2rem;
-    padding: 1rem 1.25rem;
-    background: #f8f9fa;
-    border-left: 3px solid #ccc;
-    border-radius: 0 4px 4px 0;
-}
-
-.note-body {
-    font-family: inherit;
-    font-size: 0.95rem;
-    white-space: pre-wrap;
-    word-break: break-word;
-    margin: 0;
-    color: #444;
-}
-
-/* Page jump overlay - hidden by default, toggled by Ctrl+J */
-.viewer-controls {
-    display: none;
-    position: fixed;
-    bottom: 2.5rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 101;
-    background: rgba(255, 255, 255, 0.93);
-    backdrop-filter: blur(6px);
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 0.6rem 1.25rem;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.viewer-controls.visible {
-    display: flex;
-    align-items: center;
-}
-
-.page-selector {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.page-selector label {
-    font-weight: 500;
-    font-size: 0.9rem;
-    color: #555;
-}
-
-.page-selector select {
-    padding: 0.4rem 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.95rem;
-    cursor: pointer;
-}
-
-.page-selector select:focus {
-    outline: none;
-    border-color: #007bff;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  display: block;
 }
 
 /* Zoom-capable page image */
 #page-image {
-    cursor: grab;
-    user-select: none;
-    transform-origin: center;
+  cursor: grab;
+  user-select: none;
+  transform-origin: center;
+}
+
+/* ── Page note display ────────────────────────────────────────── */
+.page-note {
+  margin: 1rem 2rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-subtle);
+  border-left: 3px solid var(--border-medium);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.note-body {
+  font-family: inherit;
+  font-size: 0.95rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* ── Page jump overlay ────────────────────────────────────────── */
+.viewer-controls {
+  display: none;
+  position: fixed;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay);
+  background: rgba(255, 255, 255, 0.93);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: 0.6rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.viewer-controls.visible {
+  display: flex;
+  align-items: center;
+}
+
+.page-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page-selector label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+}
+
+.page-selector select {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.page-selector select:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }

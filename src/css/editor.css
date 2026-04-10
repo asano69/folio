@@ -1,19 +1,28 @@
-/* Page metadata badges */
+/* ── Edit pane ────────────────────────────────────────────────
+   Shared pane structure comes from pane.css.
+   Only edit-specific sizing and form styles live here.
+──────────────────────────────────────────────────────────────── */
+
+#edit-pane {
+  width: 50%;
+}
+
+/* ── Page metadata badges ─────────────────────────────────────── */
 .page-title-badge {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #444;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .page-attr-badge {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    border-radius: 3px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: capitalize;
-    background: #e0e0e0;
-    color: #555;
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: var(--border);
+  color: var(--text-tertiary);
 }
 
 .attr-cover   { background: #ffd6d6; color: #900; }
@@ -22,149 +31,88 @@
 .attr-index   { background: #ffefd6; color: #640; }
 .attr-other   { background: #ede0ff; color: #408; }
 
-/* Edit pane - right sidebar, mirrors TOC pane on the left */
-.edit-backdrop {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.3);
-    z-index: 99;
-}
-
-.edit-backdrop.visible {
-    display: block;
-}
-
-.edit-pane {
-    position: fixed;
-    right: 0;
-    top: 0;
-    height: 100vh;
-    width: 50%;
-    z-index: 100;
-    background: #fff;
-    box-shadow: -2px 0 16px rgba(0, 0, 0, 0.15);
-    display: flex;
-    flex-direction: column;
-    transform: translateX(100%);
-    transition: transform 0.25s ease;
-    overflow: hidden;
-}
-
-.edit-pane.open {
-    transform: translateX(0);
-}
-
-.edit-pane-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid #e0e0e0;
-    flex-shrink: 0;
-}
-
-.edit-pane-heading {
-    font-weight: 600;
-    font-size: 1rem;
-}
-
-.edit-close-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
-    color: #888;
-    padding: 0.25rem;
-    line-height: 1;
-}
-
-.edit-close-btn:hover {
-    color: #333;
-}
-
+/* ── Pane body ────────────────────────────────────────────────── */
 .edit-pane-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1.25rem 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
-/* Edit form fields */
+/* ── Form fields ──────────────────────────────────────────────── */
 .edit-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
 }
 
 .edit-field label {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: #555;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
 }
 
 .edit-field input,
 .edit-field select,
 .edit-field textarea {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: 0.95rem;
-    background: #fff;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: var(--bg-surface);
 }
 
 .edit-field input:focus,
 .edit-field select:focus,
 .edit-field textarea:focus {
-    outline: none;
-    border-color: #007bff;
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .edit-field textarea {
-    resize: vertical;
-    flex: 1;
-    min-height: 8rem;
+  resize: vertical;
+  flex: 1;
+  min-height: 8rem;
 }
 
+/* ── Actions ──────────────────────────────────────────────────── */
 .edit-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 0.25rem;
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
 }
 
 .edit-actions button {
-    padding: 0.5rem 1.25rem;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 500;
-    transition: background 0.15s;
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background var(--transition-fast);
 }
 
 #edit-save {
-    background: #007bff;
-    color: #fff;
+  background: var(--color-primary);
+  color: var(--bg-surface);
 }
 
 #edit-save:hover:not(:disabled) {
-    background: #0056b3;
+  background: var(--color-primary-dark);
 }
 
 #edit-save:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 #edit-cancel {
-    background: #e0e0e0;
-    color: #333;
+  background: var(--border);
+  color: var(--text-primary);
 }
 
 #edit-cancel:hover {
-    background: #ccc;
+  background: var(--border-medium);
 }
