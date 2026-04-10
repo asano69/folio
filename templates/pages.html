@@ -1,0 +1,33 @@
+{{define "title"}}Pages — {{.Book.Title}} - folio{{end}}
+
+{{define "content"}}
+<div class="books-container">
+    <div class="library-header">
+        <h2><a href="/viewer?book={{.Book.ID}}" class="pages-book-link">{{.Book.Title}}</a></h2>
+        <span class="pages-count">{{len .Pages}} pages</span>
+    </div>
+
+    {{if .Pages}}
+    <div class="books-grid pages-grid">
+        {{range .Pages}}
+        <a href="/viewer?book={{$.Book.ID}}&page={{.Number}}" class="book-card page-card">
+            <div class="book-thumbnail page-thumbnail">
+                {{if .HasThumb}}
+                <img src="/page-thumbnails/{{$.Book.ID}}/{{.Hash}}" alt="Page {{.Number}}">
+                {{else}}
+                <div class="thumbnail-placeholder">{{.Number}}</div>
+                {{end}}
+            </div>
+            <div class="page-card-info">
+                <span class="page-number">p.{{.Number}}</span>
+                {{if .Attribute}}<span class="page-attr-badge attr-{{.Attribute}}">{{.Attribute}}</span>{{end}}
+                {{if .NoteTitle}}<span class="page-note-title">{{.NoteTitle}}</span>{{end}}
+            </div>
+        </a>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="no-books">No pages found.</p>
+    {{end}}
+</div>
+{{end}}

@@ -559,3 +559,65 @@ func (s *Store) CountAllBooks() (int, error) {
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM books WHERE missing_since IS NULL`).Scan(&n)
 	return n, err
 }
+
+// ListNotesByBook returns all notes for a book keyed by page hash.
+// Used to avoid N+1 queries when rendering a page grid.
+func (s *Store) ListNotesByBook(bookID string) (map[string]Note, error) {
+	rows, err := s.db.Query(`
+		SELECT id, book_id, page_hash, title, attribute, body, svg_drawing, updated_at
+		FROM notes WHERE book_id = ?
+	`, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	notes := make(map[string]Note)
+	for rows.Next() {
+		var n Note
+		if err := rows.Scan(
+			&n.ID, &n.BookID, &n.PageHash,
+			&n.Title, &n.Attribute, &n.Body,
+			&n.SvgDrawing, &n.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		notes[n.PageHash] = n
+	}
+	return notes, rows.Err()
+}
+
+// ListPageHashesWithThumbnails returns the set of page hashes that have a
+// stored thumbnail for the given book, allowing a single query instead of N.
+func (s *Store) ListPageHashesWithThumbnails(bookID string) (map[string]bool, error) {
+	rows, err := s.db.Query(
+		`SELECT page_hash FROM page_thumbnails WHERE book_id = ?`, bookID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	set := make(map[string]bool)
+	for rows.Next() {
+		var h string
+		if err := rows.Scan(&h); err != nil {
+			return nil, err
+		}
+		set[h] = true
+	}
+	return set, rows.Err()
+}
+
+// GetPageThumbnail returns the JPEG thumbnail bytes for a page, or nil if not found.
+func (s *Store) GetPageThumbnail(bookID, pageHash string) ([]byte, error) {
+	var data []byte
+	err := s.db.QueryRow(
+		`SELECT data FROM page_thumbnails WHERE book_id = ? AND page_hash = ?`,
+		bookID, pageHash,
+	).Scan(&data)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return data, err
+}

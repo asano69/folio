@@ -13,7 +13,7 @@ import (
 
 const (
 	bookThumbnailWidth = 400
-	pageThumbnailWidth = 200
+	pageThumbnailWidth = 300
 )
 
 // GenerateThumbnail opens the first image page in a CBZ and returns a

@@ -85,6 +85,21 @@ func (s *server) setupRoutes() {
 	cHandler := &handlers.CollectionsAPIHandler{Store: s.store}
 	s.mux.Handle("/api/collections", cHandler)  // exact match for POST (create)
 	s.mux.Handle("/api/collections/", cHandler) // prefix match for /{id} and /{id}/books/{bookID}
+
+	pagesTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+		"templates/layout.html",
+		"templates/pages.html",
+	))
+
+	s.mux.Handle("/pages", &handlers.PagesHandler{
+		Store:    s.store,
+		Template: pagesTemplate,
+	})
+
+	s.mux.Handle("/page-thumbnails/", &handlers.PageThumbnailHandler{
+		Store: s.store,
+	})
+
 }
 
 func (s *server) Start() error {
