@@ -295,8 +295,8 @@ function setupEditMode(): void {
       const collectionId = item.dataset.collectionId!;
       try {
         await deleteCollection(collectionId);
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('collection') === collectionId) {
+        // If we are currently viewing this collection, redirect to home.
+        if (window.location.pathname === `/collections/${collectionId}`) {
           window.location.href = '/';
         } else {
           item.remove();

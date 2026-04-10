@@ -42,9 +42,18 @@ func (s *server) setupRoutes() {
 		"inc": func(i int) int { return i + 1 },
 	}
 
-	shelfTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+	// sidebar.html is included in both home and collection template sets so
+	// that the {{template "sidebar" .}} call resolves in both.
+	homeTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
 		"templates/layout.html",
-		"templates/shelf.html",
+		"templates/sidebar.html",
+		"templates/home.html",
+	))
+
+	collectionTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+		"templates/layout.html",
+		"templates/sidebar.html",
+		"templates/collection.html",
 	))
 
 	viewerTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
@@ -62,9 +71,14 @@ func (s *server) setupRoutes() {
 		"templates/bibliographic.html",
 	))
 
-	s.mux.Handle("/", &handlers.ShelfHandler{
+	s.mux.Handle("/", &handlers.HomeHandler{
 		Store:    s.store,
-		Template: shelfTemplate,
+		Template: homeTemplate,
+	})
+
+	s.mux.Handle("/collections/", &handlers.CollectionHandler{
+		Store:    s.store,
+		Template: collectionTemplate,
 	})
 
 	// Routes /books/{uuid}/overview, /books/{uuid}/bibliography,

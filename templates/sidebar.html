@@ -1,0 +1,35 @@
+{{define "sidebar"}}
+<aside class="collection-sidebar">
+    <div class="collection-toolbar">
+        <button id="collection-edit-btn" class="collection-edit-btn" title="Edit collections">✎ Edit</button>
+    </div>
+    <div class="collection-search-wrap">
+        <input
+            type="search"
+            id="collection-search"
+            class="collection-search-input"
+            placeholder="Filter collections…"
+            autocomplete="off"
+            aria-label="Filter collections">
+    </div>
+    <nav class="collection-nav">
+        <a href="/" class="collection-item{{if eq .ActiveCollectionID 0}} collection-item--active{{end}}">
+            <span class="collection-count">({{.TotalBookCount}})</span>
+            <span class="collection-title">All Books</span>
+        </a>
+        {{range .Collections}}
+        <div class="collection-item collection-drop-zone{{if eq .ID $.ActiveCollectionID}} collection-item--active{{end}}"
+             data-collection-id="{{.ID}}">
+            <button class="collection-delete-btn" title="Delete" hidden>✕</button>
+            <a href="/collections/{{.ID}}" class="collection-link">
+                <span class="collection-count">({{.BookCount}})</span>
+                <span class="collection-title">{{.Title}}</span>
+            </a>
+        </div>
+        {{end}}
+        <div id="collection-add-item" class="collection-item collection-add-item" hidden>
+            <span class="collection-add-label">＋ Add Collection</span>
+        </div>
+    </nav>
+</aside>
+{{end}}
