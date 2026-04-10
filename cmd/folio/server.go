@@ -67,16 +67,13 @@ func (s *server) setupRoutes() {
 		Template: shelfTemplate,
 	})
 
-	s.mux.Handle("/viewer", &handlers.ViewerHandler{
-		Store:    s.store,
-		Template: viewerTemplate,
-	})
-
-	// Routes /book/{uuid}/overview and /book/{uuid}/bibliographic.
-	s.mux.Handle("/book/", &handlers.BookDispatchHandler{
+	// Routes /books/{uuid}/overview, /books/{uuid}/bibliography,
+	// and /books/{uuid}/pages/{page_num}.
+	s.mux.Handle("/books/", &handlers.BookDispatchHandler{
 		Store:                 s.store,
 		OverviewTemplate:      overviewTemplate,
 		BibliographicTemplate: bibliographicTemplate,
+		ViewerTemplate:        viewerTemplate,
 	})
 
 	s.mux.Handle("/images/", &handlers.ImageHandler{
