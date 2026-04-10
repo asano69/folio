@@ -530,3 +530,25 @@ func (s *Store) CountAllBooks() (int, error) {
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM books WHERE missing_since IS NULL`).Scan(&n)
 	return n, err
 }
+
+// HasPageThumbnail reports whether a thumbnail exists for the given page.
+func (s *Store) HasPageThumbnail(bookID, pageHash string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM page_thumbnails WHERE book_id = ? AND page_hash = ?`,
+		bookID, pageHash,
+	).Scan(&count)
+	return count > 0, err
+}
+
+// UpsertPageThumbnail inserts or replaces a page-level thumbnail.
+func (s *Store) UpsertPageThumbnail(bookID, pageHash string, data []byte) error {
+	_, err := s.db.Exec(`
+		INSERT INTO page_thumbnails (book_id, page_hash, data)
+		VALUES (?, ?, ?)
+		ON CONFLICT(book_id, page_hash) DO UPDATE SET
+			data       = excluded.data,
+			created_at = CURRENT_TIMESTAMP
+	`, bookID, pageHash, data)
+	return err
+}

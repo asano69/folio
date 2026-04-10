@@ -30,21 +30,38 @@ func GenerateThumbnail(cbzPath string) ([]byte, error) {
 		return nil, fmt.Errorf("no image pages in %s", cbzPath)
 	}
 
-	// Find the zip entry for the first page.
-	first := pages[0].Filename
+	return generateThumbnailFromEntry(r, pages[0].Filename, cbzPath)
+}
+
+// GeneratePageThumbnail opens the named image entry in a CBZ and returns a
+// JPEG-encoded thumbnail scaled to thumbnailWidth pixels wide.
+func GeneratePageThumbnail(cbzPath, filename string) ([]byte, error) {
+	r, err := zip.OpenReader(cbzPath)
+	if err != nil {
+		return nil, fmt.Errorf("open cbz %s: %w", cbzPath, err)
+	}
+	defer r.Close()
+
+	return generateThumbnailFromEntry(r, filename, cbzPath)
+}
+
+// generateThumbnailFromEntry finds filename inside an open zip and returns a
+// JPEG thumbnail. Extracted as a shared helper to avoid duplicating the
+// decode/resize/encode pipeline.
+func generateThumbnailFromEntry(r *zip.ReadCloser, filename, cbzPath string) ([]byte, error) {
 	for _, f := range r.File {
-		if f.Name != first {
+		if f.Name != filename {
 			continue
 		}
 		rc, err := f.Open()
 		if err != nil {
-			return nil, fmt.Errorf("open page %s: %w", first, err)
+			return nil, fmt.Errorf("open page %s: %w", filename, err)
 		}
 		defer rc.Close()
 
 		src, _, err := image.Decode(rc)
 		if err != nil {
-			return nil, fmt.Errorf("decode image %s: %w", first, err)
+			return nil, fmt.Errorf("decode image %s: %w", filename, err)
 		}
 
 		thumb := resizeToWidth(src, thumbnailWidth)
@@ -56,7 +73,7 @@ func GenerateThumbnail(cbzPath string) ([]byte, error) {
 		return buf.Bytes(), nil
 	}
 
-	return nil, fmt.Errorf("page entry %s not found in %s", first, cbzPath)
+	return nil, fmt.Errorf("page entry %s not found in %s", filename, cbzPath)
 }
 
 // resizeToWidth scales img proportionally so its width equals w.

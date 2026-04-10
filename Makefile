@@ -60,6 +60,17 @@ docker-build:
 
 
 # ─────────────────────────────────────────
+# database
+# ─────────────────────────────────────────
+.PHONY: db
+reset-db:  ## (*) Deploy stack via Komodo
+	rm -fr /data
+	docker exec -it komodo km x -y destroy-stack dbgate
+	#docker exec -it komodo km x -y pull-stack   my-mind
+	docker exec -it komodo km x -y deploy-stack dbgate
+
+
+# ─────────────────────────────────────────
 # icon
 # ─────────────────────────────────────────
 .PHONY: icon

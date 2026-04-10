@@ -41,6 +41,18 @@ func main() {
 			fmt.Fprintf(os.Stderr, "thumbnail: %v\n", err)
 			os.Exit(1)
 		}
+
+	case "page-thumbnails":
+		// Optional book UUID; omit to process the entire library.
+		bookID := ""
+		if len(os.Args) >= 3 {
+			bookID = os.Args[2]
+		}
+		if err := runPageThumbnails(cfg, bookID); err != nil {
+			fmt.Fprintf(os.Stderr, "page-thumbnails: %v\n", err)
+			os.Exit(1)
+		}
+
 	case "hash":
 		if len(os.Args) < 3 {
 			fmt.Fprintf(os.Stderr, "usage: folio hash <book-uuid>\n")
@@ -202,7 +214,7 @@ func runScan(cfg *config.Config, scanPath string) error {
 	return nil
 }
 
-// runThumbnail regenerates the thumbnail for a single book identified by UUID.
+// runThumbnail regenerates the book-level thumbnail for a single book identified by UUID.
 func runThumbnail(cfg *config.Config, bookID string) error {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
@@ -228,6 +240,118 @@ func runThumbnail(cfg *config.Config, bookID string) error {
 	}
 
 	fmt.Printf("Thumbnail updated for %s (%s)\n", book.Title, bookID)
+	return nil
+}
+
+// runPageThumbnails generates page-level thumbnails for a single book (when
+// bookID is non-empty) or for all non-missing books in the library. Pages that
+// already have a thumbnail in page_thumbnails are skipped by default.
+// Generation is parallelised across GOMAXPROCS workers; DB writes are sequential.
+func runPageThumbnails(cfg *config.Config, bookID string) error {
+	db, err := store.Open(cfg.DataPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	// Resolve the target book list.
+	var books []store.Book
+	if bookID != "" {
+		book, err := db.GetBook(bookID)
+		if err != nil {
+			return err
+		}
+		if book == nil {
+			return fmt.Errorf("book %s not found", bookID)
+		}
+		books = []store.Book{*book}
+	} else {
+		books, err = db.ListBooks()
+		if err != nil {
+			return fmt.Errorf("list books: %w", err)
+		}
+	}
+
+	// Collect pages that are missing a thumbnail.
+	type pageJob struct {
+		bookID   string
+		source   string
+		pageHash string
+		filename string
+	}
+	var jobs []pageJob
+
+	for _, b := range books {
+		if b.MissingSince != nil {
+			continue // CBZ file is gone; nothing to read
+		}
+		pages, err := db.ListPages(b.ID)
+		if err != nil {
+			return fmt.Errorf("list pages %s: %w", b.ID, err)
+		}
+		for _, p := range pages {
+			exists, err := db.HasPageThumbnail(b.ID, p.Hash)
+			if err != nil {
+				return fmt.Errorf("check page thumbnail %s/%s: %w", b.ID, p.Hash, err)
+			}
+			if !exists {
+				jobs = append(jobs, pageJob{b.ID, b.Source, p.Hash, p.Filename})
+			}
+		}
+	}
+
+	if len(jobs) == 0 {
+		fmt.Println("All page thumbnails are up to date.")
+		return nil
+	}
+
+	fmt.Printf("Generating %d page thumbnails...\n", len(jobs))
+
+	type thumbResult struct {
+		bookID   string
+		pageHash string
+		data     []byte
+		err      error
+	}
+
+	jobCh := make(chan pageJob, len(jobs))
+	for _, j := range jobs {
+		jobCh <- j
+	}
+	close(jobCh)
+
+	results := make(chan thumbResult, len(jobs))
+
+	var wg sync.WaitGroup
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range jobCh {
+				data, err := storage.GeneratePageThumbnail(j.source, j.filename)
+				results <- thumbResult{j.bookID, j.pageHash, data, err}
+			}
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var done, skipped int
+	for r := range results {
+		if r.err != nil {
+			fmt.Fprintf(os.Stderr, "  skip: %v\n", r.err)
+			skipped++
+			continue
+		}
+		if err := db.UpsertPageThumbnail(r.bookID, r.pageHash, r.data); err != nil {
+			return fmt.Errorf("store page thumbnail: %w", err)
+		}
+		done++
+	}
+
+	fmt.Printf("Done. %d generated, %d skipped.\n", done, skipped)
 	return nil
 }
 
@@ -262,5 +386,5 @@ func runHash(cfg *config.Config, bookID string) error {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: folio [server|scan [path]|thumbnail <uuid>|hash <uuid>]\n")
+	fmt.Fprintf(os.Stderr, "usage: folio [server|scan [path]|thumbnail <uuid>|page-thumbnails [uuid]|hash <uuid>]\n")
 }
