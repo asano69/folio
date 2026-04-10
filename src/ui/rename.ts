@@ -1,21 +1,28 @@
 // Inline rename handler for book titles on the library page.
+// Rename is activated globally via the Edit button rather than per-card icons.
 import { renameBook } from '../api';
 
+let editMode = false;
+
 export function initRename(): void {
-  document.querySelectorAll<HTMLButtonElement>('.rename-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  const editBtn = document.getElementById('shelf-edit-btn') as HTMLButtonElement | null;
+  if (!editBtn) return;
+
+  const booksMain = document.querySelector<HTMLElement>('.books-main');
+
+  editBtn.addEventListener('click', () => {
+    editMode = !editMode;
+    editBtn.classList.toggle('active', editMode);
+    booksMain?.classList.toggle('shelf--edit', editMode);
+  });
+
+  // Clicking a book title in edit mode starts an inline rename.
+  document.querySelectorAll<HTMLElement>('.book-title[data-book-id]').forEach(titleEl => {
+    titleEl.addEventListener('click', (e) => {
+      if (!editMode) return;
       e.preventDefault();
-      const bookId = btn.dataset.bookId;
+      const bookId = titleEl.dataset.bookId;
       if (!bookId) return;
-
-      // The h3 is a direct flex child of .book-info; replacing it with an
-      // input keeps the input as a flex child, avoiding the HTML restriction
-      // against placing interactive content inside <a>.
-      const titleEl = document.querySelector<HTMLElement>(
-        `.book-title[data-book-id="${bookId}"]`
-      );
-      if (!titleEl) return;
-
       startRename(titleEl, bookId);
     });
   });

@@ -40,7 +40,7 @@
     <div class="books-main">
         <div class="books-container">
             <div class="library-header">
-                <h2>{{if .ActiveCollectionTitle}}{{.ActiveCollectionTitle}}{{else}}Library{{end}}</h2>
+                <h2>{{if .ActiveCollectionTitle}}{{.ActiveCollectionTitle}}{{else}}All Books{{end}}</h2>
                 {{if .Books}}
                 <div class="search-bar">
                     <input
@@ -53,6 +53,7 @@
                     <button id="search-clear" class="search-clear-btn" hidden aria-label="Clear search">✕</button>
                 </div>
                 {{end}}
+                <button id="shelf-edit-btn" class="shelf-edit-btn">✎ Edit</button>
             </div>
             {{if .Books}}
             <div class="books-grid">
@@ -65,19 +66,18 @@
                             {{else}}
                             <div class="thumbnail-placeholder">No thumbnail</div>
                             {{end}}
+                            {{if $.ActiveCollectionID}}
+                            <button class="collection-remove-btn"
+                                    data-book-id="{{.ID}}"
+                                    data-collection-id="{{$.ActiveCollectionID}}"
+                                    title="Remove from collection">✕</button>
+                            {{end}}
                         </div>
                     </a>
                     <div class="book-info">
                         <h3 class="book-title" data-book-id="{{.ID}}">
                             <a href="/book?book={{.ID}}">{{.Title}}</a>
                         </h3>
-                        <button class="rename-btn" data-book-id="{{.ID}}" title="Rename">✎</button>
-                        {{if $.ActiveCollectionID}}
-                        <button class="collection-remove-btn"
-                                data-book-id="{{.ID}}"
-                                data-collection-id="{{$.ActiveCollectionID}}"
-                                title="Remove from collection">✕</button>
-                        {{end}}
                     </div>
                 </div>
                 {{end}}
