@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS books (
     source        TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'unread'
                   CHECK(status IN ('unread','reading','read','skip')),
+    file_mtime    INTEGER NOT NULL DEFAULT 0,
     missing_since DATETIME,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -174,6 +175,14 @@ CREATE INDEX IF NOT EXISTS idx_collection_tags_tag ON collection_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_sections_book ON sections(book_id);
 `
 
+// migrations contains ALTER TABLE statements that cannot be expressed as
+// CREATE TABLE IF NOT EXISTS. Each is executed once and the error is discarded
+// because SQLite has no "ADD COLUMN IF NOT EXISTS"; a duplicate-column error
+// simply means the migration already ran on a previous startup.
+var migrations = []string{
+	`ALTER TABLE books ADD COLUMN file_mtime INTEGER NOT NULL DEFAULT 0`,
+}
+
 func Open(dataPath string) (*Store, error) {
 	if err := os.MkdirAll(dataPath, 0755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
@@ -194,7 +203,15 @@ func Open(dataPath string) (*Store, error) {
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
 
+	applyMigrations(db)
+
 	return &Store{db: db}, nil
+}
+
+func applyMigrations(db *sql.DB) {
+	for _, m := range migrations {
+		db.Exec(m) // error intentionally ignored; see migrations comment above
+	}
 }
 
 func (s *Store) Close() error {

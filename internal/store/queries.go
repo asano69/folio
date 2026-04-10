@@ -41,6 +41,7 @@ type Book struct {
 	Title        string
 	Source       string
 	Status       string
+	FileMtime    int64
 	MissingSince *string
 }
 
@@ -100,18 +101,19 @@ func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	return entries, rows.Err()
 }
 
-// UpsertBook inserts a new book or updates its title, source, and clears
-// missing_since if it already exists. Status is intentionally excluded from
-// the UPDATE so that user-set status is preserved across re-scans.
+// UpsertBook inserts a new book or updates its title, source, file_mtime, and
+// clears missing_since if it already exists. Status is intentionally excluded
+// from the UPDATE so that user-set status is preserved across re-scans.
 func (s *Store) UpsertBook(b storage.Book) error {
 	_, err := s.db.Exec(`
-		INSERT INTO books (id, title, source)
-		VALUES (?, ?, ?)
+		INSERT INTO books (id, title, source, file_mtime)
+		VALUES (?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			title         = excluded.title,
 			source        = excluded.source,
+			file_mtime    = excluded.file_mtime,
 			missing_since = NULL
-	`, b.ID, b.Title, b.Source)
+	`, b.ID, b.Title, b.Source, b.FileMtime)
 	return err
 }
 
@@ -213,6 +215,28 @@ func (s *Store) HasThumbnail(bookID string) (bool, error) {
 	return count > 0, err
 }
 
+// HasPageThumbnail reports whether a thumbnail exists for the given page.
+func (s *Store) HasPageThumbnail(bookID, pageHash string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM page_thumbnails WHERE book_id = ? AND page_hash = ?`,
+		bookID, pageHash,
+	).Scan(&count)
+	return count > 0, err
+}
+
+// UpsertPageThumbnail inserts or replaces a page-level thumbnail.
+func (s *Store) UpsertPageThumbnail(bookID, pageHash string, data []byte) error {
+	_, err := s.db.Exec(`
+		INSERT INTO page_thumbnails (book_id, page_hash, data)
+		VALUES (?, ?, ?)
+		ON CONFLICT(book_id, page_hash) DO UPDATE SET
+			data       = excluded.data,
+			created_at = CURRENT_TIMESTAMP
+	`, bookID, pageHash, data)
+	return err
+}
+
 // UpdateBookTitle updates the title of an existing book.
 func (s *Store) UpdateBookTitle(id, title string) error {
 	_, err := s.db.Exec(`UPDATE books SET title = ? WHERE id = ?`, title, id)
@@ -221,7 +245,11 @@ func (s *Store) UpdateBookTitle(id, title string) error {
 
 // ListBooks returns all books ordered by title, including missing ones.
 func (s *Store) ListBooks() ([]Book, error) {
-	rows, err := s.db.Query(`SELECT id, title, source, status, missing_since FROM books ORDER BY title`)
+	rows, err := s.db.Query(`
+		SELECT id, title, source, status, file_mtime, missing_since
+		FROM books
+		ORDER BY title
+	`)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +258,7 @@ func (s *Store) ListBooks() ([]Book, error) {
 	var books []Book
 	for rows.Next() {
 		var b Book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.MissingSince); err != nil {
+		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince); err != nil {
 			return nil, err
 		}
 		books = append(books, b)
@@ -243,7 +271,8 @@ func (s *Store) ListBooks() ([]Book, error) {
 // the scanned subtree only.
 func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
 	rows, err := s.db.Query(
-		`SELECT id, title, source, status, missing_since FROM books WHERE source LIKE ? || '/%'`,
+		`SELECT id, title, source, status, file_mtime, missing_since
+		 FROM books WHERE source LIKE ? || '/%'`,
 		dirPath,
 	)
 	if err != nil {
@@ -254,7 +283,7 @@ func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
 	var books []Book
 	for rows.Next() {
 		var b Book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.MissingSince); err != nil {
+		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince); err != nil {
 			return nil, err
 		}
 		books = append(books, b)
@@ -266,8 +295,8 @@ func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
 func (s *Store) GetBook(id string) (*Book, error) {
 	var b Book
 	err := s.db.QueryRow(
-		`SELECT id, title, source, status, missing_since FROM books WHERE id = ?`, id,
-	).Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.MissingSince)
+		`SELECT id, title, source, status, file_mtime, missing_since FROM books WHERE id = ?`, id,
+	).Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -502,7 +531,7 @@ func (s *Store) RemoveBookFromCollection(collectionID int, bookID string) error 
 // ListBooksInCollection returns books belonging to a collection, ordered by title.
 func (s *Store) ListBooksInCollection(collectionID int) ([]Book, error) {
 	rows, err := s.db.Query(`
-		SELECT b.id, b.title, b.source, b.status, b.missing_since
+		SELECT b.id, b.title, b.source, b.status, b.file_mtime, b.missing_since
 		FROM books b
 		JOIN collection_books cb ON cb.book_id = b.id
 		WHERE cb.collection_id = ?
@@ -516,7 +545,7 @@ func (s *Store) ListBooksInCollection(collectionID int) ([]Book, error) {
 	var books []Book
 	for rows.Next() {
 		var b Book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.MissingSince); err != nil {
+		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince); err != nil {
 			return nil, err
 		}
 		books = append(books, b)
@@ -529,26 +558,4 @@ func (s *Store) CountAllBooks() (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM books WHERE missing_since IS NULL`).Scan(&n)
 	return n, err
-}
-
-// HasPageThumbnail reports whether a thumbnail exists for the given page.
-func (s *Store) HasPageThumbnail(bookID, pageHash string) (bool, error) {
-	var count int
-	err := s.db.QueryRow(
-		`SELECT COUNT(*) FROM page_thumbnails WHERE book_id = ? AND page_hash = ?`,
-		bookID, pageHash,
-	).Scan(&count)
-	return count > 0, err
-}
-
-// UpsertPageThumbnail inserts or replaces a page-level thumbnail.
-func (s *Store) UpsertPageThumbnail(bookID, pageHash string, data []byte) error {
-	_, err := s.db.Exec(`
-		INSERT INTO page_thumbnails (book_id, page_hash, data)
-		VALUES (?, ?, ?)
-		ON CONFLICT(book_id, page_hash) DO UPDATE SET
-			data       = excluded.data,
-			created_at = CURRENT_TIMESTAMP
-	`, bookID, pageHash, data)
-	return err
 }

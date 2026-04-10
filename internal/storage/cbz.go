@@ -23,6 +23,42 @@ type folioMeta struct {
 	Title string `json:"title"`
 }
 
+// openCBZMeta reads only folio.json from a CBZ and returns book identity and
+// the file's modification time. Pages are not listed and hashes are not computed,
+// making this significantly faster than openCBZ for already-registered books.
+//
+// If folio.json is absent, the returned Book has an empty ID, signalling that a
+// full open via openCBZ is required to generate one.
+func openCBZMeta(path string) (Book, error) {
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		return Book{}, fmt.Errorf("open cbz %s: %w", path, err)
+	}
+	defer r.Close()
+
+	meta, err := readMeta(r)
+	if err != nil {
+		return Book{}, err
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return Book{}, fmt.Errorf("stat %s: %w", path, err)
+	}
+
+	if meta == nil {
+		// No folio.json yet; full open will generate one.
+		return Book{Source: path, FileMtime: info.ModTime().Unix()}, nil
+	}
+
+	return Book{
+		ID:        meta.ID,
+		Title:     meta.Title,
+		Source:    path,
+		FileMtime: info.ModTime().Unix(),
+	}, nil
+}
+
 func openCBZ(path string) (Book, error) {
 	r, err := zip.OpenReader(path)
 	if err != nil {
@@ -67,11 +103,19 @@ func openCBZ(path string) (Book, error) {
 		return Book{}, err
 	}
 
+	// Stat after any potential writeMeta call so FileMtime reflects the final
+	// state of the file on disk.
+	info, err := os.Stat(path)
+	if err != nil {
+		return Book{}, fmt.Errorf("stat %s: %w", path, err)
+	}
+
 	return Book{
-		ID:     meta.ID,
-		Title:  meta.Title,
-		Source: path,
-		Pages:  pages,
+		ID:        meta.ID,
+		Title:     meta.Title,
+		Source:    path,
+		FileMtime: info.ModTime().Unix(),
+		Pages:     pages,
 	}, nil
 }
 

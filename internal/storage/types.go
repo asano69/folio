@@ -2,10 +2,11 @@ package storage
 
 // Book represents a scanned CBZ file.
 type Book struct {
-	ID     string
-	Title  string
-	Source string // absolute path to the CBZ file
-	Pages  []Page
+	ID        string
+	Title     string
+	Source    string // absolute path to the CBZ file
+	FileMtime int64  // Unix timestamp from os.Stat; used to detect CBZ changes between scans
+	Pages     []Page
 }
 
 // Page represents a single image entry inside a CBZ.
