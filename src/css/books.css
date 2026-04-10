@@ -6,7 +6,6 @@ body:has(.library-layout) header {
 /* Remove max-width and padding from main on the library page */
 main:has(.library-layout) {
   padding: 0;
-  max-width: none;
 }
 
 /* ── Library header ───────────────────────────────────────────── */

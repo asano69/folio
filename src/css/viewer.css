@@ -6,7 +6,6 @@ body:has(.viewer-layout) header {
 /* Remove main padding and width cap when the viewer is active */
 main:has(.viewer-layout) {
   padding: 0;
-  max-width: none;
 }
 
 /* ── Viewer layout ────────────────────────────────────────────── */

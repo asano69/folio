@@ -13,22 +13,21 @@
   color: var(--text-muted);
 }
 
-/* Fixed-size grid columns to match the card width */
+/* Columns are at least 300px wide and grow to fill available space */
 .pages-grid {
-  grid-template-columns: repeat(auto-fill, 300px);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
 /* ── Page card ────────────────────────────────────────────────── */
 .page-card {
-  width: 300px;
   text-decoration: none;
   color: inherit;
   display: block;
 }
 
-/* Thumbnail area: fixed 300×150, image centered at natural size */
+/* Thumbnail area: fixed 150px tall, full card width */
 .page-thumbnail {
-  width: 300px;
+  width: 100%;
   height: 150px;
   background: var(--bg-subtle);
   display: flex;
