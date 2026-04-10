@@ -1,0 +1,135 @@
+/* ── Drawing canvas wrapper ───────────────────────────────────
+   Wraps the page image and the SVG overlay inside .viewer-image
+   so the overlay can be absolutely positioned over the image.
+──────────────────────────────────────────────────────────────── */
+.drawing-canvas {
+  position: relative;
+  height: 100%;
+}
+
+/* ── SVG overlay ──────────────────────────────────────────────
+   Covers the image exactly. isolation: isolate ensures that
+   mix-blend-mode: destination-out on the erase layer only
+   composites within the SVG context and never erases the
+   underlying page image.
+──────────────────────────────────────────────────────────────── */
+.drawing-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  isolation: isolate;
+  pointer-events: none;
+  overflow: visible; /* allow strokes near the edge to be fully visible */
+}
+
+/* ── Right overlay button group ──────────────────────────────── */
+.viewer-overlay-right {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: var(--z-overlay);
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ── Draw pane ────────────────────────────────────────────────
+   Shared pane structure comes from pane.css.
+──────────────────────────────────────────────────────────────── */
+#draw-pane {
+  width: 260px;
+}
+
+.draw-pane-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── Tool selector ────────────────────────────────────────────── */
+.draw-tools {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.draw-tool-btn {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.draw-tool-btn.active {
+  background: var(--color-primary-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+/* ── Form fields ──────────────────────────────────────────────── */
+.draw-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.draw-field label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.draw-field input[type="color"] {
+  width: 100%;
+  height: 2.5rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius);
+  cursor: pointer;
+  padding: 0.2rem;
+  background: var(--bg-surface);
+}
+
+.draw-field input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+/* ── Save button ──────────────────────────────────────────────── */
+.draw-actions button {
+  width: 100%;
+  padding: 0.5rem;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  transition: background var(--transition-fast);
+}
+
+.draw-actions button:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+
+.draw-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Hint text ────────────────────────────────────────────────── */
+.draw-hint {
+  font-size: 0.8rem;
+  color: var(--text-faint);
+  text-align: center;
+  line-height: 1.5;
+}

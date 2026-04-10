@@ -23,6 +23,8 @@ export function initEditor(): void {
 
   const open = (): void => {
     snapshot = captureValues();
+    // Notify other panes (e.g. draw pane) so they can close.
+    document.dispatchEvent(new CustomEvent('folio:edit-pane-open'));
     pane.classList.add('open');
     backdrop?.classList.add('visible');
     toggleBtn.classList.add('active');

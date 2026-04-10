@@ -5,6 +5,7 @@ import { initEditor } from './viewer/editor';
 import { initTOC } from './viewer/toc';
 import { initSearch } from './ui/search';
 import { initCollections } from './ui/collections';
+import { initDrawing } from './viewer/drawing';
 
 document.addEventListener('DOMContentLoaded', () => {
     initViewer();
@@ -14,6 +15,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initTOC();
     initSearch();
     initCollections();
-
+    initDrawing();
 });
-
