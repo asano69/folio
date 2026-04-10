@@ -89,4 +89,8 @@ folio
 | POST | `/api/collections/{id}/books/{bookID}` | `CollectionsAPIHandler` | ブック追加 |
 | DELETE | `/api/collections/{id}/books/{bookID}` | `CollectionsAPIHandler` | ブック削除 |
 
+<<<<<<< HEAD
 `/api/pages/` の drawing サブルートはハンドラ内でパスを見て分岐しています（`server.go` には `/api/pages/` の1エントリのみ）。
+=======
+`/api/pages/` の drawing サブルートはハンドラ内でパスを見て分岐しています（`server.go` には `/api/pages/` の1エントリのみ）。
+>>>>>>> 85772a49e41984b9191dc9ba01d77d272571d6d4
