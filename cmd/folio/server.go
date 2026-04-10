@@ -52,7 +52,12 @@ func (s *server) setupRoutes() {
 		"templates/viewer.html",
 	))
 
-	s.mux.Handle("/", &handlers.BooksHandler{
+	bookTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+		"templates/layout.html",
+		"templates/book.html",
+	))
+
+	s.mux.Handle("/", &handlers.ShelfHandler{
 		Store:    s.store,
 		Template: shelfTemplate,
 	})
@@ -60,6 +65,11 @@ func (s *server) setupRoutes() {
 	s.mux.Handle("/viewer", &handlers.ViewerHandler{
 		Store:    s.store,
 		Template: viewerTemplate,
+	})
+
+	s.mux.Handle("/book", &handlers.BookHandler{
+		Store:    s.store,
+		Template: bookTemplate,
 	})
 
 	s.mux.Handle("/images/", &handlers.ImageHandler{
@@ -85,16 +95,6 @@ func (s *server) setupRoutes() {
 	cHandler := &handlers.CollectionsAPIHandler{Store: s.store}
 	s.mux.Handle("/api/collections", cHandler)  // exact match for POST (create)
 	s.mux.Handle("/api/collections/", cHandler) // prefix match for /{id} and /{id}/books/{bookID}
-
-	bookTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
-		"templates/layout.html",
-		"templates/book.html",
-	))
-
-	s.mux.Handle("/book", &handlers.PagesHandler{
-		Store:    s.store,
-		Template: bookTemplate,
-	})
 
 	s.mux.Handle("/page-thumbnails/", &handlers.PageThumbnailHandler{
 		Store: s.store,

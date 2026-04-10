@@ -7,8 +7,8 @@ import (
 	"folio/internal/store"
 )
 
-// PagesHandler renders GET /book?book={id} — a thumbnail grid of all pages.
-type PagesHandler struct {
+// BookHandler renders GET /book?book={id} — a thumbnail grid of all pages.
+type BookHandler struct {
 	Store    *store.Store
 	Template *template.Template
 }
@@ -22,7 +22,7 @@ type pageGridItem struct {
 	Attribute string
 }
 
-func (h *PagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *BookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	bookID := r.URL.Query().Get("book")
 	if bookID == "" {
 		http.Error(w, "book ID required", http.StatusBadRequest)

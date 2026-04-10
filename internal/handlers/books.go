@@ -8,10 +8,9 @@ import (
 	"folio/internal/store"
 )
 
-type BooksHandler struct {
+type ShelfHandler struct {
 	Store    *store.Store
 	Template *template.Template
-	// NOT Template *html/template.Template
 }
 
 // bookView is the template model for a single book card.
@@ -22,7 +21,7 @@ type bookView struct {
 	MissingSince string // empty means present; non-empty is the missing-since timestamp
 }
 
-func (h *BooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *ShelfHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Parse optional collection filter.
 	collectionID := 0
 	if s := r.URL.Query().Get("collection"); s != "" {
