@@ -39,7 +39,10 @@ export function initImageDisplay() {
   }
 
   // Wheel zoom anchored to the cursor position.
-  image.addEventListener('wheel', (e: WheelEvent) => {
+  // Attached to the container so zoom still works when the drawing overlay
+  // sits on top and intercepts pointer events on the image.
+  const wheelTarget = (image.closest('.viewer-image') as HTMLElement) ?? image;
+  wheelTarget.addEventListener('wheel', (e: WheelEvent) => {
     e.preventDefault();
 
     const prevScale = state.scale;

@@ -47,6 +47,13 @@ function handleKeyboardNavigation(e: KeyboardEvent) {
     return;
   }
 
+  // Suppress page navigation while the drawing pane is active so that key
+  // events intended for drawing (Ctrl+Z etc.) are not misinterpreted, and so
+  // the user does not accidentally navigate away with unsaved strokes.
+  if (document.getElementById('draw-pane')?.classList.contains('open')) {
+    return;
+  }
+
   // Suppress page navigation when focus is inside a form element
   const active = document.activeElement;
   if (active && (

@@ -59,12 +59,46 @@
             </div>
         </div>
     </div>
+
+    {{/* Draw pane - slides in from right */}}
+    <div id="draw-backdrop" class="pane-backdrop"></div>
+    <div id="draw-pane" class="pane pane--right">
+        <div class="pane-header">
+            <span class="pane-heading">Draw</span>
+            <button class="pane-close-btn" id="draw-close">✕</button>
+        </div>
+        <div class="draw-pane-body pane-body">
+            <div class="draw-tools">
+                <button id="draw-tool-pen" class="draw-tool-btn active">✏ Pen</button>
+                <button id="draw-tool-eraser" class="draw-tool-btn">⬜ Eraser</button>
+            </div>
+            <div class="draw-field" id="draw-color-field">
+                <label for="draw-color">Color</label>
+                <input type="color" id="draw-color" value="#e74c3c">
+            </div>
+            <div class="draw-field" id="draw-opacity-field">
+                <label>Opacity — <span id="draw-opacity-val">100%</span></label>
+                <input type="range" id="draw-opacity" min="10" max="100" value="100" step="5">
+            </div>
+            <div class="draw-field">
+                <label>Size — <span id="draw-size-val">4px</span></label>
+                <input type="range" id="draw-size" min="1" max="50" value="4">
+            </div>
+            <div class="draw-actions">
+                <button id="draw-save">Save</button>
+            </div>
+            <p class="draw-hint">Ctrl+Z to undo<br>Ctrl+Y to redo</p>
+        </div>
+    </div>
     {{end}}
 
     {{/* Overlay buttons - fixed position, sit on top of the image */}}
     <button class="viewer-overlay-btn viewer-overlay-btn--left" id="toc-toggle">☰ Contents</button>
     {{if .CurrentImage}}
-    <button class="viewer-overlay-btn viewer-overlay-btn--right" id="edit-toggle">✎ Edit</button>
+    <div class="viewer-overlay-right">
+        <button class="viewer-overlay-btn" id="draw-toggle">✍ Draw</button>
+        <button class="viewer-overlay-btn" id="edit-toggle">✎ Edit</button>
+    </div>
     {{end}}
 
     <div class="viewer-container">
@@ -82,7 +116,17 @@
 
         {{if .CurrentImage}}
         <div class="viewer-image">
-            <img src="/images/{{.Book.ID}}/{{.CurrentImage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
+            <div class="drawing-canvas">
+                <img src="/images/{{.Book.ID}}/{{.CurrentImage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
+                <svg id="drawing-overlay" class="drawing-overlay"
+                     data-book-id="{{.Book.ID}}"
+                     data-page-hash="{{.CurrentImage.Hash}}"
+                     {{if .Note.SvgDrawing}}data-drawing="{{.Note.SvgDrawing}}"{{end}}
+                     xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">
+                    <g id="drawing-ink"></g>
+                    <g id="drawing-erase" style="mix-blend-mode: destination-out"></g>
+                </svg>
+            </div>
         </div>
         {{end}}
 
