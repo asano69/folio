@@ -9,7 +9,7 @@ export function initViewer() {
       const pageNum = target.value;
 
       if (bookId && pageNum) {
-        window.location.href = `/viewer?book=${bookId}&page=${pageNum}`;
+        window.location.href = `/books/${bookId}/pages/${pageNum}`;
       }
     });
   }
