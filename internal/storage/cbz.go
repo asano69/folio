@@ -24,7 +24,7 @@ type folioMeta struct {
 }
 
 // openCBZMeta reads only folio.json from a CBZ and returns book identity and
-// the file's modification time. Pages are not listed and hashes are not computed,
+// the file's modification time. Images are not listed and hashes are not computed,
 // making this significantly faster than openCBZ for already-registered books.
 //
 // If folio.json is absent, the returned Book has an empty ID, signalling that a
@@ -73,7 +73,7 @@ func openCBZ(path string) (Book, error) {
 
 	// If no folio.json found, generate one and write it back.
 	// writeMeta closes r before overwriting the file (ZIP structure requires a full rewrite),
-	// so we must reopen the archive afterwards to read page entries.
+	// so we must reopen the archive afterwards to read image entries.
 	if meta == nil {
 		id, err := uuid.NewV7()
 		if err != nil {
@@ -90,7 +90,7 @@ func openCBZ(path string) (Book, error) {
 		}
 		meta = m
 
-		// Reopen after the rewrite so listPages can read the updated archive.
+		// Reopen after the rewrite so listImages can read the updated archive.
 		r, err = zip.OpenReader(path)
 		if err != nil {
 			return Book{}, fmt.Errorf("reopen cbz after write %s: %w", path, err)
@@ -98,7 +98,7 @@ func openCBZ(path string) (Book, error) {
 	}
 	defer r.Close()
 
-	pages, err := listPages(r)
+	images, err := listImages(r)
 	if err != nil {
 		return Book{}, err
 	}
@@ -115,18 +115,18 @@ func openCBZ(path string) (Book, error) {
 		Title:     meta.Title,
 		Source:    path,
 		FileMtime: info.ModTime().Unix(),
-		Pages:     pages,
+		Pages:     images,
 	}, nil
 }
 
-// OpenBook opens a single CBZ file and returns its book data including pages
+// OpenBook opens a single CBZ file and returns its book data including images
 // with hashes. It is the exported equivalent of openCBZ, intended for use by
 // commands that operate on one book at a time (e.g. "folio hash <uuid>").
 func OpenBook(path string) (Book, error) {
 	return openCBZ(path)
 }
 
-// OpenPage returns a reader for a single page inside a CBZ.
+// OpenPage returns a reader for a single image inside a CBZ.
 func OpenPage(cbzPath, filename string) (io.ReadCloser, error) {
 	r, err := zip.OpenReader(cbzPath)
 	if err != nil {
@@ -253,10 +253,10 @@ func writeMeta(path string, r *zip.ReadCloser, meta *folioMeta) error {
 	return os.WriteFile(path, buf.Bytes(), 0644)
 }
 
-// listPages returns image entries from an open zip, sorted by filename.
-// Each page's Hash is computed as the SHA-256 of its uncompressed bytes.
-func listPages(r *zip.ReadCloser) ([]Page, error) {
-	var pages []Page
+// listImages returns image entries from an open zip, sorted by filename.
+// Each entry's Hash is computed as the SHA-256 of its uncompressed bytes.
+func listImages(r *zip.ReadCloser) ([]ImageEntry, error) {
+	var images []ImageEntry
 	for _, f := range r.File {
 		if f.FileInfo().IsDir() {
 			continue
@@ -271,18 +271,18 @@ func listPages(r *zip.ReadCloser) ([]Page, error) {
 			return nil, fmt.Errorf("hash %s: %w", f.Name, err)
 		}
 
-		pages = append(pages, Page{Filename: f.Name, Hash: hash})
+		images = append(images, ImageEntry{Filename: f.Name, Hash: hash})
 	}
 
-	sort.Slice(pages, func(i, j int) bool {
-		return pages[i].Filename < pages[j].Filename
+	sort.Slice(images, func(i, j int) bool {
+		return images[i].Filename < images[j].Filename
 	})
 
-	for i := range pages {
-		pages[i].Number = i + 1
+	for i := range images {
+		images[i].Number = i + 1
 	}
 
-	return pages, nil
+	return images, nil
 }
 
 // hashEntry computes the SHA-256 of a zip entry's uncompressed bytes.

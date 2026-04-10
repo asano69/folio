@@ -28,13 +28,13 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pages, err := h.Store.ListPages(bookID)
+	images, err := h.Store.ListImages(bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	totalPages := len(pages)
+	totalPages := len(images)
 
 	pageNum := 1
 	if pageNumStr != "" {
@@ -46,16 +46,16 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		pageNum = totalPages
 	}
 
-	var currentPage *store.Page
+	var currentImage *store.Image
 	if totalPages > 0 {
-		currentPage = &pages[pageNum-1]
+		currentImage = &images[pageNum-1]
 	}
 
-	// Fetch note keyed by the page's content hash, which is stable across
-	// re-scans and CBZ page deletions.
+	// Fetch note keyed by the image's content hash, which is stable across
+	// re-scans and CBZ image deletions.
 	var note store.Note
-	if currentPage != nil {
-		note, err = h.Store.GetNote(bookID, currentPage.Hash)
+	if currentImage != nil {
+		note, err = h.Store.GetNote(bookID, currentImage.Hash)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -79,8 +79,8 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	data := struct {
 		Book         *store.Book
-		CurrentPage  *store.Page
-		Pages        []store.Page
+		CurrentImage *store.Image
+		Images       []store.Image
 		PageNum      int
 		TotalPages   int
 		HasPrev      bool
@@ -91,8 +91,8 @@ func (h *ViewerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ActiveTocIdx int
 	}{
 		Book:         book,
-		CurrentPage:  currentPage,
-		Pages:        pages,
+		CurrentImage: currentImage,
+		Images:       images,
 		PageNum:      pageNum,
 		TotalPages:   totalPages,
 		HasPrev:      pageNum > 1,

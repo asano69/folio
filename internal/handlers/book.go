@@ -7,14 +7,14 @@ import (
 	"folio/internal/store"
 )
 
-// BookHandler renders GET /book?book={id} — a thumbnail grid of all pages.
-type BookHandler struct {
+// BookImagesHandler renders GET /book?book={id} — a thumbnail grid of all images.
+type BookImagesHandler struct {
 	Store    *store.Store
 	Template *template.Template
 }
 
-// pageGridItem is the template model for a single page card.
-type pageGridItem struct {
+// imageGridItem is the template model for a single image card.
+type imageGridItem struct {
 	Number    int
 	Hash      string
 	HasThumb  bool
@@ -22,7 +22,7 @@ type pageGridItem struct {
 	Attribute string
 }
 
-func (h *BookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *BookImagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	bookID := r.URL.Query().Get("book")
 	if bookID == "" {
 		http.Error(w, "book ID required", http.StatusBadRequest)
@@ -35,7 +35,7 @@ func (h *BookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pages, err := h.Store.ListPages(bookID)
+	images, err := h.Store.ListImages(bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -47,20 +47,20 @@ func (h *BookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	thumbSet, err := h.Store.ListPageHashesWithThumbnails(bookID)
+	thumbSet, err := h.Store.ListImageHashesWithThumbnails(bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	items := make([]pageGridItem, 0, len(pages))
-	for _, p := range pages {
-		item := pageGridItem{
-			Number:   p.Number,
-			Hash:     p.Hash,
-			HasThumb: thumbSet[p.Hash],
+	items := make([]imageGridItem, 0, len(images))
+	for _, img := range images {
+		item := imageGridItem{
+			Number:   img.Number,
+			Hash:     img.Hash,
+			HasThumb: thumbSet[img.Hash],
 		}
-		if n, ok := notes[p.Hash]; ok {
+		if n, ok := notes[img.Hash]; ok {
 			item.NoteTitle = n.Title
 			item.Attribute = n.Attribute
 		}
@@ -68,11 +68,11 @@ func (h *BookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Book  *store.Book
-		Pages []pageGridItem
+		Book   *store.Book
+		Images []imageGridItem
 	}{
-		Book:  book,
-		Pages: items,
+		Book:   book,
+		Images: items,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {

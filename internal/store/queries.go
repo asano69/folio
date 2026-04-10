@@ -45,8 +45,8 @@ type Book struct {
 	MissingSince *string
 }
 
-// Page is the DB representation of a page.
-type Page struct {
+// Image is the DB representation of a single scanned image inside a CBZ.
+type Image struct {
 	ID       int
 	BookID   string
 	Number   int
@@ -54,11 +54,11 @@ type Page struct {
 	Hash     string
 }
 
-// Note holds user-authored metadata for a single page.
+// Note holds user-authored metadata for a single image.
 // ID is the integer primary key, used as a stable reference for note_tags.
 // SvgDrawing holds raw SVG markup; nil when no drawing has been saved.
-// PageHash is the SHA-256 of the page's uncompressed image bytes, which
-// remains stable across re-scans and CBZ page deletions.
+// PageHash is the SHA-256 of the image's uncompressed bytes, which
+// remains stable across re-scans and CBZ image deletions.
 type Note struct {
 	ID         int
 	BookID     string
@@ -70,13 +70,13 @@ type Note struct {
 	UpdatedAt  string
 }
 
-// TocEntry is a single entry in the table of contents derived from section-attributed pages.
+// TocEntry is a single entry in the table of contents derived from section-attributed images.
 type TocEntry struct {
 	PageNum int
 	Title   string
 }
 
-// GetTOC returns all section-attributed pages for a book, ordered by page number.
+// GetTOC returns all section-attributed images for a book, ordered by page number.
 func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	rows, err := s.db.Query(`
 		SELECT p.number, n.title
@@ -128,9 +128,9 @@ func (s *Store) MarkBookMissing(id string) error {
 	return err
 }
 
-// UpsertPages replaces all pages for a book, then rebuilds the sections table
-// so that start_page values stay correct if page numbers have shifted.
-func (s *Store) UpsertPages(bookID string, pages []storage.Page) error {
+// UpsertImages replaces all image records for a book, then rebuilds the sections
+// table so that start_page values stay correct if page numbers have shifted.
+func (s *Store) UpsertImages(bookID string, entries []storage.ImageEntry) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -141,11 +141,11 @@ func (s *Store) UpsertPages(bookID string, pages []storage.Page) error {
 		return err
 	}
 
-	for _, p := range pages {
+	for _, e := range entries {
 		if _, err := tx.Exec(`
 			INSERT INTO pages (book_id, number, filename, hash)
 			VALUES (?, ?, ?, ?)
-		`, bookID, p.Number, p.Filename, p.Hash); err != nil {
+		`, bookID, e.Number, e.Filename, e.Hash); err != nil {
 			return err
 		}
 	}
@@ -158,7 +158,7 @@ func (s *Store) UpsertPages(bookID string, pages []storage.Page) error {
 }
 
 // rebuildSections re-derives the sections table from notes where attribute = 'section'.
-// Sections whose source page no longer exists are removed. Existing section status
+// Sections whose source image no longer exists are removed. Existing section status
 // values are preserved via ON CONFLICT DO UPDATE (only title is overwritten).
 func rebuildSections(tx *sql.Tx, bookID string) error {
 	_, err := tx.Exec(`
@@ -215,8 +215,8 @@ func (s *Store) HasThumbnail(bookID string) (bool, error) {
 	return count > 0, err
 }
 
-// HasPageThumbnail reports whether a thumbnail exists for the given page.
-func (s *Store) HasPageThumbnail(bookID, pageHash string) (bool, error) {
+// HasImageThumbnail reports whether a thumbnail exists for the given image.
+func (s *Store) HasImageThumbnail(bookID, pageHash string) (bool, error) {
 	var count int
 	err := s.db.QueryRow(
 		`SELECT COUNT(*) FROM page_thumbnails WHERE book_id = ? AND page_hash = ?`,
@@ -225,8 +225,8 @@ func (s *Store) HasPageThumbnail(bookID, pageHash string) (bool, error) {
 	return count > 0, err
 }
 
-// UpsertPageThumbnail inserts or replaces a page-level thumbnail.
-func (s *Store) UpsertPageThumbnail(bookID, pageHash string, data []byte) error {
+// UpsertImageThumbnail inserts or replaces an image-level thumbnail.
+func (s *Store) UpsertImageThumbnail(bookID, pageHash string, data []byte) error {
 	_, err := s.db.Exec(`
 		INSERT INTO page_thumbnails (book_id, page_hash, data)
 		VALUES (?, ?, ?)
@@ -303,8 +303,8 @@ func (s *Store) GetBook(id string) (*Book, error) {
 	return &b, err
 }
 
-// ListPages returns all pages for a book ordered by number.
-func (s *Store) ListPages(bookID string) ([]Page, error) {
+// ListImages returns all images for a book ordered by number.
+func (s *Store) ListImages(bookID string) ([]Image, error) {
 	rows, err := s.db.Query(`
 		SELECT id, book_id, number, filename, hash
 		FROM pages
@@ -316,34 +316,34 @@ func (s *Store) ListPages(bookID string) ([]Page, error) {
 	}
 	defer rows.Close()
 
-	var pages []Page
+	var images []Image
 	for rows.Next() {
-		var p Page
-		if err := rows.Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash); err != nil {
+		var img Image
+		if err := rows.Scan(&img.ID, &img.BookID, &img.Number, &img.Filename, &img.Hash); err != nil {
 			return nil, err
 		}
-		pages = append(pages, p)
+		images = append(images, img)
 	}
-	return pages, rows.Err()
+	return images, rows.Err()
 }
 
-// GetCoverPage returns the first page of a book, or nil if none exists.
-func (s *Store) GetCoverPage(bookID string) (*Page, error) {
-	var p Page
+// GetCoverImage returns the first image of a book, or nil if none exists.
+func (s *Store) GetCoverImage(bookID string) (*Image, error) {
+	var img Image
 	err := s.db.QueryRow(`
 		SELECT id, book_id, number, filename, hash
 		FROM pages
 		WHERE book_id = ?
 		ORDER BY number
 		LIMIT 1
-	`, bookID).Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash)
+	`, bookID).Scan(&img.ID, &img.BookID, &img.Number, &img.Filename, &img.Hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
-	return &p, err
+	return &img, err
 }
 
-// GetNote returns the note for a page identified by its hash, or a zero-value
+// GetNote returns the note for an image identified by its hash, or a zero-value
 // Note if none exists.
 func (s *Store) GetNote(bookID, pageHash string) (Note, error) {
 	var n Note
@@ -362,7 +362,7 @@ func (s *Store) GetNote(bookID, pageHash string) (Note, error) {
 	return n, err
 }
 
-// UpsertNote inserts or updates the text fields of a page note (title, attribute,
+// UpsertNote inserts or updates the text fields of an image note (title, attribute,
 // body), then synchronises the sections table. svg_drawing is intentionally
 // excluded so that saving text annotations never clobbers an existing drawing.
 // Use UpsertDrawing to update the SVG drawing independently.
@@ -393,7 +393,7 @@ func (s *Store) UpsertNote(n Note) error {
 	return tx.Commit()
 }
 
-// UpsertDrawing inserts or updates only the svg_drawing field of a page note.
+// UpsertDrawing inserts or updates only the svg_drawing field of an image note.
 // Passing nil clears an existing drawing. Text fields (title, attribute, body)
 // are not touched.
 func (s *Store) UpsertDrawing(bookID, pageHash string, svg *string) error {
@@ -409,7 +409,7 @@ func (s *Store) UpsertDrawing(bookID, pageHash string, svg *string) error {
 
 // syncSection keeps the sections table in sync with notes where attribute = 'section'.
 // Called within a transaction whenever a note is saved.
-// If the page hash cannot be resolved to a page number the sync is skipped silently.
+// If the image hash cannot be resolved to a page number the sync is skipped silently.
 func syncSection(tx *sql.Tx, bookID, pageHash, attribute, title string) error {
 	var pageNum int
 	err := tx.QueryRow(
@@ -436,8 +436,8 @@ func syncSection(tx *sql.Tx, bookID, pageHash, attribute, title string) error {
 	return err
 }
 
-// HasPages reports whether any pages are registered for the given book.
-func (s *Store) HasPages(bookID string) (bool, error) {
+// HasImages reports whether any images are registered for the given book.
+func (s *Store) HasImages(bookID string) (bool, error) {
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&count)
 	return count > 0, err
@@ -560,8 +560,8 @@ func (s *Store) CountAllBooks() (int, error) {
 	return n, err
 }
 
-// ListNotesByBook returns all notes for a book keyed by page hash.
-// Used to avoid N+1 queries when rendering a page grid.
+// ListNotesByBook returns all notes for a book keyed by image hash.
+// Used to avoid N+1 queries when rendering an image grid.
 func (s *Store) ListNotesByBook(bookID string) (map[string]Note, error) {
 	rows, err := s.db.Query(`
 		SELECT id, book_id, page_hash, title, attribute, body, svg_drawing, updated_at
@@ -587,9 +587,9 @@ func (s *Store) ListNotesByBook(bookID string) (map[string]Note, error) {
 	return notes, rows.Err()
 }
 
-// ListPageHashesWithThumbnails returns the set of page hashes that have a
+// ListImageHashesWithThumbnails returns the set of image hashes that have a
 // stored thumbnail for the given book, allowing a single query instead of N.
-func (s *Store) ListPageHashesWithThumbnails(bookID string) (map[string]bool, error) {
+func (s *Store) ListImageHashesWithThumbnails(bookID string) (map[string]bool, error) {
 	rows, err := s.db.Query(
 		`SELECT page_hash FROM page_thumbnails WHERE book_id = ?`, bookID,
 	)
@@ -609,8 +609,8 @@ func (s *Store) ListPageHashesWithThumbnails(bookID string) (map[string]bool, er
 	return set, rows.Err()
 }
 
-// GetPageThumbnail returns the JPEG thumbnail bytes for a page, or nil if not found.
-func (s *Store) GetPageThumbnail(bookID, pageHash string) ([]byte, error) {
+// GetImageThumbnail returns the JPEG thumbnail bytes for an image, or nil if not found.
+func (s *Store) GetImageThumbnail(bookID, pageHash string) ([]byte, error) {
 	var data []byte
 	err := s.db.QueryRow(
 		`SELECT data FROM page_thumbnails WHERE book_id = ? AND page_hash = ?`,

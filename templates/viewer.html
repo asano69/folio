@@ -26,11 +26,11 @@
     </div>
 
     {{/* Edit pane - slides in from right */}}
-    {{if .CurrentPage}}
+    {{if .CurrentImage}}
     <div id="edit-backdrop" class="pane-backdrop"></div>
     <div id="edit-pane" class="pane pane--right"
          data-book-id="{{.Book.ID}}"
-         data-page-hash="{{.CurrentPage.Hash}}">
+         data-page-hash="{{.CurrentImage.Hash}}">
         <div class="pane-header">
             <span class="pane-heading">Edit Page</span>
             <button class="pane-close-btn" id="edit-close">✕</button>
@@ -63,7 +63,7 @@
 
     {{/* Overlay buttons - fixed position, sit on top of the image */}}
     <button class="viewer-overlay-btn viewer-overlay-btn--left" id="toc-toggle">☰ Contents</button>
-    {{if .CurrentPage}}
+    {{if .CurrentImage}}
     <button class="viewer-overlay-btn viewer-overlay-btn--right" id="edit-toggle">✎ Edit</button>
     {{end}}
 
@@ -80,9 +80,9 @@
         <span class="next-btn disabled" hidden></span>
         {{end}}
 
-        {{if .CurrentPage}}
+        {{if .CurrentImage}}
         <div class="viewer-image">
-            <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
+            <img src="/images/{{.Book.ID}}/{{.CurrentImage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
         </div>
         {{end}}
 
@@ -100,7 +100,7 @@
             <div class="page-selector">
                 <label for="page-select">Jump to page:</label>
                 <select id="page-select" data-book-id="{{.Book.ID}}">
-                    {{range .Pages}}
+                    {{range .Images}}
                     <option value="{{.Number}}" {{if eq .Number $.PageNum}}selected{{end}}>
                         Page {{.Number}}
                     </option>

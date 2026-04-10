@@ -67,7 +67,7 @@ func (s *server) setupRoutes() {
 		Template: viewerTemplate,
 	})
 
-	s.mux.Handle("/book", &handlers.BookHandler{
+	s.mux.Handle("/book", &handlers.BookImagesHandler{
 		Store:    s.store,
 		Template: bookTemplate,
 	})
@@ -96,7 +96,7 @@ func (s *server) setupRoutes() {
 	s.mux.Handle("/api/collections", cHandler)  // exact match for POST (create)
 	s.mux.Handle("/api/collections/", cHandler) // prefix match for /{id} and /{id}/books/{bookID}
 
-	s.mux.Handle("/page-thumbnails/", &handlers.PageThumbnailHandler{
+	s.mux.Handle("/page-thumbnails/", &handlers.ImageThumbnailHandler{
 		Store: s.store,
 	})
 }

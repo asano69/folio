@@ -16,8 +16,8 @@ const (
 	pageThumbnailWidth = 300
 )
 
-// GenerateThumbnail opens the first image page in a CBZ and returns a
-// JPEG-encoded thumbnail scaled to thumbnailWidth pixels wide.
+// GenerateThumbnail opens the first image in a CBZ and returns a
+// JPEG-encoded thumbnail scaled to bookThumbnailWidth pixels wide.
 func GenerateThumbnail(cbzPath string) ([]byte, error) {
 	r, err := zip.OpenReader(cbzPath)
 	if err != nil {
@@ -25,43 +25,43 @@ func GenerateThumbnail(cbzPath string) ([]byte, error) {
 	}
 	defer r.Close()
 
-	pages, err := listPages(r)
+	images, err := listImages(r)
 	if err != nil {
-		return nil, fmt.Errorf("list pages %s: %w", cbzPath, err)
+		return nil, fmt.Errorf("list images %s: %w", cbzPath, err)
 	}
-	if len(pages) == 0 {
-		return nil, fmt.Errorf("no image pages in %s", cbzPath)
+	if len(images) == 0 {
+		return nil, fmt.Errorf("no images in %s", cbzPath)
 	}
 
-	first := pages[0].Filename
+	first := images[0].Filename
 	for _, f := range r.File {
 		if f.Name == first {
 			return thumbnailFromEntry(f, bookThumbnailWidth)
 		}
 	}
-	return nil, fmt.Errorf("page entry %s not found in %s", first, cbzPath)
+	return nil, fmt.Errorf("image entry %s not found in %s", first, cbzPath)
 }
 
-// PageThumbnailRequest pairs a page filename with its content hash.
+// ImageThumbnailRequest pairs an image filename with its content hash.
 // Hash is carried through so callers can key the result without re-deriving it.
-type PageThumbnailRequest struct {
+type ImageThumbnailRequest struct {
 	Filename string
 	Hash     string
 }
 
-// PageThumbnailResult holds the generated thumbnail for one page.
-type PageThumbnailResult struct {
+// ImageThumbnailResult holds the generated thumbnail for one image.
+type ImageThumbnailResult struct {
 	Hash string
 	Data []byte
 }
 
-// GeneratePageThumbnails opens cbzPath once and generates JPEG thumbnails for
-// every requested page. Pages not found in the archive are silently skipped.
+// GenerateImageThumbnails opens cbzPath once and generates JPEG thumbnails for
+// every requested image. Images not found in the archive are silently skipped.
 //
 // Opening the ZIP once amortises the cost of reading the central directory
-// (stored at the end of the file) across all pages, which is significantly
-// faster than calling a per-page function in a loop.
-func GeneratePageThumbnails(cbzPath string, reqs []PageThumbnailRequest) ([]PageThumbnailResult, error) {
+// (stored at the end of the file) across all images, which is significantly
+// faster than calling a per-image function in a loop.
+func GenerateImageThumbnails(cbzPath string, reqs []ImageThumbnailRequest) ([]ImageThumbnailResult, error) {
 	r, err := zip.OpenReader(cbzPath)
 	if err != nil {
 		return nil, fmt.Errorf("open cbz %s: %w", cbzPath, err)
@@ -74,7 +74,7 @@ func GeneratePageThumbnails(cbzPath string, reqs []PageThumbnailRequest) ([]Page
 		need[req.Filename] = req.Hash
 	}
 
-	var results []PageThumbnailResult
+	var results []ImageThumbnailResult
 	for _, f := range r.File {
 		hash, ok := need[f.Name]
 		if !ok {
@@ -84,7 +84,7 @@ func GeneratePageThumbnails(cbzPath string, reqs []PageThumbnailRequest) ([]Page
 		if err != nil {
 			return nil, fmt.Errorf("thumbnail %s: %w", f.Name, err)
 		}
-		results = append(results, PageThumbnailResult{Hash: hash, Data: data})
+		results = append(results, ImageThumbnailResult{Hash: hash, Data: data})
 	}
 	return results, nil
 }

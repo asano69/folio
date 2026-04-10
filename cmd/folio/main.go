@@ -48,7 +48,7 @@ func main() {
 		if len(os.Args) >= 3 {
 			bookID = os.Args[2]
 		}
-		if err := runPageThumbnails(cfg, bookID); err != nil {
+		if err := runImageThumbnails(cfg, bookID); err != nil {
 			fmt.Fprintf(os.Stderr, "page-thumbnails: %v\n", err)
 			os.Exit(1)
 		}
@@ -104,7 +104,7 @@ func runScan(cfg *config.Config, scanPath string) error {
 	fmt.Printf("Scanning %s\n", absScanPath)
 
 	// Phase 1: lightweight meta scan — reads only folio.json from each CBZ.
-	// This gives us each book's UUID and file mtime without hashing any pages.
+	// This gives us each book's UUID and file mtime without hashing any images.
 	metaBooks, err := storage.ScanMeta(absScanPath)
 	if err != nil {
 		return err
@@ -189,17 +189,17 @@ func runScan(cfg *config.Config, scanPath string) error {
 		}
 	}
 
-	// Upsert new/changed books and always refresh their page records, since the
-	// CBZ contents may have changed (pages added, removed, or reordered).
+	// Upsert new/changed books and always refresh their image records, since the
+	// CBZ contents may have changed (images added, removed, or reordered).
 	for _, b := range changedBooks {
 		foundIDs[b.ID] = struct{}{}
 		if err := db.UpsertBook(b); err != nil {
 			return fmt.Errorf("upsert book %s: %w", b.ID, err)
 		}
-		if err := db.UpsertPages(b.ID, b.Pages); err != nil {
-			return fmt.Errorf("upsert pages %s: %w", b.ID, err)
+		if err := db.UpsertImages(b.ID, b.Pages); err != nil {
+			return fmt.Errorf("upsert images %s: %w", b.ID, err)
 		}
-		fmt.Printf("  %s (%d pages)\n", b.Title, len(b.Pages))
+		fmt.Printf("  %s (%d images)\n", b.Title, len(b.Pages))
 	}
 
 	// Combine all found books for the thumbnail phase.
@@ -317,14 +317,14 @@ func runThumbnail(cfg *config.Config, bookID string) error {
 	return nil
 }
 
-// runPageThumbnails generates page-level thumbnails for a single book (when
-// bookID is non-empty) or for all non-missing books in the library. Pages that
+// runImageThumbnails generates image-level thumbnails for a single book (when
+// bookID is non-empty) or for all non-missing books in the library. Images that
 // already have a thumbnail in page_thumbnails are skipped.
 //
 // Jobs are batched per book: each worker opens a CBZ once and processes all
-// pages that need thumbnails in a single pass, avoiding repeated ZIP central
+// images that need thumbnails in a single pass, avoiding repeated ZIP central
 // directory reads. DB writes remain sequential.
-func runPageThumbnails(cfg *config.Config, bookID string) error {
+func runImageThumbnails(cfg *config.Config, bookID string) error {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
 		return err
@@ -348,12 +348,12 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 		}
 	}
 
-	// Collect one job per book containing only pages that need thumbnails.
+	// Collect one job per book containing only images that need thumbnails.
 	type bookJob struct {
 		bookID   string
 		source   string
 		reqCount int
-		reqs     []storage.PageThumbnailRequest
+		reqs     []storage.ImageThumbnailRequest
 	}
 	var jobs []bookJob
 
@@ -361,22 +361,22 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 		if b.MissingSince != nil {
 			continue // CBZ file is gone; nothing to read
 		}
-		pages, err := db.ListPages(b.ID)
+		images, err := db.ListImages(b.ID)
 		if err != nil {
-			return fmt.Errorf("list pages %s: %w", b.ID, err)
+			return fmt.Errorf("list images %s: %w", b.ID, err)
 		}
-		var reqs []storage.PageThumbnailRequest
-		for _, p := range pages {
-			if p.Hash == "" {
-				fmt.Fprintf(os.Stderr, "  skip page %d of %s: no hash (run folio hash <uuid>)\n", p.Number, b.ID)
+		var reqs []storage.ImageThumbnailRequest
+		for _, img := range images {
+			if img.Hash == "" {
+				fmt.Fprintf(os.Stderr, "  skip image %d of %s: no hash (run folio hash <uuid>)\n", img.Number, b.ID)
 				continue
 			}
-			exists, err := db.HasPageThumbnail(b.ID, p.Hash)
+			exists, err := db.HasImageThumbnail(b.ID, img.Hash)
 			if err != nil {
-				return fmt.Errorf("check page thumbnail %s/%s: %w", b.ID, p.Hash, err)
+				return fmt.Errorf("check image thumbnail %s/%s: %w", b.ID, img.Hash, err)
 			}
 			if !exists {
-				reqs = append(reqs, storage.PageThumbnailRequest{Filename: p.Filename, Hash: p.Hash})
+				reqs = append(reqs, storage.ImageThumbnailRequest{Filename: img.Filename, Hash: img.Hash})
 			}
 		}
 		if len(reqs) > 0 {
@@ -385,7 +385,7 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 	}
 
 	if len(jobs) == 0 {
-		fmt.Println("All page thumbnails are up to date.")
+		fmt.Println("All image thumbnails are up to date.")
 		return nil
 	}
 
@@ -393,12 +393,12 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 	for _, j := range jobs {
 		total += j.reqCount
 	}
-	fmt.Printf("Generating %d page thumbnails across %d books...\n", total, len(jobs))
+	fmt.Printf("Generating %d image thumbnails across %d books...\n", total, len(jobs))
 
 	type bookResult struct {
 		bookID   string
 		reqCount int
-		results  []storage.PageThumbnailResult
+		results  []storage.ImageThumbnailResult
 		err      error
 	}
 
@@ -416,7 +416,7 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 		go func() {
 			defer wg.Done()
 			for j := range jobCh {
-				res, err := storage.GeneratePageThumbnails(j.source, j.reqs)
+				res, err := storage.GenerateImageThumbnails(j.source, j.reqs)
 				resultCh <- bookResult{j.bookID, j.reqCount, res, err}
 			}
 		}()
@@ -433,9 +433,9 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 			skipped += r.reqCount
 			continue
 		}
-		for _, pt := range r.results {
-			if err := db.UpsertPageThumbnail(r.bookID, pt.Hash, pt.Data); err != nil {
-				return fmt.Errorf("store page thumbnail: %w", err)
+		for _, it := range r.results {
+			if err := db.UpsertImageThumbnail(r.bookID, it.Hash, it.Data); err != nil {
+				return fmt.Errorf("store image thumbnail: %w", err)
 			}
 			done++
 		}
@@ -445,7 +445,7 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 	return nil
 }
 
-// runHash recomputes page hashes for a single book identified by UUID and
+// runHash recomputes image hashes for a single book identified by UUID and
 // updates the DB. Use this when the CBZ contents have changed since the last scan.
 func runHash(cfg *config.Config, bookID string) error {
 	db, err := store.Open(cfg.DataPath)
@@ -467,11 +467,11 @@ func runHash(cfg *config.Config, bookID string) error {
 		return err
 	}
 
-	if err := db.UpsertPages(bookID, b.Pages); err != nil {
+	if err := db.UpsertImages(bookID, b.Pages); err != nil {
 		return err
 	}
 
-	fmt.Printf("Pages updated for %s (%s): %d pages\n", book.Title, bookID, len(b.Pages))
+	fmt.Printf("Images updated for %s (%s): %d images\n", book.Title, bookID, len(b.Pages))
 	return nil
 }
 
