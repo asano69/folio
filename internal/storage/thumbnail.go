@@ -11,7 +11,10 @@ import (
 	"golang.org/x/image/draw"
 )
 
-const thumbnailWidth = 200
+const (
+	bookThumbnailWidth = 400
+	pageThumbnailWidth = 200
+)
 
 // GenerateThumbnail opens the first image page in a CBZ and returns a
 // JPEG-encoded thumbnail scaled to thumbnailWidth pixels wide.
@@ -33,7 +36,7 @@ func GenerateThumbnail(cbzPath string) ([]byte, error) {
 	first := pages[0].Filename
 	for _, f := range r.File {
 		if f.Name == first {
-			return thumbnailFromEntry(f)
+			return thumbnailFromEntry(f, bookThumbnailWidth)
 		}
 	}
 	return nil, fmt.Errorf("page entry %s not found in %s", first, cbzPath)
@@ -77,7 +80,7 @@ func GeneratePageThumbnails(cbzPath string, reqs []PageThumbnailRequest) ([]Page
 		if !ok {
 			continue
 		}
-		data, err := thumbnailFromEntry(f)
+		data, err := thumbnailFromEntry(f, pageThumbnailWidth)
 		if err != nil {
 			return nil, fmt.Errorf("thumbnail %s: %w", f.Name, err)
 		}
@@ -87,7 +90,7 @@ func GeneratePageThumbnails(cbzPath string, reqs []PageThumbnailRequest) ([]Page
 }
 
 // thumbnailFromEntry decodes and resizes a single ZIP entry into a JPEG thumbnail.
-func thumbnailFromEntry(f *zip.File) ([]byte, error) {
+func thumbnailFromEntry(f *zip.File, width int) ([]byte, error) {
 	rc, err := f.Open()
 	if err != nil {
 		return nil, err
@@ -100,7 +103,7 @@ func thumbnailFromEntry(f *zip.File) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, resizeToWidth(src, thumbnailWidth), &jpeg.Options{Quality: 85}); err != nil {
+	if err := jpeg.Encode(&buf, resizeToWidth(src, width), &jpeg.Options{Quality: 85}); err != nil {
 		return nil, fmt.Errorf("encode: %w", err)
 	}
 	return buf.Bytes(), nil
