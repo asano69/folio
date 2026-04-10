@@ -108,21 +108,21 @@ export function initDrawing(): void {
     overlay.style.touchAction   = active ? 'none'       : '';
   };
 
-  const openPane = (): void => {
-    // Close the edit pane if it is open, without triggering its snapshot logic.
-    document.dispatchEvent(new CustomEvent('folio:draw-pane-open'));
-    pane.classList.add('open');
-    backdrop?.classList.add('visible');
-    toggleBtn.classList.add('active');
-    setDrawingMode(true);
-  };
 
-  const closePane = (): void => {
-    pane.classList.remove('open');
-    backdrop?.classList.remove('visible');
-    toggleBtn.classList.remove('active');
-    setDrawingMode(false);
-  };
+	const openPane = (): void => {
+	    document.dispatchEvent(new CustomEvent('folio:draw-pane-open'));
+	    pane.classList.add('open');
+	    // No backdrop: the user must be able to click the image to draw.
+	    toggleBtn.classList.add('active');
+	    setDrawingMode(true);
+	};
+
+	const closePane = (): void => {
+	    pane.classList.remove('open');
+	    toggleBtn.classList.remove('active');
+	    setDrawingMode(false);
+	};
+
 
   toggleBtn.addEventListener('click', () => {
     pane.classList.contains('open') ? closePane() : openPane();
