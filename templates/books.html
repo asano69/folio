@@ -29,7 +29,6 @@
                 </a>
                 <div class="collection-actions">
                     <button class="collection-rename-btn" title="Rename">✎</button>
-                    <a href="/pages?book={{.ID}}" class="pages-link" title="Page list">⊞</a>
                     <button class="collection-delete-btn" title="Delete">✕</button>
                 </div>
             </div>
@@ -59,7 +58,7 @@
             <div class="books-grid">
                 {{range .Books}}
                 <div class="book-card" draggable="true" data-book-id="{{.ID}}">
-                    <a href="/viewer?book={{.ID}}">
+                    <a href="/pages?book={{.ID}}">
                         <div class="book-thumbnail">
                             {{if .HasThumbnail}}
                             <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
@@ -70,7 +69,7 @@
                     </a>
                     <div class="book-info">
                         <h3 class="book-title" data-book-id="{{.ID}}">
-                            <a href="/viewer?book={{.ID}}">{{.Title}}</a>
+                            <a href="/pages?book={{.ID}}">{{.Title}}</a>
                         </h3>
                         <button class="rename-btn" data-book-id="{{.ID}}" title="Rename">✎</button>
                         {{if $.ActiveCollectionID}}
