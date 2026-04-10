@@ -3,20 +3,20 @@
 {{define "content"}}
 <div class="books-container">
     <div class="library-header">
-        <h2><a href="/book/{{.Book.ID}}/bibliographic" class="pages-book-link">{{.Book.Title}}</a></h2>
+        <h2><a href="/books/{{.Book.ID}}/bibliography" class="pages-book-link">{{.Book.Title}}</a></h2>
         <span class="pages-count">{{len .Items}} pages</span>
     </div>
 
     <nav class="book-view-tabs">
-        <a href="/book/{{.Book.ID}}/overview" class="book-view-tab book-view-tab--active">Overview</a>
-        <a href="/book/{{.Book.ID}}/bibliographic" class="book-view-tab">Bibliographic</a>
+        <a href="/books/{{.Book.ID}}/overview" class="book-view-tab book-view-tab--active">Overview</a>
+        <a href="/books/{{.Book.ID}}/bibliography" class="book-view-tab">Bibliographic</a>
     </nav>
 
     {{if .Items}}
     <div class="books-grid pages-grid" data-book-id="{{.Book.ID}}">
         {{range .Items}}
         <div class="book-card page-card page-card--{{.Status}}" data-page-hash="{{.Hash}}">
-            <a href="/viewer?book={{$.Book.ID}}&page={{.Number}}" class="page-card-link">
+            <a href="/books/{{$.Book.ID}}/pages/{{.Number}}" class="page-card-link">
                 <div class="book-thumbnail page-thumbnail">
                     {{if .HasThumb}}
                     <img src="/page-thumbnails/{{$.Book.ID}}/{{.Hash}}" alt="Page {{.Number}}">

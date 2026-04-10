@@ -12,7 +12,7 @@
         <nav class="toc-nav pane-body">
             {{if .TOC}}
             {{range $i, $e := .TOC}}
-            <a href="/viewer?book={{$.Book.ID}}&page={{$e.PageNum}}"
+            <a href="/books/{{$.Book.ID}}/pages/{{$e.PageNum}}"
                class="toc-entry{{if eq $i $.ActiveTocIdx}} toc-entry-active{{end}}">
                 {{$e.Title}}
             </a>
@@ -104,12 +104,12 @@
     <div class="viewer-container">
         {{/* Hidden anchors provide hrefs for keyboard navigation without occupying layout space */}}
         {{if .HasPrev}}
-        <a href="/viewer?book={{.Book.ID}}&page={{sub .PageNum 1}}" class="prev-btn" hidden></a>
+        <a href="/books/{{.Book.ID}}/pages/{{sub .PageNum 1}}" class="prev-btn" hidden></a>
         {{else}}
         <span class="prev-btn disabled" hidden></span>
         {{end}}
         {{if .HasNext}}
-        <a href="/viewer?book={{.Book.ID}}&page={{add .PageNum 1}}" class="next-btn" hidden></a>
+        <a href="/books/{{.Book.ID}}/pages/{{add .PageNum 1}}" class="next-btn" hidden></a>
         {{else}}
         <span class="next-btn disabled" hidden></span>
         {{end}}

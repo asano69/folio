@@ -7,8 +7,8 @@
     </div>
 
     <nav class="book-view-tabs">
-        <a href="/book/{{.Book.ID}}/overview" class="book-view-tab">Overview</a>
-        <a href="/book/{{.Book.ID}}/bibliographic" class="book-view-tab book-view-tab--active">Bibliographic</a>
+        <a href="/books/{{.Book.ID}}/overview" class="book-view-tab">Overview</a>
+        <a href="/books/{{.Book.ID}}/bibliography" class="book-view-tab book-view-tab--active">Bibliographic</a>
     </nav>
 
     <div class="bibliographic-layout">
@@ -26,7 +26,7 @@
             {{if .TOC}}
             <nav class="bibliographic-toc">
                 {{range .TOC}}
-                <a href="/viewer?book={{$.Book.ID}}&page={{.PageNum}}" class="bibliographic-toc-entry">
+                <a href="/books/{{$.Book.ID}}/pages/{{.PageNum}}" class="bibliographic-toc-entry">
                     <span class="bibliographic-toc-page">p.{{.PageNum}}</span>
                     <span class="bibliographic-toc-title">{{.Title}}</span>
                 </a>

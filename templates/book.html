@@ -3,14 +3,14 @@
 {{define "content"}}
 <div class="books-container">
     <div class="library-header">
-        <h2><a href="/viewer?book={{.Book.ID}}" class="pages-book-link">{{.Book.Title}}</a></h2>
+        <h2><a href="/books/{{.Book.ID}}/overview" class="pages-book-link">{{.Book.Title}}</a></h2>
         <span class="pages-count">{{len .Images}} pages</span>
     </div>
 
     {{if .Images}}
     <div class="books-grid pages-grid">
         {{range .Images}}
-        <a href="/viewer?book={{$.Book.ID}}&page={{.Number}}" class="book-card page-card">
+        <a href="/books/{{$.Book.ID}}/pages/{{.Number}}" class="book-card page-card">
             <div class="book-thumbnail page-thumbnail">
                 {{if .HasThumb}}
                 <img src="/page-thumbnails/{{$.Book.ID}}/{{.Hash}}" alt="Page {{.Number}}">
