@@ -4,24 +4,15 @@
 //   - A transparent SVG element is absolutely positioned over the page image.
 //   - The SVG shares the image's CSS transform (synced via MutationObserver) so
 //     that zoom and pan apply to both simultaneously.
-//   - Ink strokes live in <g id="drawing-ink">; eraser strokes live in
-//     <g id="drawing-erase" style="mix-blend-mode: destination-out">.
-//   - The SVG has isolation: isolate so destination-out only erases within the
-//     SVG's compositing context, never the underlying page image.
+//   - Ink strokes live in <g id="drawing-ink">.
+//   - The eraser works by hit-testing ink paths and removing matching elements
+//     from the DOM, so new strokes drawn after erasing are never affected.
 //
-// Known limitation: because ink and erase strokes are stored in separate layers,
-// eraser strokes always apply to all ink regardless of draw order. Drawing ink
-// over an erased area then undoing the erase will reveal the ink underneath.
-// For typical annotation use this trade-off is acceptable.
+// Undo/redo history tracks two kinds of entries:
+//   - 'add'   : a single ink path that was appended
+//   - 'erase' : a set of ink paths that were removed (restored on undo)
 
 import { saveDrawing } from '../api';
-
-type LayerName = 'ink' | 'erase';
-
-interface Stroke {
-  element: SVGPathElement;
-  layer:   LayerName;
-}
 
 interface PenSettings {
   color:   string;
@@ -32,6 +23,12 @@ interface PenSettings {
 interface EraserSettings {
   size: number;
 }
+
+// A history entry is either an ink stroke that was added, or a set of paths
+// that were removed by the eraser.
+type HistoryEntry =
+  | { kind: 'add';   element: SVGPathElement }
+  | { kind: 'erase'; removed: SVGPathElement[] };
 
 export function initDrawing(): void {
   const toggleBtn = document.getElementById('draw-toggle')  as HTMLButtonElement | null;
@@ -53,17 +50,16 @@ export function initDrawing(): void {
     return;
   }
 
-  const inkLayer   = overlay.querySelector<SVGGElement>('#drawing-ink')!;
-  const eraseLayer = overlay.querySelector<SVGGElement>('#drawing-erase')!;
+  const inkLayer = overlay.querySelector<SVGGElement>('#drawing-ink')!;
 
   // ── State ──────────────────────────────────────────────────────────────────
 
   const pen:    PenSettings    = { color: '#e74c3c', opacity: 1, size: 4 };
   const eraser: EraserSettings = { size: 20 };
-  let activeTool: LayerName    = 'ink';
+  let activeTool: 'ink' | 'erase' = 'ink';
 
-  const undoStack: Stroke[] = [];
-  const redoStack: Stroke[] = [];
+  const undoStack: HistoryEntry[] = [];
+  const redoStack: HistoryEntry[] = [];
 
   // ── SVG viewBox ────────────────────────────────────────────────────────────
 
@@ -97,32 +93,30 @@ export function initDrawing(): void {
 
   const existingData = overlay.dataset.drawing;
   if (existingData) {
-    restoreDrawing(existingData, inkLayer, eraseLayer);
+    restoreDrawing(existingData, inkLayer);
   }
 
   // ── Pane open / close ──────────────────────────────────────────────────────
 
   const setDrawingMode = (active: boolean): void => {
-    overlay.style.pointerEvents = active ? 'all'        : 'none';
-    overlay.style.cursor        = active ? 'crosshair'  : '';
-    overlay.style.touchAction   = active ? 'none'       : '';
+    overlay.style.pointerEvents = active ? 'all'       : 'none';
+    overlay.style.cursor        = active ? 'crosshair' : '';
+    overlay.style.touchAction   = active ? 'none'      : '';
   };
 
+  const openPane = (): void => {
+    document.dispatchEvent(new CustomEvent('folio:draw-pane-open'));
+    pane.classList.add('open');
+    // No backdrop: the user must be able to click the image to draw.
+    toggleBtn.classList.add('active');
+    setDrawingMode(true);
+  };
 
-	const openPane = (): void => {
-	    document.dispatchEvent(new CustomEvent('folio:draw-pane-open'));
-	    pane.classList.add('open');
-	    // No backdrop: the user must be able to click the image to draw.
-	    toggleBtn.classList.add('active');
-	    setDrawingMode(true);
-	};
-
-	const closePane = (): void => {
-	    pane.classList.remove('open');
-	    toggleBtn.classList.remove('active');
-	    setDrawingMode(false);
-	};
-
+  const closePane = (): void => {
+    pane.classList.remove('open');
+    toggleBtn.classList.remove('active');
+    setDrawingMode(false);
+  };
 
   toggleBtn.addEventListener('click', () => {
     pane.classList.contains('open') ? closePane() : openPane();
@@ -159,7 +153,7 @@ export function initDrawing(): void {
     if (sizeVal) sizeVal.textContent = `${sizeInput?.value ?? '4'}px`;
   };
 
-  penBtn?.addEventListener('click', () => { activeTool = 'ink';   syncToolUI(); });
+  penBtn?.addEventListener('click',   () => { activeTool = 'ink';   syncToolUI(); });
   eraserBtn?.addEventListener('click', () => { activeTool = 'erase'; syncToolUI(); });
 
   colorInput?.addEventListener('input', () => {
@@ -185,7 +179,7 @@ export function initDrawing(): void {
     if (!saveBtn) return;
     saveBtn.disabled = true;
     try {
-      const svg = serializeDrawing(inkLayer, eraseLayer);
+      const svg = serializeDrawing(inkLayer);
       await saveDrawing(bookId, pageHash, svg);
     } catch (err) {
       console.error('Failed to save drawing:', err);
@@ -203,19 +197,21 @@ export function initDrawing(): void {
 
     if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
       e.preventDefault();
-      undoStroke(undoStack, redoStack);
+      undoEntry(undoStack, redoStack, inkLayer);
     } else if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) {
       e.preventDefault();
-      redoStroke(undoStack, redoStack, inkLayer, eraseLayer);
+      redoEntry(undoStack, redoStack, inkLayer);
     }
   });
 
   // ── Drawing interaction ────────────────────────────────────────────────────
 
-  let currentPath:  SVGPathElement | null = null;
-  let currentLayer: SVGGElement    | null = null;
+  let currentPath: SVGPathElement | null = null;
   let pathData = '';
   let drawing  = false;
+
+  // Paths removed during the current eraser drag, grouped into one history entry.
+  let currentEraseRemoved: SVGPathElement[] = [];
 
   overlay.addEventListener('pointerdown', (e: PointerEvent) => {
     if (e.button !== 0) return;
@@ -228,40 +224,122 @@ export function initDrawing(): void {
     const pt = toSVGPoint(overlay, e.clientX, e.clientY);
 
     if (activeTool === 'ink') {
-      currentPath  = makePenPath(pen, pt.x, pt.y);
-      currentLayer = inkLayer;
+      currentPath = makePenPath(pen, pt.x, pt.y);
+      pathData    = `M ${pt.x} ${pt.y}`;
+      currentPath.setAttribute('d', pathData);
+      inkLayer.appendChild(currentPath);
     } else {
-      currentPath  = makeEraserPath(eraser, pt.x, pt.y);
-      currentLayer = eraseLayer;
+      currentEraseRemoved = [];
+      eraseAt(inkLayer, pt.x, pt.y, eraser.size, currentEraseRemoved);
     }
 
-    pathData = `M ${pt.x} ${pt.y}`;
-    currentPath.setAttribute('d', pathData);
-    currentLayer.appendChild(currentPath);
     drawing = true;
   });
 
   overlay.addEventListener('pointermove', (e: PointerEvent) => {
-    if (!drawing || !currentPath) return;
-    const pt  = toSVGPoint(overlay, e.clientX, e.clientY);
-    pathData += ` L ${pt.x} ${pt.y}`;
-    currentPath.setAttribute('d', pathData);
+    if (!drawing) return;
+    const pt = toSVGPoint(overlay, e.clientX, e.clientY);
+
+    if (activeTool === 'ink' && currentPath) {
+      pathData += ` L ${pt.x} ${pt.y}`;
+      currentPath.setAttribute('d', pathData);
+    } else if (activeTool === 'erase') {
+      eraseAt(inkLayer, pt.x, pt.y, eraser.size, currentEraseRemoved);
+    }
   });
 
   const endStroke = (): void => {
-    if (!drawing || !currentPath || !currentLayer) return;
+    if (!drawing) return;
     drawing = false;
-    undoStack.push({ element: currentPath, layer: activeTool });
-    currentPath  = null;
-    currentLayer = null;
-    pathData     = '';
+
+    if (activeTool === 'ink' && currentPath) {
+      undoStack.push({ kind: 'add', element: currentPath });
+      currentPath = null;
+      pathData    = '';
+    } else if (activeTool === 'erase' && currentEraseRemoved.length > 0) {
+      undoStack.push({ kind: 'erase', removed: currentEraseRemoved });
+      currentEraseRemoved = [];
+    }
   };
 
   overlay.addEventListener('pointerup',     endStroke);
   overlay.addEventListener('pointercancel', endStroke);
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Eraser hit-testing ─────────────────────────────────────────────────────────
+
+// eraseAt removes all ink paths whose bounding box overlaps with a circle of
+// the given radius centred at (x, y). Removed elements are appended to the
+// `removed` array so the caller can record them for undo.
+//
+// Bounding-box intersection is a conservative approximation: it may match paths
+// whose strokes do not visually overlap the eraser, but is fast and reliable
+// across all browsers without needing getIntersectionList.
+function eraseAt(
+  inkLayer: SVGGElement,
+  x: number,
+  y: number,
+  size: number,
+  removed: SVGPathElement[],
+): void {
+  const half = size / 2;
+  // Iterate a static snapshot because we mutate the live collection.
+  const children = Array.from(inkLayer.children) as SVGPathElement[];
+  for (const path of children) {
+    const bb = path.getBBox();
+    const overlaps =
+      bb.x            < x + half &&
+      bb.x + bb.width > x - half &&
+      bb.y             < y + half &&
+      bb.y + bb.height > y - half;
+    if (overlaps) {
+      path.remove();
+      removed.push(path);
+    }
+  }
+}
+
+// ── Undo / redo helpers ────────────────────────────────────────────────────────
+
+function undoEntry(
+  undoStack: HistoryEntry[],
+  redoStack: HistoryEntry[],
+  inkLayer:  SVGGElement,
+): void {
+  const entry = undoStack.pop();
+  if (!entry) return;
+  if (entry.kind === 'add') {
+    entry.element.remove();
+  } else {
+    // Restore removed paths. Order is preserved; they are re-appended at the
+    // end of the layer, which may differ from the original Z-order when paths
+    // from multiple erase operations are interleaved, but is acceptable for
+    // annotation use.
+    for (const el of entry.removed) {
+      inkLayer.appendChild(el);
+    }
+  }
+  redoStack.push(entry);
+}
+
+function redoEntry(
+  undoStack: HistoryEntry[],
+  redoStack: HistoryEntry[],
+  inkLayer:  SVGGElement,
+): void {
+  const entry = redoStack.pop();
+  if (!entry) return;
+  if (entry.kind === 'add') {
+    inkLayer.appendChild(entry.element);
+  } else {
+    for (const el of entry.removed) {
+      el.remove();
+    }
+  }
+  undoStack.push(entry);
+}
+
+// ── Geometry helpers ───────────────────────────────────────────────────────────
 
 function toSVGPoint(svg: SVGSVGElement, clientX: number, clientY: number): DOMPoint {
   const pt = svg.createSVGPoint();
@@ -272,75 +350,37 @@ function toSVGPoint(svg: SVGSVGElement, clientX: number, clientY: number): DOMPo
 
 function makePenPath(p: PenSettings, x: number, y: number): SVGPathElement {
   const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  el.setAttribute('fill',              'none');
-  el.setAttribute('stroke',            p.color);
-  el.setAttribute('stroke-opacity',    String(p.opacity));
-  el.setAttribute('stroke-width',      String(p.size));
-  el.setAttribute('stroke-linecap',    'round');
-  el.setAttribute('stroke-linejoin',   'round');
-  el.setAttribute('d',                 `M ${x} ${y}`);
-  return el;
-}
-
-function makeEraserPath(e: EraserSettings, x: number, y: number): SVGPathElement {
-  const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   el.setAttribute('fill',            'none');
-  el.setAttribute('stroke',          'black'); // color is irrelevant; destination-out uses alpha
-  el.setAttribute('stroke-width',    String(e.size));
+  el.setAttribute('stroke',          p.color);
+  el.setAttribute('stroke-opacity',  String(p.opacity));
+  el.setAttribute('stroke-width',    String(p.size));
   el.setAttribute('stroke-linecap',  'round');
   el.setAttribute('stroke-linejoin', 'round');
   el.setAttribute('d',               `M ${x} ${y}`);
   return el;
 }
 
-function undoStroke(undoStack: Stroke[], redoStack: Stroke[]): void {
-  const stroke = undoStack.pop();
-  if (!stroke) return;
-  stroke.element.remove();
-  redoStack.push(stroke);
-}
-
-function redoStroke(
-  undoStack: Stroke[],
-  redoStack: Stroke[],
-  inkLayer:   SVGGElement,
-  eraseLayer: SVGGElement,
-): void {
-  const stroke = redoStack.pop();
-  if (!stroke) return;
-  const layer = stroke.layer === 'ink' ? inkLayer : eraseLayer;
-  layer.appendChild(stroke.element);
-  undoStack.push(stroke);
-}
+// ── Serialization ──────────────────────────────────────────────────────────────
 
 // serializeDrawing returns the inner SVG markup to persist, or null when the
 // ink layer is empty (nothing to save).
-function serializeDrawing(inkLayer: SVGGElement, eraseLayer: SVGGElement): string | null {
+function serializeDrawing(inkLayer: SVGGElement): string | null {
   if (inkLayer.childElementCount === 0) return null;
-  return inkLayer.outerHTML + eraseLayer.outerHTML;
+  return inkLayer.outerHTML;
 }
 
-// restoreDrawing parses previously saved markup and populates the live layers.
+// restoreDrawing parses previously saved markup and populates the ink layer.
 // Restored strokes are intentionally excluded from the undo stack so that
 // Ctrl+Z only operates on strokes drawn in the current session.
-function restoreDrawing(
-  data:       string,
-  inkLayer:   SVGGElement,
-  eraseLayer: SVGGElement,
-): void {
+function restoreDrawing(data: string, inkLayer: SVGGElement): void {
   const parser = new DOMParser();
-  const doc    = parser.parseFromString(
+  const doc = parser.parseFromString(
     `<svg xmlns="http://www.w3.org/2000/svg">${data}</svg>`,
     'image/svg+xml',
   );
 
-  const savedInk   = doc.querySelector('#drawing-ink');
-  const savedErase = doc.querySelector('#drawing-erase');
-
+  const savedInk = doc.querySelector('#drawing-ink');
   savedInk?.childNodes.forEach(node => {
     inkLayer.appendChild(document.importNode(node, true));
-  });
-  savedErase?.childNodes.forEach(node => {
-    eraseLayer.appendChild(document.importNode(node, true));
   });
 }
