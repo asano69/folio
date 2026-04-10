@@ -118,7 +118,11 @@
         <div class="viewer-image">
             <div class="drawing-canvas">
                 <img src="/images/{{.Book.ID}}/{{.CurrentImage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
-								<svg id="drawing-overlay" class="drawing-overlay" ...>
+								<svg id="drawing-overlay" class="drawing-overlay"
+								     data-book-id="{{.Book.ID}}"
+								     data-page-hash="{{.CurrentImage.Hash}}"
+								     {{if .Note.SvgDrawing}}data-drawing="{{.Note.SvgDrawing}}"{{end}}
+								     xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">
 								    <g id="drawing-ink"></g>
 								</svg>
             </div>
