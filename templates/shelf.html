@@ -3,6 +3,9 @@
 {{define "content"}}
 <div class="library-layout">
     <aside class="collection-sidebar">
+        <div class="collection-toolbar">
+            <button id="collection-edit-btn" class="collection-edit-btn" title="Edit collections">✎ Edit</button>
+        </div>
         <div class="collection-search-wrap">
             <input
                 type="search"
@@ -15,26 +18,23 @@
         <nav class="collection-nav">
             {{/* "All Books" is always visible and is not a drop zone */}}
             <a href="/" class="collection-item{{if eq .ActiveCollectionID 0}} collection-item--active{{end}}">
-                <span class="collection-icon">🌳</span>
-                <span class="collection-title">All Books</span>
                 <span class="collection-count">({{.TotalBookCount}})</span>
+                <span class="collection-title">All Books</span>
             </a>
             {{range .Collections}}
             <div class="collection-item collection-drop-zone{{if eq .ID $.ActiveCollectionID}} collection-item--active{{end}}"
                  data-collection-id="{{.ID}}">
+                <button class="collection-delete-btn" title="Delete" hidden>✕</button>
                 <a href="/?collection={{.ID}}" class="collection-link">
-                    <span class="collection-icon">🗃️</span>
-                    <span class="collection-title">{{.Title}}</span>
                     <span class="collection-count">({{.BookCount}})</span>
+                    <span class="collection-title">{{.Title}}</span>
                 </a>
-                <div class="collection-actions">
-                    <button class="collection-rename-btn" title="Rename">✎</button>
-                    <button class="collection-delete-btn" title="Delete">✕</button>
-                </div>
             </div>
             {{end}}
+            <div id="collection-add-item" class="collection-item collection-add-item" hidden>
+                <span class="collection-add-label">＋ Add Collection</span>
+            </div>
         </nav>
-        <button class="collection-new-btn" id="collection-new-btn">+ New Collection</button>
     </aside>
 
     <div class="books-main">

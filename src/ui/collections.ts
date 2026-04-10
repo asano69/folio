@@ -10,8 +10,7 @@ import {
 export function initCollections(): void {
   setupCollectionFilter();
   setupDragAndDrop();
-  setupCreateCollection();
-  setupCollectionActions();
+  setupEditMode();
   setupRemoveFromCollection();
 }
 
@@ -53,7 +52,14 @@ function setupDragAndDrop(): void {
       e.dataTransfer!.effectAllowed = 'copy';
       card.classList.add('dragging');
     });
-    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      // Clean up any stale drag-over state (e.g. when the drag is cancelled
+      // outside the browser window and dragleave does not fire).
+      document.querySelectorAll<HTMLElement>('.collection-drop-zone.drag-over').forEach(z => {
+        z.classList.remove('drag-over');
+      });
+    });
   });
 
   // Collection items are drop targets.
@@ -63,7 +69,15 @@ function setupDragAndDrop(): void {
       e.dataTransfer!.dropEffect = 'copy';
       zone.classList.add('drag-over');
     });
-    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+
+    // Chrome fires dragleave when the pointer moves over a child element.
+    // Only remove the class when the pointer has truly left the zone.
+    zone.addEventListener('dragleave', (e: DragEvent) => {
+      if (!zone.contains(e.relatedTarget as Node)) {
+        zone.classList.remove('drag-over');
+      }
+    });
+
     zone.addEventListener('drop', (e: DragEvent) => {
       e.preventDefault();
       zone.classList.remove('drag-over');
@@ -100,62 +114,48 @@ async function handleDrop(
   }
 }
 
-// ── Create collection ─────────────────────────────────────────
+// ── Edit mode ─────────────────────────────────────────────────
+//
+// The edit button above the search box toggles edit mode.
+// In edit mode:
+//   - A delete (✕) button appears on the left of each collection item.
+//   - Clicking the collection title starts an inline rename.
+//   - An "Add Collection" item appears at the bottom of the list.
 
-function setupCreateCollection(): void {
-  const btn = document.getElementById('collection-new-btn');
-  if (!btn) return;
+function setupEditMode(): void {
+  const editBtn = document.getElementById('collection-edit-btn') as HTMLButtonElement | null;
+  const addItem = document.getElementById('collection-add-item') as HTMLElement | null;
 
-  btn.addEventListener('click', () => {
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'collection-new-input';
-    input.placeholder = 'Collection name';
+  if (!editBtn) return;
 
-    btn.replaceWith(input);
-    input.focus();
+  let editMode = false;
 
-    let finishing = false;
+  const setEditMode = (active: boolean): void => {
+    editMode = active;
+    editBtn.classList.toggle('active', active);
 
-    const finish = async (): Promise<void> => {
-      if (finishing) return;
-      finishing = true;
-
-      const title = input.value.trim();
-      if (title) {
-        try {
-          await createCollection(title);
-          window.location.reload();
-          return;
-        } catch (err) {
-          console.error(err);
-        }
-      }
-      input.replaceWith(btn);
-    };
-
-    input.addEventListener('blur', finish);
-    input.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-      if (e.key === 'Escape') { input.value = ''; input.blur(); }
+    document.querySelectorAll<HTMLElement>('.collection-delete-btn').forEach(btn => {
+      btn.hidden = !active;
     });
-  });
-}
 
-// ── Rename and delete ─────────────────────────────────────────
+    if (addItem) addItem.hidden = !active;
+  };
 
-function setupCollectionActions(): void {
-  document.querySelectorAll<HTMLButtonElement>('.collection-rename-btn').forEach(btn => {
-    btn.addEventListener('click', (e: Event) => {
+  editBtn.addEventListener('click', () => setEditMode(!editMode));
+
+  // Clicking the collection link renames in edit mode; navigates normally otherwise.
+  document.querySelectorAll<HTMLElement>('.collection-drop-zone').forEach(zone => {
+    const link = zone.querySelector<HTMLElement>('.collection-link');
+    link?.addEventListener('click', (e: Event) => {
+      if (!editMode) return;
       e.preventDefault();
-      e.stopPropagation();
-      const item = btn.closest<HTMLElement>('.collection-drop-zone');
-      const titleEl = item?.querySelector<HTMLElement>('.collection-title');
-      if (!item || !titleEl) return;
-      startRenameCollection(item.dataset.collectionId!, titleEl);
+      const titleEl = zone.querySelector<HTMLElement>('.collection-title');
+      if (!titleEl) return;
+      startRenameCollection(zone.dataset.collectionId!, titleEl);
     });
   });
 
+  // Delete buttons.
   document.querySelectorAll<HTMLButtonElement>('.collection-delete-btn').forEach(btn => {
     btn.addEventListener('click', async (e: Event) => {
       e.preventDefault();
@@ -178,6 +178,47 @@ function setupCollectionActions(): void {
         console.error(err);
       }
     });
+  });
+
+  // Add new collection inline.
+  addItem?.addEventListener('click', () => startCreateCollection(addItem));
+}
+
+async function startCreateCollection(addItem: HTMLElement): Promise<void> {
+  const label = addItem.querySelector<HTMLElement>('.collection-add-label');
+  if (!label) return;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'collection-new-input';
+  input.placeholder = 'Collection name';
+
+  label.replaceWith(input);
+  input.focus();
+
+  let finishing = false;
+
+  const finish = async (): Promise<void> => {
+    if (finishing) return;
+    finishing = true;
+
+    const title = input.value.trim();
+    if (title) {
+      try {
+        await createCollection(title);
+        window.location.reload();
+        return;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    input.replaceWith(label);
+  };
+
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = ''; input.blur(); }
   });
 }
 
