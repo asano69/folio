@@ -1,0 +1,49 @@
+{{define "title"}}Overview — {{.Book.Title}} - folio{{end}}
+
+{{define "content"}}
+<div class="books-container">
+    <div class="library-header">
+        <h2><a href="/book/{{.Book.ID}}/bibliographic" class="pages-book-link">{{.Book.Title}}</a></h2>
+        <span class="pages-count">{{len .Items}} pages</span>
+    </div>
+
+    <nav class="book-view-tabs">
+        <a href="/book/{{.Book.ID}}/overview" class="book-view-tab book-view-tab--active">Overview</a>
+        <a href="/book/{{.Book.ID}}/bibliographic" class="book-view-tab">Bibliographic</a>
+    </nav>
+
+    {{if .Items}}
+    <div class="books-grid pages-grid" data-book-id="{{.Book.ID}}">
+        {{range .Items}}
+        <div class="book-card page-card page-card--{{.Status}}" data-page-hash="{{.Hash}}">
+            <a href="/viewer?book={{$.Book.ID}}&page={{.Number}}" class="page-card-link">
+                <div class="book-thumbnail page-thumbnail">
+                    {{if .HasThumb}}
+                    <img src="/page-thumbnails/{{$.Book.ID}}/{{.Hash}}" alt="Page {{.Number}}">
+                    {{else}}
+                    <div class="thumbnail-placeholder">{{.Number}}</div>
+                    {{end}}
+                </div>
+                <div class="page-card-info">
+                    <span class="page-number">p.{{.Number}}</span>
+                    {{if .Attribute}}<span class="page-attr-badge attr-{{.Attribute}}">{{.Attribute}}</span>{{end}}
+                    {{if .NoteTitle}}<span class="page-note-title">{{.NoteTitle}}</span>{{end}}
+                </div>
+            </a>
+            {{/* Status buttons appear on hover. Clicking stops propagation so the card link is not followed. */}}
+            {{/* TODO: multi-select for batch status updates (see shelf.html rubber-band pattern) */}}
+            {{/* TODO: attribute editing without opening the viewer */}}
+            <div class="page-status-buttons">
+                <button class="status-btn{{if eq .Status "unread"}} status-btn--active{{end}}" data-status="unread" title="Unread">−</button>
+                <button class="status-btn{{if eq .Status "reading"}} status-btn--active{{end}}" data-status="reading" title="Reading">…</button>
+                <button class="status-btn{{if eq .Status "read"}} status-btn--active{{end}}" data-status="read" title="Read">✓</button>
+                <button class="status-btn{{if eq .Status "skip"}} status-btn--active{{end}}" data-status="skip" title="Skip">↷</button>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="no-books">No pages found.</p>
+    {{end}}
+</div>
+{{end}}

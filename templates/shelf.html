@@ -59,7 +59,7 @@
             <div class="books-grid">
                 {{range .Books}}
                 <div class="book-card" draggable="true" data-book-id="{{.ID}}">
-                    <a href="/book?book={{.ID}}">
+                    <a href="/book/{{.ID}}/overview">
                         <div class="book-thumbnail">
                             {{if .HasThumbnail}}
                             <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
@@ -76,7 +76,7 @@
                     </a>
                     <div class="book-info">
                         <h3 class="book-title" data-book-id="{{.ID}}">
-                            <a href="/book?book={{.ID}}">{{.Title}}</a>
+                            <a href="/book/{{.ID}}/overview">{{.Title}}</a>
                         </h3>
                     </div>
                 </div>

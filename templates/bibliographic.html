@@ -1,0 +1,53 @@
+{{define "title"}}{{.Book.Title}} - folio{{end}}
+
+{{define "content"}}
+<div class="books-container">
+    <div class="library-header">
+        <h2>{{.Book.Title}}</h2>
+    </div>
+
+    <nav class="book-view-tabs">
+        <a href="/book/{{.Book.ID}}/overview" class="book-view-tab">Overview</a>
+        <a href="/book/{{.Book.ID}}/bibliographic" class="book-view-tab book-view-tab--active">Bibliographic</a>
+    </nav>
+
+    <div class="bibliographic-layout">
+        <section class="bibliographic-section">
+            <h3 class="bibliographic-section-title">Stats</h3>
+            <dl class="bibliographic-stats">
+                <dt>Pages</dt>
+                <dd>{{.PageCount}}</dd>
+            </dl>
+        </section>
+
+        {{/* TODO: sections list with per-section status — see store.GetTOC and store.TocEntry */}}
+        <section class="bibliographic-section">
+            <h3 class="bibliographic-section-title">Sections</h3>
+            {{if .TOC}}
+            <nav class="bibliographic-toc">
+                {{range .TOC}}
+                <a href="/viewer?book={{$.Book.ID}}&page={{.PageNum}}" class="bibliographic-toc-entry">
+                    <span class="bibliographic-toc-page">p.{{.PageNum}}</span>
+                    <span class="bibliographic-toc-title">{{.Title}}</span>
+                </a>
+                {{end}}
+            </nav>
+            {{else}}
+            <p class="bibliographic-empty">No sections yet. Mark pages with the "Section" attribute in the viewer to build a table of contents.</p>
+            {{end}}
+        </section>
+
+        <section class="bibliographic-section">
+            <h3 class="bibliographic-section-title">Notes</h3>
+            <div class="bibliographic-note-form">
+                <textarea
+                    id="book-note-body"
+                    class="bibliographic-note-textarea"
+                    data-book-id="{{.Book.ID}}"
+                    placeholder="Add notes about this book…">{{.NoteBody}}</textarea>
+                <button id="book-note-save" class="bibliographic-note-save">Save</button>
+            </div>
+        </section>
+    </div>
+</div>
+{{end}}
