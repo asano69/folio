@@ -8,12 +8,12 @@ import (
 	"folio/internal/store"
 )
 
-// PagesAPIHandler handles PUT /api/pages/{bookID}/{pageHash}.
-type PagesAPIHandler struct {
+// NoteAPIHandler handles PUT /api/pages/{bookID}/{pageHash}.
+type NoteAPIHandler struct {
 	Store *store.Store
 }
 
-func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *NoteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/pages/")
 	parts := strings.SplitN(path, "/", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {

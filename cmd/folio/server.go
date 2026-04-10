@@ -87,7 +87,7 @@ func (s *server) setupRoutes() {
 	})
 
 	// Handles PUT /api/pages/{bookID}/{pageHash} and PUT /api/pages/{bookID}/{pageHash}/drawing.
-	s.mux.Handle("/api/pages/", &handlers.PagesAPIHandler{
+	s.mux.Handle("/api/pages/", &handlers.NoteAPIHandler{
 		Store: s.store,
 	})
 
