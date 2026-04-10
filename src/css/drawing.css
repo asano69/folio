@@ -4,7 +4,11 @@
 ──────────────────────────────────────────────────────────────── */
 .drawing-canvas {
   position: relative;
-  height: 100%;
+  /* Use inline-block so the canvas sizes to the image rather than the
+     parent container. This keeps the SVG overlay exactly aligned with
+     the rendered image at any viewport width. */
+  display: inline-block;
+  line-height: 0; /* remove inline whitespace gap below the image */
 }
 
 /* ── SVG overlay ──────────────────────────────────────────────

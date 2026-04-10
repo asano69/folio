@@ -59,12 +59,12 @@ main:has(.viewer-layout) {
 }
 
 .viewer-image img {
-  height: 100%;
-  width: auto;
+  max-height: 100vh;
   max-width: 100%;
+  width: auto;
+  height: auto; /* natural aspect ratio; constrained by max-height/max-width */
   display: block;
 }
-
 /* Zoom-capable page image */
 #page-image {
   cursor: grab;
