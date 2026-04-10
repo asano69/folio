@@ -621,3 +621,66 @@ func (s *Store) GetImageThumbnail(bookID, pageHash string) ([]byte, error) {
 	}
 	return data, err
 }
+
+// CountPages returns the total number of pages registered for a book.
+func (s *Store) CountPages(bookID string) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&n)
+	return n, err
+}
+
+// GetBookNote returns the memo body for a book, or an empty string if none exists.
+func (s *Store) GetBookNote(bookID string) (string, error) {
+	var body string
+	err := s.db.QueryRow(`SELECT body FROM book_notes WHERE book_id = ?`, bookID).Scan(&body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return body, err
+}
+
+// UpsertBookNote inserts or updates the memo for a book.
+func (s *Store) UpsertBookNote(bookID, body string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO book_notes (book_id, body, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(book_id) DO UPDATE SET
+			body       = excluded.body,
+			updated_at = CURRENT_TIMESTAMP
+	`, bookID, body)
+	return err
+}
+
+// ListPageStatuses returns a map of page_hash -> status for all pages in a book
+// that have an explicit status record. Pages with no record are absent from the map.
+func (s *Store) ListPageStatuses(bookID string) (map[string]string, error) {
+	rows, err := s.db.Query(
+		`SELECT page_hash, status FROM page_status WHERE book_id = ?`, bookID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	m := make(map[string]string)
+	for rows.Next() {
+		var hash, status string
+		if err := rows.Scan(&hash, &status); err != nil {
+			return nil, err
+		}
+		m[hash] = status
+	}
+	return m, rows.Err()
+}
+
+// UpsertPageStatus sets the read status for a page identified by its content hash.
+func (s *Store) UpsertPageStatus(bookID, pageHash, status string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO page_status (book_id, page_hash, status, updated_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(book_id, page_hash) DO UPDATE SET
+			status     = excluded.status,
+			updated_at = CURRENT_TIMESTAMP
+	`, bookID, pageHash, status)
+	return err
+}

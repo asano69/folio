@@ -52,9 +52,14 @@ func (s *server) setupRoutes() {
 		"templates/viewer.html",
 	))
 
-	bookTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+	overviewTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
 		"templates/layout.html",
-		"templates/book.html",
+		"templates/overview.html",
+	))
+
+	bibliographicTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+		"templates/layout.html",
+		"templates/bibliographic.html",
 	))
 
 	s.mux.Handle("/", &handlers.ShelfHandler{
@@ -67,34 +72,37 @@ func (s *server) setupRoutes() {
 		Template: viewerTemplate,
 	})
 
-	s.mux.Handle("/book", &handlers.BookImagesHandler{
-		Store:    s.store,
-		Template: bookTemplate,
+	// Routes /book/{uuid}/overview and /book/{uuid}/bibliographic.
+	s.mux.Handle("/book/", &handlers.BookDispatchHandler{
+		Store:                 s.store,
+		OverviewTemplate:      overviewTemplate,
+		BibliographicTemplate: bibliographicTemplate,
 	})
 
 	s.mux.Handle("/images/", &handlers.ImageHandler{
 		Store: s.store,
 	})
 
-	// Serves pre-generated JPEG thumbnails from the DB.
 	s.mux.Handle("/thumbnails/", &handlers.ThumbnailHandler{
 		Store: s.store,
 	})
 
-	// Handles PUT /api/books/{id} and POST /api/books/{id}/thumbnail.
+	// Handles PUT /api/books/{id}, PUT /api/books/{id}/note,
+	// and POST /api/books/{id}/thumbnail.
 	s.mux.Handle("/api/books/", &handlers.APIHandler{
 		Store: s.store,
 	})
 
-	// Handles PUT /api/pages/{bookID}/{pageHash} and PUT /api/pages/{bookID}/{pageHash}/drawing.
+	// Handles PUT /api/pages/{bookID}/{pageHash},
+	// PUT /api/pages/{bookID}/{pageHash}/drawing, and
+	// PUT /api/pages/{bookID}/{pageHash}/status.
 	s.mux.Handle("/api/pages/", &handlers.NoteAPIHandler{
 		Store: s.store,
 	})
 
-	// Handles collection CRUD and book membership under /api/collections/.
 	cHandler := &handlers.CollectionsAPIHandler{Store: s.store}
-	s.mux.Handle("/api/collections", cHandler)  // exact match for POST (create)
-	s.mux.Handle("/api/collections/", cHandler) // prefix match for /{id} and /{id}/books/{bookID}
+	s.mux.Handle("/api/collections", cHandler)
+	s.mux.Handle("/api/collections/", cHandler)
 
 	s.mux.Handle("/page-thumbnails/", &handlers.ImageThumbnailHandler{
 		Store: s.store,

@@ -86,3 +86,19 @@ export async function renameCollection(id: string, title: string): Promise<void>
 export async function deleteCollection(id: string): Promise<void> {
   await request(`/api/collections/${id}`, { method: 'DELETE' });
 }
+
+export async function saveBookNote(bookId: string, body: string): Promise<void> {
+  await request(`/api/books/${bookId}/note`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function updatePageStatus(bookId: string, pageHash: string, status: string): Promise<void> {
+  await request(`/api/pages/${bookId}/${pageHash}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+}

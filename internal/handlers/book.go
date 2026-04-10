@@ -3,32 +3,49 @@ package handlers
 import (
 	"html/template"
 	"net/http"
+	"strings"
 
 	"folio/internal/store"
 )
 
-// BookImagesHandler renders GET /book?book={id} — a thumbnail grid of all images.
-type BookImagesHandler struct {
-	Store    *store.Store
-	Template *template.Template
+// BookDispatchHandler routes /book/{uuid}/overview and /book/{uuid}/bibliographic.
+type BookDispatchHandler struct {
+	Store                 *store.Store
+	OverviewTemplate      *template.Template
+	BibliographicTemplate *template.Template
 }
 
-// imageGridItem is the template model for a single image card.
-type imageGridItem struct {
+// overviewItem is the template model for a single page card in the overview grid.
+type overviewItem struct {
 	Number    int
 	Hash      string
 	HasThumb  bool
 	NoteTitle string
 	Attribute string
+	Status    string // always one of: unread, reading, read, skip
 }
 
-func (h *BookImagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	bookID := r.URL.Query().Get("book")
-	if bookID == "" {
-		http.Error(w, "book ID required", http.StatusBadRequest)
+func (h *BookDispatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Expect /book/{uuid}/overview or /book/{uuid}/bibliographic
+	path := strings.TrimPrefix(r.URL.Path, "/book/")
+	path = strings.Trim(path, "/")
+	parts := strings.SplitN(path, "/", 2)
+	if len(parts) != 2 {
+		http.NotFound(w, r)
 		return
 	}
+	bookID, view := parts[0], parts[1]
+	switch view {
+	case "overview":
+		h.serveOverview(w, r, bookID)
+	case "bibliographic":
+		h.serveBibliographic(w, r, bookID)
+	default:
+		http.NotFound(w, r)
+	}
+}
 
+func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Request, bookID string) {
 	book, err := h.Store.GetBook(bookID)
 	if err != nil || book == nil {
 		http.NotFound(w, r)
@@ -53,12 +70,23 @@ func (h *BookImagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items := make([]imageGridItem, 0, len(images))
+	statuses, err := h.Store.ListPageStatuses(bookID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	items := make([]overviewItem, 0, len(images))
 	for _, img := range images {
-		item := imageGridItem{
+		status := statuses[img.Hash]
+		if status == "" {
+			status = "unread"
+		}
+		item := overviewItem{
 			Number:   img.Number,
 			Hash:     img.Hash,
 			HasThumb: thumbSet[img.Hash],
+			Status:   status,
 		}
 		if n, ok := notes[img.Hash]; ok {
 			item.NoteTitle = n.Title
@@ -68,14 +96,56 @@ func (h *BookImagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Book   *store.Book
-		Images []imageGridItem
+		Book  *store.Book
+		Items []overviewItem
 	}{
-		Book:   book,
-		Images: items,
+		Book:  book,
+		Items: items,
 	}
 
-	if err := h.Template.Execute(w, data); err != nil {
+	if err := h.OverviewTemplate.Execute(w, data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (h *BookDispatchHandler) serveBibliographic(w http.ResponseWriter, r *http.Request, bookID string) {
+	book, err := h.Store.GetBook(bookID)
+	if err != nil || book == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	pageCount, err := h.Store.CountPages(bookID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	noteBody, err := h.Store.GetBookNote(bookID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	toc, err := h.Store.GetTOC(bookID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	data := struct {
+		Book      *store.Book
+		PageCount int
+		NoteBody  string
+		TOC       []store.TocEntry
+	}{
+		Book:      book,
+		PageCount: pageCount,
+		NoteBody:  noteBody,
+		TOC:       toc,
+	}
+
+	if err := h.BibliographicTemplate.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

@@ -1,0 +1,217 @@
+/* ── Book view tab navigation ─────────────────────────────────── */
+.book-view-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+
+.book-view-tab {
+  padding: 0.5rem 1.25rem;
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.book-view-tab:hover {
+  color: var(--text-secondary);
+}
+
+.book-view-tab--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* ── Page card status tints ───────────────────────────────────── */
+.page-card--reading { background: #eef3ff; }
+.page-card--read    { background: #eef8f0; }
+.page-card--skip    { background: var(--bg-subtle); opacity: 0.65; }
+/* unread = default card background, no override needed */
+
+/* ── Page card link fills the card ───────────────────────────── */
+.page-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ── Status button overlay ────────────────────────────────────── */
+/* Positioned at the bottom of the card, over the info row, on hover. */
+.page-card {
+  position: relative;
+}
+
+.page-status-buttons {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(2px);
+  border-top: 1px solid var(--border-light);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+.page-card:hover .page-status-buttons {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.status-btn {
+  flex: 1;
+  padding: 0.25rem 0;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.status-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.status-btn--active {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ── Bibliographic layout ─────────────────────────────────────── */
+.bibliographic-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 680px;
+}
+
+.bibliographic-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bibliographic-section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* ── Stats ────────────────────────────────────────────────────── */
+.bibliographic-stats {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1.5rem;
+  font-size: 0.95rem;
+}
+
+.bibliographic-stats dt {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.bibliographic-stats dd {
+  color: var(--text-primary);
+}
+
+/* ── TOC ──────────────────────────────────────────────────────── */
+.bibliographic-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.bibliographic-toc-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.45rem 0.75rem;
+  text-decoration: none;
+  color: var(--text-secondary);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  transition: background var(--transition-fast);
+}
+
+.bibliographic-toc-entry:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.bibliographic-toc-page {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--text-faint);
+  min-width: 3rem;
+}
+
+.bibliographic-empty {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── Note form ────────────────────────────────────────────────── */
+.bibliographic-note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bibliographic-note-textarea {
+  width: 100%;
+  min-height: 12rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+  background: var(--bg-surface);
+  line-height: 1.6;
+}
+
+.bibliographic-note-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.bibliographic-note-save {
+  align-self: flex-start;
+  padding: 0.45rem 1.25rem;
+  background: var(--color-primary);
+  color: var(--bg-surface);
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.bibliographic-note-save:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+
+.bibliographic-note-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

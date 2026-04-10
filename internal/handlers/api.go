@@ -14,6 +14,7 @@ import (
 // Routes:
 //
 //	PUT  /api/books/{id}           — rename a book
+//	PUT  /api/books/{id}/note      — save book-level memo
 //	POST /api/books/{id}/thumbnail — regenerate thumbnail
 type APIHandler struct {
 	Store *store.Store
@@ -34,6 +35,21 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.regenerateThumbnail(w, r, bookID)
+		return
+	}
+
+	// PUT /api/books/{id}/note
+	if strings.HasSuffix(path, "/note") {
+		bookID := strings.TrimSuffix(path, "/note")
+		if bookID == "" || strings.Contains(bookID, "/") {
+			http.Error(w, "invalid book ID", http.StatusBadRequest)
+			return
+		}
+		if r.Method != http.MethodPut {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		h.saveBookNote(w, r, bookID)
 		return
 	}
 
@@ -89,6 +105,29 @@ func (h *APIHandler) renameBook(w http.ResponseWriter, r *http.Request, bookID s
 		ID    string `json:"id"`
 		Title string `json:"title"`
 	}{ID: bookID, Title: title})
+}
+
+func (h *APIHandler) saveBookNote(w http.ResponseWriter, r *http.Request, bookID string) {
+	var body struct {
+		Body string `json:"body"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	book, err := h.Store.GetBook(bookID)
+	if err != nil || book == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := h.Store.UpsertBookNote(bookID, body.Body); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // regenerateThumbnail handles POST /api/books/{id}/thumbnail.
