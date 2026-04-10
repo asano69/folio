@@ -22,9 +22,7 @@ main:has(.viewer-layout) {
 
 /* ── Fixed overlay buttons ────────────────────────────────────── */
 .viewer-overlay-btn {
-  position: fixed;
-  top: 1rem;
-  z-index: var(--z-overlay);
+  /* position/top/z-index を削除 */
   padding: 0.4rem 0.8rem;
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(4px);
@@ -37,15 +35,14 @@ main:has(.viewer-layout) {
   white-space: nowrap;
 }
 
-.viewer-overlay-btn:hover,
-.viewer-overlay-btn.active {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: rgba(255, 255, 255, 0.97);
+/* Standalone left-anchored button (TOC toggle). */
+.viewer-overlay-btn--left {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: var(--z-overlay);
 }
 
-.viewer-overlay-btn--left  { left: 1rem; }
-.viewer-overlay-btn--right { right: 1rem; }
 
 /* ── Page image ───────────────────────────────────────────────── */
 
