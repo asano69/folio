@@ -7,7 +7,7 @@ import (
 	"folio/internal/store"
 )
 
-// PagesHandler renders GET /pages?book={id} — a thumbnail grid of all pages.
+// PagesHandler renders GET /book?book={id} — a thumbnail grid of all pages.
 type PagesHandler struct {
 	Store    *store.Store
 	Template *template.Template

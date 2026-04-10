@@ -58,7 +58,7 @@
             <div class="books-grid">
                 {{range .Books}}
                 <div class="book-card" draggable="true" data-book-id="{{.ID}}">
-                    <a href="/pages?book={{.ID}}">
+                    <a href="/book?book={{.ID}}">
                         <div class="book-thumbnail">
                             {{if .HasThumbnail}}
                             <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
@@ -69,7 +69,7 @@
                     </a>
                     <div class="book-info">
                         <h3 class="book-title" data-book-id="{{.ID}}">
-                            <a href="/pages?book={{.ID}}">{{.Title}}</a>
+                            <a href="/book?book={{.ID}}">{{.Title}}</a>
                         </h3>
                         <button class="rename-btn" data-book-id="{{.ID}}" title="Rename">✎</button>
                         {{if $.ActiveCollectionID}}
