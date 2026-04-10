@@ -67,3 +67,25 @@ folio
 └── folio.env
 ```
 
+## ルート
+
+| Method | Path | Handler | 説明 |
+|--------|------|---------|------|
+| GET | `/` | `BooksHandler` | ライブラリ一覧 |
+| GET | `/viewer` | `ViewerHandler` | ページビューア |
+| GET | `/pages` | `PagesHandler` | ページサムネイル一覧 |
+| GET | `/images/{bookID}/{filename}` | `ImageHandler` | ページ画像配信 |
+| GET | `/thumbnails/{bookID}` | `ThumbnailHandler` | ブックサムネイル |
+| GET | `/page-thumbnails/{bookID}/{pageHash}` | `PageThumbnailHandler` | ページサムネイル |
+| GET | `/static/` | `http.FileServer` | 静的ファイル |
+| PUT | `/api/books/{id}` | `APIHandler` | ブック名変更 |
+| POST | `/api/books/{id}/thumbnail` | `APIHandler` | サムネイル再生成 |
+| PUT | `/api/pages/{bookID}/{pageHash}` | `PagesAPIHandler` | ノート保存 |
+| PUT | `/api/pages/{bookID}/{pageHash}/drawing` | `PagesAPIHandler` | SVG保存 |
+| POST | `/api/collections` | `CollectionsAPIHandler` | コレクション作成 |
+| PUT | `/api/collections/{id}` | `CollectionsAPIHandler` | コレクション名変更 |
+| DELETE | `/api/collections/{id}` | `CollectionsAPIHandler` | コレクション削除 |
+| POST | `/api/collections/{id}/books/{bookID}` | `CollectionsAPIHandler` | ブック追加 |
+| DELETE | `/api/collections/{id}/books/{bookID}` | `CollectionsAPIHandler` | ブック削除 |
+
+`/api/pages/` の drawing サブルートはハンドラ内でパスを見て分岐しています（`server.go` には `/api/pages/` の1エントリのみ）。
