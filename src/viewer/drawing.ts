@@ -78,7 +78,7 @@ export function initDrawing(): void {
 
   // ── State ──────────────────────────────────────────────────────────────────
 
-  const pen:    PenSettings    = { color: '#e74c3c', opacity: 1, size: 4 };
+  const pen: PenSettings = { color: '#dd3', opacity: 0.3, size: 50 };
   const eraser: EraserSettings = { size: 20 };
   let activeTool: 'ink' | 'erase' = 'ink';
 
@@ -174,7 +174,7 @@ export function initDrawing(): void {
 
   const penBtn       = document.getElementById('draw-tool-pen')    as HTMLButtonElement | null;
   const eraserBtn    = document.getElementById('draw-tool-eraser') as HTMLButtonElement | null;
-  const colorInput   = document.getElementById('draw-color')       as HTMLInputElement  | null;
+  const colorPicker  = document.getElementById('draw-color-picker') as HTMLElement | null;
   const opacityInput = document.getElementById('draw-opacity')     as HTMLInputElement  | null;
   const sizeInput    = document.getElementById('draw-size')        as HTMLInputElement  | null;
   const opacityVal   = document.getElementById('draw-opacity-val');
@@ -190,7 +190,7 @@ export function initDrawing(): void {
     if (colorField)   colorField.hidden   = !isPen;
     if (opacityField) opacityField.hidden = !isPen;
     if (sizeInput) {
-      sizeInput.max   = isPen ? '50' : '80';
+      sizeInput.max   = '100';
       sizeInput.value = String(isPen ? pen.size : eraser.size);
     }
     if (sizeVal) sizeVal.textContent = `${sizeInput?.value ?? '4'}px`;
@@ -199,9 +199,20 @@ export function initDrawing(): void {
   penBtn?.addEventListener('click',   () => { activeTool = 'ink';   syncToolUI(); });
   eraserBtn?.addEventListener('click', () => { activeTool = 'erase'; syncToolUI(); });
 
-  colorInput?.addEventListener('input', () => {
-    pen.color = colorInput.value;
+  colorPicker?.querySelectorAll<HTMLAnchorElement>('[data-color]').forEach(swatch => {
+      swatch.addEventListener('click', (e: MouseEvent) => {
+          e.preventDefault();
+          const color = swatch.dataset.color;
+          if (!color) return;
+          pen.color = color;
+          colorPicker.querySelectorAll('[data-color]').forEach(s =>
+              s.classList.remove('color-picker-active')
+          );
+          swatch.classList.add('color-picker-active');
+      });
   });
+
+
 
   opacityInput?.addEventListener('input', () => {
     pen.opacity = parseInt(opacityInput.value, 10) / 100;

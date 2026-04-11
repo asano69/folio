@@ -73,16 +73,27 @@
                 <button id="draw-tool-eraser" class="draw-tool-btn">⬜ Eraser</button>
             </div>
             <div class="draw-field" id="draw-color-field">
-                <label for="draw-color">Color</label>
-                <input type="color" id="draw-color" value="#e74c3c">
+                <label>
+                    <span>Color</span>
+                    <span id="draw-color-picker" class="color-picker">
+                        <a data-color="#d33" title="Red"     href="#" class="color-picker-active" style="background:#d33"></a>
+                        <a data-color="#000" title="Black"   href="#" style="background:#000"></a>
+                        <a data-color="#33d" title="Blue"    href="#" style="background:#33d"></a>
+                        <a data-color="#3d3" title="Green"   href="#" style="background:#3d3"></a>
+                        <a data-color="#d3d" title="Magenta" href="#" style="background:#d3d"></a>
+                        <a data-color="#3dd" title="Cyan"    href="#" style="background:#3dd"></a>
+                        <a data-color="#dd3" title="Yellow"  href="#" style="background:#dd3"></a>
+                    </span>
+                </label>
             </div>
+
             <div class="draw-field" id="draw-opacity-field">
                 <label>Opacity — <span id="draw-opacity-val">100%</span></label>
                 <input type="range" id="draw-opacity" min="10" max="100" value="100" step="5">
             </div>
             <div class="draw-field">
-                <label>Size — <span id="draw-size-val">4px</span></label>
-                <input type="range" id="draw-size" min="1" max="50" value="4">
+                <label>Size — <span id="draw-size-val">10px</span></label>
+                <input type="range" id="draw-size" min="10" max="100" value="10">
             </div>
             <div class="draw-actions">
                 <button id="draw-save">Save</button>
