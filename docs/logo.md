@@ -1,5 +1,7 @@
 ### Application Icon: Ginkgo
 
+![logo](../cmd/folio/assets/folio.svg)
+
 The Folio application uses the ginkgo leaf as its icon. This choice reflects several aspects of Folio’s core philosophy and design principles.
 
 First, the ginkgo is often described as a “living fossil,” having remained largely unchanged for millions of years. This aligns with Folio’s view that books are enduring resources. Even if software evolves or disappears, the underlying books—and their meaning—persist over time.
