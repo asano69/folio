@@ -1,4 +1,9 @@
-Folioのコンセプトを考えると、イチョウ（Ginkgo） が一番しっくりくると思います。  
-理由がいくつかあります。
-- まず、イチョウは「生きた化石」と呼ばれるほど古くから変わらず存在し続けています。Folioが「書籍は永続的なリソースである」「アプリが消えても本は残る」という哲学を持っていることと重なります。
-- 次に、イチョウの葉の形が本のページをめくる動作や、扇状に広がる様子がライブラリのグリッドを連想させます。
+### Application Icon: Ginkgo
+
+The Folio application uses the ginkgo leaf as its icon. This choice reflects several aspects of Folio’s core philosophy and design principles.
+
+First, the ginkgo is often described as a “living fossil,” having remained largely unchanged for millions of years. This aligns with Folio’s view that books are enduring resources. Even if software evolves or disappears, the underlying books—and their meaning—persist over time.
+
+Second, the distinctive fan-shaped form of the ginkgo leaf evokes the act of turning pages. Its radial structure also resembles a spread of pages or a library grid, visually connecting the icon to browsing, organization, and exploration of book content.
+
+Finally, Folio’s backend is implemented in Go, and the phonetic similarity between “Go” and “Ginkgo” provides a subtle, memorable association that reinforces the identity of the system.
