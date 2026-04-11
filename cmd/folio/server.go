@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -10,6 +11,9 @@ import (
 	"folio/internal/handlers"
 	"folio/internal/store"
 )
+
+//go:embed favicon.svg
+var faviconSVG string
 
 type server struct {
 	config *config.Config
@@ -53,10 +57,9 @@ func (s *server) setupRoutes() {
 	s.mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	funcMap := template.FuncMap{
-		"add":     func(a, b int) int { return a + b },
-		"sub":     func(a, b int) int { return a - b },
-		"inc":     func(i int) int { return i + 1 },
-		"logoSVG": func() template.HTML { return template.HTML(folioLogoSVG) },
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
+		"inc": func(i int) int { return i + 1 },
 	}
 
 	// sidebar.html is included in both home and collection template sets so
