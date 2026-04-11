@@ -4,8 +4,8 @@
 ──────────────────────────────────────────────────────────────── */
 :root {
   /* Brand */
-  --color-primary:       #007bff;
-  --color-primary-dark:  #0056b3;
+  --color-primary:       #99AD7A;
+  --color-primary-dark:  #546B41;
   --color-primary-bg:    #f0f6ff;   /* light tint for active/hover states */
   --color-primary-muted: #7ab3f7;   /* muted for secondary accents */
   --color-danger:        #c00;
@@ -20,10 +20,12 @@
   --text-disabled:  #bbb;
 
   /* Surfaces */
-  --bg-page:    #f5f5f5;
+  --bg-page:    #F9F8F6;
   --bg-surface: #fff;
   --bg-subtle:  #f8f9fa;
   --bg-hover:   #f5f5f5;
+
+	--bg-header: #EFE9E3;
 
   /* Borders */
   --border:        #e0e0e0;
@@ -67,10 +69,11 @@ body {
 
 /* ── Site header ──────────────────────────────────────────────── */
 header {
-  background: var(--bg-surface);
+  background: var(--bg-header);
   border-bottom: 1px solid var(--border);
-  padding: 1rem 2rem;
+  padding: 0.1rem 0.5rem;
   box-shadow: var(--shadow-sm);
+
 }
 
 header h1 {

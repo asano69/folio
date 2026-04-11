@@ -1,6 +1,6 @@
 /* Hide the site header on the library page to match the full-bleed layout */
 body:has(.library-layout) header {
-  display: none;
+  display: true;
 }
 
 /* Remove max-width and padding from main on the library page */
