@@ -50,7 +50,7 @@ export interface AddToCollectionResult {
 }
 
 export async function addBookToCollection(
-  collectionId: string,
+  collectionId: number,
   bookId: string,
 ): Promise<AddToCollectionResult> {
   const res = await request(`/api/collections/${collectionId}/books/${bookId}`, {
@@ -60,7 +60,7 @@ export async function addBookToCollection(
 }
 
 export async function removeBookFromCollection(
-  collectionId: string,
+  collectionId: number,
   bookId: string,
 ): Promise<void> {
   await request(`/api/collections/${collectionId}/books/${bookId}`, { method: 'DELETE' });
@@ -75,7 +75,7 @@ export async function createCollection(title: string): Promise<{ id: number; tit
   return res.json();
 }
 
-export async function renameCollection(id: string, title: string): Promise<void> {
+export async function renameCollection(id: number, title: string): Promise<void> {
   await request(`/api/collections/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -83,7 +83,7 @@ export async function renameCollection(id: string, title: string): Promise<void>
   });
 }
 
-export async function deleteCollection(id: string): Promise<void> {
+export async function deleteCollection(id: number): Promise<void> {
   await request(`/api/collections/${id}`, { method: 'DELETE' });
 }
 

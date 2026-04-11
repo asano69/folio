@@ -218,15 +218,17 @@ function setupDragAndDrop(): void {
       e.preventDefault();
       zone.classList.remove('drag-over');
       const bookId = e.dataTransfer!.getData('text/plain');
-      const collectionId = zone.dataset.collectionId!;
-      if (bookId && collectionId) handleDrop(zone, collectionId, bookId);
+      // Parse to number immediately on extraction from the DOM so the type
+      // matches the api.ts signature and Collection.id throughout.
+      const collectionId = parseInt(zone.dataset.collectionId!, 10);
+      if (bookId && !isNaN(collectionId)) handleDrop(zone, collectionId, bookId);
     });
   });
 }
 
 // handleDrop adds the dragged book — or all selected books when the dragged
 // card belongs to the current selection — to the target collection.
-async function handleDrop(zone: HTMLElement, collectionId: string, bookId: string): Promise<void> {
+async function handleDrop(zone: HTMLElement, collectionId: number, bookId: string): Promise<void> {
   const idsToAdd =
     selectedBookIds.has(bookId) && selectedBookIds.size > 0
       ? [...selectedBookIds]
@@ -282,7 +284,9 @@ function setupEditMode(): void {
       e.preventDefault();
       const titleEl = zone.querySelector<HTMLElement>('.collection-title');
       if (!titleEl) return;
-      startRenameCollection(zone.dataset.collectionId!, titleEl);
+      // Parse to number immediately on extraction from the DOM.
+      const collectionId = parseInt(zone.dataset.collectionId!, 10);
+      if (!isNaN(collectionId)) startRenameCollection(collectionId, titleEl);
     });
   });
 
@@ -292,7 +296,9 @@ function setupEditMode(): void {
       e.stopPropagation();
       const item = btn.closest<HTMLElement>('.collection-drop-zone');
       if (!item) return;
-      const collectionId = item.dataset.collectionId!;
+      // Parse to number immediately on extraction from the DOM.
+      const collectionId = parseInt(item.dataset.collectionId!, 10);
+      if (isNaN(collectionId)) return;
       try {
         await deleteCollection(collectionId);
         // If we are currently viewing this collection, redirect to home.
@@ -346,7 +352,7 @@ async function startCreateCollection(addItem: HTMLElement): Promise<void> {
   });
 }
 
-async function startRenameCollection(collectionId: string, titleEl: HTMLElement): Promise<void> {
+async function startRenameCollection(collectionId: number, titleEl: HTMLElement): Promise<void> {
   const currentTitle = titleEl.textContent ?? '';
 
   const input = document.createElement('input');
@@ -389,8 +395,10 @@ function setupRemoveFromCollection(): void {
     btn.addEventListener('click', async (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-      const { bookId, collectionId } = btn.dataset;
-      if (!bookId || !collectionId) return;
+      const { bookId } = btn.dataset;
+      // Parse to number immediately on extraction from the DOM.
+      const collectionId = parseInt(btn.dataset.collectionId!, 10);
+      if (!bookId || isNaN(collectionId)) return;
       try {
         await removeBookFromCollection(collectionId, bookId);
         btn.closest<HTMLElement>('.book-card')?.remove();

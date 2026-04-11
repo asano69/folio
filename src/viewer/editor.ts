@@ -1,5 +1,6 @@
 import { saveNote } from '../api';
 import type { NotePayload } from '../types';
+import { PANE_EVENT_EDIT_OPEN, PANE_EVENT_DRAW_OPEN } from './pane-events';
 
 export function initEditor(): void {
   const toggleBtn = document.getElementById('edit-toggle') as HTMLButtonElement | null;
@@ -24,7 +25,7 @@ export function initEditor(): void {
   const open = (): void => {
     snapshot = captureValues();
     // Notify other panes (e.g. draw pane) so they can close.
-    document.dispatchEvent(new CustomEvent('folio:edit-pane-open'));
+    document.dispatchEvent(new CustomEvent(PANE_EVENT_EDIT_OPEN));
     pane.classList.add('open');
     backdrop?.classList.add('visible');
     toggleBtn.classList.add('active');
@@ -96,4 +97,7 @@ export function initEditor(): void {
       noteEl.hidden = !body;
     }
   }
+
+  // Close when the draw pane is opened.
+  document.addEventListener(PANE_EVENT_DRAW_OPEN, close);
 }

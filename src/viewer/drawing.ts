@@ -13,6 +13,7 @@
 //   - 'erase' : a set of ink paths that were removed (restored on undo)
 
 import { saveDrawing } from '../api';
+import { PANE_EVENT_DRAW_OPEN, PANE_EVENT_EDIT_OPEN } from './pane-events';
 
 interface PenSettings {
   color:   string;
@@ -105,7 +106,7 @@ export function initDrawing(): void {
   };
 
   const openPane = (): void => {
-    document.dispatchEvent(new CustomEvent('folio:draw-pane-open'));
+    document.dispatchEvent(new CustomEvent(PANE_EVENT_DRAW_OPEN));
     pane.classList.add('open');
     // No backdrop: the user must be able to click the image to draw.
     toggleBtn.classList.add('active');
@@ -125,7 +126,7 @@ export function initDrawing(): void {
   backdrop?.addEventListener('click',  closePane);
 
   // Close when the edit pane is opened.
-  document.addEventListener('folio:edit-pane-open', closePane);
+  document.addEventListener(PANE_EVENT_EDIT_OPEN, closePane);
 
   // ── Tool UI ────────────────────────────────────────────────────────────────
 
