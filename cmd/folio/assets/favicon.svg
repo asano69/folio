@@ -9,7 +9,7 @@
     .icon-path { fill: #546B41; }
     @media (prefers-color-scheme: dark) {
       /* Dark mode: light green, visible on dark browser chrome */
-      .icon-path { fill: #99AD7A; }
+      .icon-path { fill: #FFB22C; }
     }
   </style>
   <g id="SVGRepo_iconCarrier">

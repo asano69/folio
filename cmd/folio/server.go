@@ -36,8 +36,17 @@ func newServer(cfg *config.Config) (*server, error) {
 func (s *server) setupRoutes() {
 
 	s.mux.HandleFunc("/favicon.svg", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/svg+xml") // image/x-icon → image/svg+xml
-		w.Write([]byte(faviconSVG))                     // faviconData → []byte(faviconSVG)
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Write([]byte(faviconSVG))
+	})
+
+	// Browsers automatically request /favicon.ico regardless of the <link> tag.
+	// Without this handler the request falls through to HomeHandler and returns
+	// an HTML 404, which Firefox caches — causing the favicon to disappear until
+	// the cache is cleared. Serving the SVG here resolves the issue.
+	s.mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Write([]byte(faviconSVG))
 	})
 
 	fs := http.FileServer(http.Dir("./static"))
