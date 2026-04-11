@@ -6,6 +6,12 @@ backup/
 
 *.db
 *~
+*.zip
+*.cbz
+*.pdf
+*.jpg
+*.png
+
 
 node_modules
 .js
