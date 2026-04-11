@@ -9,18 +9,18 @@ import (
 	"folio/internal/store"
 )
 
-// APIHandler handles REST API requests under /api/books/.
+// BooksAPIHandler handles REST API requests under /api/books/.
 //
 // Routes:
 //
 //	PUT  /api/books/{id}           — rename a book
 //	PUT  /api/books/{id}/note      — save book-level memo
 //	POST /api/books/{id}/thumbnail — regenerate thumbnail
-type APIHandler struct {
+type BooksAPIHandler struct {
 	Store *store.Store
 }
 
-func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *BooksAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/books/")
 
 	// POST /api/books/{id}/thumbnail
@@ -68,7 +68,7 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *APIHandler) renameBook(w http.ResponseWriter, r *http.Request, bookID string) {
+func (h *BooksAPIHandler) renameBook(w http.ResponseWriter, r *http.Request, bookID string) {
 	var body struct {
 		Title string `json:"title"`
 	}
@@ -107,7 +107,7 @@ func (h *APIHandler) renameBook(w http.ResponseWriter, r *http.Request, bookID s
 	}{ID: bookID, Title: title})
 }
 
-func (h *APIHandler) saveBookNote(w http.ResponseWriter, r *http.Request, bookID string) {
+func (h *BooksAPIHandler) saveBookNote(w http.ResponseWriter, r *http.Request, bookID string) {
 	var body struct {
 		Body string `json:"body"`
 	}
@@ -132,7 +132,7 @@ func (h *APIHandler) saveBookNote(w http.ResponseWriter, r *http.Request, bookID
 
 // regenerateThumbnail handles POST /api/books/{id}/thumbnail.
 // Generating thumbnails via an API endpoint allows future web UI integration.
-func (h *APIHandler) regenerateThumbnail(w http.ResponseWriter, r *http.Request, bookID string) {
+func (h *BooksAPIHandler) regenerateThumbnail(w http.ResponseWriter, r *http.Request, bookID string) {
 	book, err := h.Store.GetBook(bookID)
 	if err != nil || book == nil {
 		http.NotFound(w, r)

@@ -9,13 +9,13 @@ import (
 	"folio/internal/store"
 )
 
-// CollectionHandler serves GET /collections/{id} — a single collection's book list.
-type CollectionHandler struct {
+// CollectionPageHandler serves GET /collections/{id} — a single collection's book list.
+type CollectionPageHandler struct {
 	Store    *store.Store
 	Template *template.Template
 }
 
-func (h *CollectionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimPrefix(r.URL.Path, "/collections/")
 	idStr = strings.Trim(idStr, "/")
 

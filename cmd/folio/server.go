@@ -76,7 +76,7 @@ func (s *server) setupRoutes() {
 		Template: homeTemplate,
 	})
 
-	s.mux.Handle("/collections/", &handlers.CollectionHandler{
+	s.mux.Handle("/collections/", &handlers.CollectionPageHandler{
 		Store:    s.store,
 		Template: collectionTemplate,
 	})
@@ -94,20 +94,20 @@ func (s *server) setupRoutes() {
 		Store: s.store,
 	})
 
-	s.mux.Handle("/thumbnails/", &handlers.ThumbnailHandler{
+	s.mux.Handle("/thumbnails/", &handlers.BookThumbnailHandler{
 		Store: s.store,
 	})
 
 	// Handles PUT /api/books/{id}, PUT /api/books/{id}/note,
 	// and POST /api/books/{id}/thumbnail.
-	s.mux.Handle("/api/books/", &handlers.APIHandler{
+	s.mux.Handle("/api/books/", &handlers.BooksAPIHandler{
 		Store: s.store,
 	})
 
 	// Handles PUT /api/pages/{bookID}/{pageHash},
 	// PUT /api/pages/{bookID}/{pageHash}/drawing, and
 	// PUT /api/pages/{bookID}/{pageHash}/status.
-	s.mux.Handle("/api/pages/", &handlers.NoteAPIHandler{
+	s.mux.Handle("/api/pages/", &handlers.PagesAPIHandler{
 		Store: s.store,
 	})
 
@@ -115,7 +115,7 @@ func (s *server) setupRoutes() {
 	s.mux.Handle("/api/collections", cHandler)
 	s.mux.Handle("/api/collections/", cHandler)
 
-	s.mux.Handle("/page-thumbnails/", &handlers.ImageThumbnailHandler{
+	s.mux.Handle("/page-thumbnails/", &handlers.PageThumbnailHandler{
 		Store: s.store,
 	})
 }

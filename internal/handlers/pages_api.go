@@ -8,16 +8,16 @@ import (
 	"folio/internal/store"
 )
 
-// NoteAPIHandler handles:
+// PagesAPIHandler handles:
 //
 //	PUT /api/pages/{bookID}/{pageHash}          — save text note
 //	PUT /api/pages/{bookID}/{pageHash}/drawing  — save SVG drawing
 //	PUT /api/pages/{bookID}/{pageHash}/status   — update read status
-type NoteAPIHandler struct {
+type PagesAPIHandler struct {
 	Store *store.Store
 }
 
-func (h *NoteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/pages/")
 
 	// PUT /api/pages/{bookID}/{pageHash}/drawing
@@ -103,7 +103,7 @@ func (h *NoteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(note)
 }
 
-func (h *NoteAPIHandler) saveDrawing(w http.ResponseWriter, r *http.Request, bookID, pageHash string) {
+func (h *PagesAPIHandler) saveDrawing(w http.ResponseWriter, r *http.Request, bookID, pageHash string) {
 	var body struct {
 		SvgDrawing *string `json:"svg_drawing"`
 	}
@@ -130,7 +130,7 @@ var validStatuses = map[string]bool{
 	"unread": true, "reading": true, "read": true, "skip": true,
 }
 
-func (h *NoteAPIHandler) saveStatus(w http.ResponseWriter, r *http.Request, bookID, pageHash string) {
+func (h *PagesAPIHandler) saveStatus(w http.ResponseWriter, r *http.Request, bookID, pageHash string) {
 	var body struct {
 		Status string `json:"status"`
 	}
