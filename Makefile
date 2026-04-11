@@ -34,6 +34,7 @@ $(JS_OUT): $(shell find $(SRC_DIR) -name "*.ts")
 $(CSS_OUT): $(shell find $(SRC_DIR) -name "*.css")
 	$(ESBUILD) $(CSS_ENTRY) \
 		--bundle \
+		--loader:.svg=dataurl \
 		--outfile=$(CSS_OUT)
 
 .PHONY: build

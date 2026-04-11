@@ -111,14 +111,12 @@ header h1 {
 }
 
 header h1 a {
-  color: var(--color-text-primary);
-  text-decoration: none;
-}
-
-/* Logo SVG is inlined; size is controlled via the svg element directly */
-header h1 a svg {
+  display: inline-block;
   width: 20px;
   height: 20px;
+  background-image: url("../icons/folio.svg");
+  background-size: contain;
+  background-repeat: no-repeat;
   vertical-align: middle;
 }
 
