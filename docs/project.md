@@ -1,5 +1,5 @@
 ## Project Structure
-
+```
 folio/
 ├── cmd/folio/
 │   ├── main.go        # CLI entry point; subcommand dispatch
@@ -75,3 +75,4 @@ folio/
 ├── .air.toml         # Air live-reload configuration
 ├── folio.env         # Local environment variable defaults
 └── .gitignore
+```
