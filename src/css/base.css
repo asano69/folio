@@ -115,6 +115,11 @@ header h1 a {
   text-decoration: none;
 }
 
+.logo {
+  width: 20px;
+  height: 20px;
+}
+
 header h1 a:hover {
   color: var(--color-text-light);
 }

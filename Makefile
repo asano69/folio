@@ -77,7 +77,7 @@ reset-db:  ## (*) Deploy stack via Komodo
 # ─────────────────────────────────────────
 .PHONY: icon
 icon:
-	magick -background none src/folio.svg \
+	magick -background none static/folio.svg \
 	  \( -clone 0 -resize 16x16 \) \
 	  \( -clone 0 -resize 32x32 \) \
 	  \( -clone 0 -resize 48x48 \) \
