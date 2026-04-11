@@ -65,11 +65,11 @@
 ```
 folio/
 ├── cmd/folio/
-│   ├── main.go        # CLI entry point; subcommand dispatch
-│   └── server.go      # HTTP server setup and route registration
+│   ├── main.go        # CLIエントリーポイント; サブコマンドの振り分け
+│   └── server.go      # HTTPサーバー設定とルート登録
 ├── internal/
 │   ├── config/
-│   │   └── config.go  # Environment variable loading; Config struct
+│   │   └── config.go  # 環境変数の読み込み; Config構造体
 │   ├── handlers/
 │   │   ├── home.go              # GET /
 │   │   ├── collection_page.go   # GET /collections/{id}
@@ -81,66 +81,61 @@ folio/
 │   │   ├── pages_api.go         # /api/pages/
 │   │   └── collections_api.go   # /api/collections/
 │   ├── storage/
-│   │   ├── types.go      # Book and ImageEntry structs
-│   │   ├── cbz.go        # CBZ open, folio.json read/write, image listing, page serving
-│   │   ├── scan.go       # Recursive library walk; Scan and ScanMeta with worker pool
-│   │   └── thumbnail.go  # Book-level and page-level JPEG thumbnail generation
+│   │   ├── types.go      # Book構造体とImageEntry構造体
+│   │   ├── cbz.go        # CBZのオープン、folio.jsonの読み書き、画像一覧取得、ページ配信
+│   │   ├── scan.go       # ライブラリの再帰走査; ワーカープールによるScanおよびScanMeta
+│   │   └── thumbnail.go  # 書籍レベルおよびページレベルのJPEGサムネイル生成
 │   └── store/
-│       ├── store.go    # SQLite open, schema init, migration application
-│       └── queries.go  # All DB read/write operations; domain type definitions
-├── src/                        # TypeScript and CSS source
-│   ├── main.ts                 # DOMContentLoaded init dispatcher
-│   ├── api.ts                  # Centralized fetch helpers for all REST endpoints
-│   ├── types.ts                # Shared frontend domain types (ReadStatus, NotePayload, etc.)
+│       ├── store.go    # SQLiteのオープン、スキーマ初期化、マイグレーション適用
+│       └── queries.go  # すべてのDB読み書き操作; ドメイン型定義
+├── src/                        # TypeScriptおよびCSSソース
+│   ├── main.ts                 # DOMContentLoaded初期化ディスパッチャ
+│   ├── api.ts                  # すべてのRESTエンドポイント用の集中化されたfetchヘルパー
+│   ├── types.ts                # 共有フロントエンドドメイン型 (ReadStatus, NotePayload など)
 │   ├── viewer/
-│   │   ├── navigation.ts  # Keyboard nav, page-jump selector
-│   │   ├── display.ts     # Wheel zoom, drag-to-pan, double-click reset
-│   │   ├── editor.ts      # Edit pane open/close, note save, snapshot/restore
-│   │   ├── toc.ts         # TOC pane toggle
-│   │   └── drawing.ts     # SVG drawing overlay, pen/eraser, undo/redo, save
+│   │   ├── navigation.ts  # キーボードナビゲーション、ページジャンプセレクタ
+│   │   ├── display.ts     # ホイールズーム、ドラッグパン、ダブルクリックリセット
+│   │   ├── editor.ts      # 編集ペインの開閉、メモ保存、スナップショット/復元
+│   │   ├── toc.ts         # TOCペイン切り替え
+│   │   └── drawing.ts     # SVG描画オーバーレイ、ペン/消しゴム、undo/redo、保存
 │   ├── ui/
-│   │   ├── search.ts        # Title filter for book grids
-│   │   ├── rename.ts        # Inline book title rename in edit mode
-│   │   ├── collections.ts   # Sidebar drag-drop, multi-select, create/rename/delete
-│   │   ├── page-status.ts   # Per-page read status buttons
-│   │   ├── book-note.ts     # Book-level memo save
-│   │   └── components.ts    # Stub for future toast/modal UI elements
+│   │   ├── search.ts        # 書籍グリッドのタイトルフィルタ
+│   │   ├── rename.ts        # 編集モードでの書籍タイトルのインラインリネーム
+│   │   ├── collections.ts   # サイドバードラッグドロップ、複数選択、作成/リネーム/削除
+│   │   ├── page-status.ts   # ページごとの既読ステータスボタン
+│   │   ├── book-note.ts     # 書籍レベルのメモ保存
+│   │   └── components.ts    # 将来のtoast/modal UI要素用スタブ
 │   ├── css/
-│   │   ├── base.css      # Design tokens (CSS variables), reset, site header
-│   │   ├── pane.css      # Shared slide-in pane structure (TOC and Edit panes)
-│   │   ├── shelf.css     # Library grid, book cards, search bar, missing books
-│   │   ├── sidebar.css   # Collection sidebar, drag-over states, multi-select
-│   │   ├── viewer.css    # Viewer layout, image display, note display, jump overlay
-│   │   ├── toc.css       # TOC pane content styles
-│   │   ├── editor.css    # Edit pane form styles
-│   │   ├── book.css      # Per-book page grid and page card styles
-│   │   ├── drawing.css   # SVG overlay, draw pane, tool buttons
-│   │   └── overview.css  # Overview page tab nav, status tints, bibliographic layout
-│   ├── style.css         # CSS entry point; imports all css/* files
-│   └── folio.svg         # Application icon source
+│   │   ├── base.css      # デザイントークン (CSS変数)、リセット、サイトヘッダ
+│   │   ├── pane.css      # 共通スライドインペイン構造 (TOCと編集ペイン)
+│   │   ├── shelf.css     # ライブラリグリッド、書籍カード、検索バー、欠落書籍
+│   │   ├── sidebar.css   # コレクションサイドバー、ドラッグオーバー状態、複数選択
+│   │   ├── viewer.css    # ビューワーレイアウト、画像表示、メモ表示、ジャンプオーバーレイ
+│   │   ├── toc.css       # TOCペイン内容スタイル
+│   │   ├── editor.css    # 編集ペインフォームスタイル
+│   │   ├── book.css      # 書籍ごとのページグリッドおよびページカードスタイル
+│   │   ├── drawing.css   # SVGオーバーレイ、描画ペイン、ツールボタン
+│   │   └── overview.css  # 概要ページのタブナビ、ステータス着色、書誌レイアウト
+│   ├── style.css         # CSSエントリーポイント; css/* のすべてをimport
+│   └── folio.svg         # アプリケーションアイコン元データ
 ├── templates/
-│   ├── layout.html        # Base HTML shell; defines title and content blocks
-│   ├── sidebar.html       # Collection sidebar partial; included by home and collection templates
-│   ├── home.html          # All-books library page
-│   ├── collection.html    # Single collection book list
-│   ├── overview.html      # Per-book page grid with status buttons
-│   ├── bibliographic.html # Per-book TOC, stats, and book-level memo
-│   └── viewer.html        # Single-page viewer with TOC, edit, and draw panes
+│   ├── layout.html        # ベースHTMLシェル; title と content ブロック定義
+│   ├── sidebar.html       # コレクションサイドバー部分テンプレート; home と collection から読み込み
+│   ├── home.html          # 全書籍ライブラリページ
+│   ├── collection.html    # 単一コレクションの書籍一覧
+│   ├── overview.html      # 書籍ごとのページグリッド（ステータスボタン付き）
+│   ├── bibliographic.html # 書籍ごとのTOC、統計、書籍レベルメモ
+│   └── viewer.html        # TOC・編集・描画ペイン付き単ページビューア
 ├── docs/
-│   ├── design-01.md  # Initial design (superseded)
-│   ├── design-02.md  # Data ownership philosophy (superseded)
-│   ├── design-03.md  # Phase 3 schema (superseded)
-│   └── design-04.md  # Current design reference (this document)
-├── static/           # Build output (gitignored except favicon.ico)
-├── Makefile          # Build, watch, docker, icon, clean targets
-├── go.mod / go.sum   # Go module definition and checksums
-├── shell.nix         # Nix development shell
-├── .air.toml         # Air live-reload configuration
-├── folio.env         # Local environment variable defaults
+│   ├── design-01.md  # 初期設計 (廃止済み)
+│   ├── design-02.md  # データ所有哲学 (廃止済み)
+│   ├── design-03.md  # Phase 3スキーマ (廃止済み)
+│   └── design-04.md  # 現在の設計リファレンス (このドキュメント)
+├── static/           # ビルド出力 (favicon.ico を除き gitignore)
+├── Makefile          # build, watch, docker, icon, clean ターゲット
+├── go.mod / go.sum   # Goモジュール定義とチェックサム
+├── shell.nix         # Nix開発シェル
+├── .air.toml         # Airライブリロード設定
+├── folio.env         # ローカル環境変数デフォルト
 └── .gitignore
 ```
-
-
-
-
-
