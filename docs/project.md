@@ -61,7 +61,7 @@ folio/
 │   ├── home.html          # All-books library page
 │   ├── collection.html    # Single collection book list
 │   ├── overview.html      # Per-book page grid with status buttons
-│   ├── bibliographic.html # Per-book TOC, stats, and book-level memo
+│   ├── bibliography.html # Per-book TOC, stats, and book-level memo
 │   └── viewer.html        # Single-page viewer with TOC, edit, and draw panes
 ├── docs/
 │   ├── design-01.md  # Initial design (superseded)

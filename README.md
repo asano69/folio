@@ -124,7 +124,7 @@ folio/
 │   ├── home.html          # 全書籍ライブラリページ
 │   ├── collection.html    # 単一コレクションの書籍一覧
 │   ├── overview.html      # 書籍ごとのページグリッド（ステータスボタン付き）
-│   ├── bibliographic.html # 書籍ごとのTOC、統計、書籍レベルメモ
+│   ├── bibliography.html # 書籍ごとのTOC、統計、書籍レベルメモ
 │   └── viewer.html        # TOC・編集・描画ペイン付き単ページビューア
 ├── docs/
 │   ├── design-01.md  # 初期設計 (廃止済み)

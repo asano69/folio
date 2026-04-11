@@ -69,7 +69,7 @@ func (s *server) setupRoutes() {
 
 	bibliographicTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
 		"templates/layout.html",
-		"templates/bibliographic.html",
+		"templates/bibliography.html",
 	))
 
 	s.mux.Handle("/", &handlers.HomeHandler{
