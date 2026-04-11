@@ -1,4 +1,4 @@
-## Why Use an Archive Format (CBZ)?
+## Why Use an Archive Format (CBZ)
 
 Folio stores materials in the CBZ format. This choice is based on technical efficiency, metadata locality, compatibility with existing assets, and alignment with the system’s data ownership philosophy.
 
