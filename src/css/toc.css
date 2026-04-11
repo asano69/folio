@@ -11,34 +11,34 @@
 .toc-nav {
   display: flex;
   flex-direction: column;
-  padding: 0.5rem 0;
+  padding: var(--spacing-md) 0;
 }
 
 .toc-entry {
-  padding: 0.6rem 1.25rem;
+  padding: var(--spacing-lg) var(--spacing-2xl);
   text-decoration: none;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
   border-left: 3px solid transparent;
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .toc-entry:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--color-hover-bg);
+  color: var(--color-text-primary);
 }
 
 .toc-entry-active {
   border-left-color: var(--color-primary);
   color: var(--color-primary);
   font-weight: 500;
-  background: var(--color-primary-bg);
+  background: var(--color-primary-light);
 }
 
 .toc-empty {
-  padding: 1.25rem;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  line-height: 1.5;
+  padding: var(--spacing-2xl);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
   text-align: center;
 }

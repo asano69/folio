@@ -1,55 +1,85 @@
 /* ── Design tokens ────────────────────────────────────────────
-   Single source of truth for colors, shadows, spacing, and
-   z-index layers. Edit here to change the look site-wide.
+   Single source of truth for colors, typography, spacing, shapes,
+   shadows, animations, and z-index. All values are defined here.
+   Other CSS files use only var(--*) and no hardcoded values.
 ──────────────────────────────────────────────────────────────── */
+
 :root {
-  /* Brand */
+  /* ── Colors (24 colors max) ──────────────────────────────────── */
+
+  /* Brand colors (confirmed) */
   --color-primary:       #99AD7A;
   --color-primary-dark:  #546B41;
-  --color-primary-bg:    #f0f6ff;   /* light tint for active/hover states */
-  --color-primary-muted: #7ab3f7;   /* muted for secondary accents */
-  --color-danger:        #c00;
+  --color-primary-light: #C3CC9B;
 
-  /* Text scale */
-  --text-primary:   #333;
-  --text-secondary: #444;
-  --text-tertiary:  #555;
-  --text-light:     #666;
-  --text-muted:     #888;
-  --text-faint:     #aaa;
-  --text-disabled:  #bbb;
+  /* Neutrals & Grays */
+  --color-page-bg:       #F9F8F6;
+  --color-header-bg:     #EFE9E3;
+  --color-surface-bg:    #fff;
+  --color-surface-subtle:#F1F3E0;
+  --color-hover-bg:      #f5f5f5;
 
-  /* Surfaces */
-  --bg-page:    #F9F8F6;
-  --bg-surface: #fff;
-  --bg-subtle:  #f8f9fa;
-  --bg-hover:   #f5f5f5;
+  /* Semantic */
+  --color-danger:        #9B0F06;
 
-	--bg-header: #EFE9E3;
+  /* Text colors (grayscale) */
+  --color-text-primary:    #333;
+  --color-text-secondary:  #444;
+  --color-text-tertiary:   #555;
+  --color-text-light:      #666;
+  --color-text-muted:      #888;
+  --color-text-faint:      #aaa;
+  --color-text-disabled:   #bbb;
 
-  /* Borders */
-  --border:        #e0e0e0;
-  --border-light:  #e8e8e8;
-  --border-medium: #ccc;
+  /* Borders & dividers (grayscale) */
+  --color-border:        #e0e0e0;
+  --color-border-light:  #e8e8e8;
+  --color-border-medium: #ccc;
 
-  /* Shadows */
+  /* ── Typography ──────────────────────────────────────────────── */
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+
+  --font-size-xs: 0.75rem;   /* 12px */
+  --font-size-sm: 0.85rem;   /* 13.6px */
+  --font-size-md: 0.95rem;   /* 15.2px */
+  --font-size-base: 1rem;    /* 16px */
+  --font-size-lg: 1.1rem;    /* 17.6px */
+  --font-size-xl: 1.5rem;    /* 24px */
+  --font-size-2xl: 1.8rem;   /* 28.8px */
+
+  --line-height-tight: 1;
+  --line-height-base: 1.6;
+  --line-height-relaxed: 1.8;
+
+  /* ── Spacing ─────────────────────────────────────────────────── */
+  --spacing-xs: 0.15rem;  /* 2.4px */
+  --spacing-sm: 0.25rem;  /* 4px */
+  --spacing-md: 0.5rem;   /* 8px */
+  --spacing-lg: 0.75rem;  /* 12px */
+  --spacing-xl: 1rem;     /* 16px */
+  --spacing-2xl: 1.25rem; /* 20px */
+  --spacing-3xl: 1.5rem;  /* 24px */
+  --spacing-4xl: 2rem;    /* 32px */
+  --spacing-5xl: 2.5rem;  /* 40px */
+
+  /* ── Shape ───────────────────────────────────────────────────── */
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-lg: 8px;
+
+  /* ── Shadows ─────────────────────────────────────────────────── */
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
 
-  /* Z-index layers */
-  --z-backdrop: 99;
-  --z-pane:     100;
-  --z-overlay:  101;
-
-  /* Motion */
+  /* ── Motion ──────────────────────────────────────────────────── */
   --transition-fast: 0.15s;
   --transition-pane: 0.25s ease;
 
-  /* Shape */
-  --radius-sm: 3px;
-  --radius:    4px;
-  --radius-lg: 8px;
+  /* ── Z-index ─────────────────────────────────────────────────── */
+  --z-backdrop: 99;
+  --z-pane:     100;
+  --z-overlay:  101;
 }
 
 /* ── Reset ────────────────────────────────────────────────────── */
@@ -61,38 +91,36 @@
 
 /* ── Base ─────────────────────────────────────────────────────── */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
-  line-height: 1.6;
-  color: var(--text-primary);
-  background: var(--bg-page);
+  font-family: var(--font-family-base);
+  line-height: var(--line-height-base);
+  color: var(--color-text-primary);
+  background: var(--color-page-bg);
 }
 
 /* ── Site header ──────────────────────────────────────────────── */
 header {
-  background: var(--bg-header);
-  border-bottom: 1px solid var(--border);
-  padding: 0.1rem 0.5rem;
+  background: var(--color-header-bg);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--spacing-sm) var(--spacing-md);
   box-shadow: var(--shadow-sm);
-
 }
 
 header h1 {
-  font-size: 1.5rem;
+  font-size: var(--font-size-xl);
   font-weight: 600;
 }
 
 header h1 a {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   text-decoration: none;
 }
 
 header h1 a:hover {
-  color: var(--text-light);
+  color: var(--color-text-light);
 }
 
 /* ── Main content area ────────────────────────────────────────── */
 main {
-
   margin: 0 auto;
-  padding: 2rem;
+  padding: var(--spacing-4xl);
 }

@@ -9,20 +9,20 @@
 
 /* ── Page metadata badges ─────────────────────────────────────── */
 .page-title-badge {
-  font-size: 0.9rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .page-attr-badge {
   display: inline-block;
-  padding: 0.15rem 0.5rem;
+  padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   text-transform: capitalize;
-  background: var(--border);
-  color: var(--text-tertiary);
+  background: var(--color-border);
+  color: var(--color-text-tertiary);
 }
 
 .attr-cover   { background: #ffd6d6; color: #900; }
@@ -33,7 +33,7 @@
 
 /* ── Pane body ────────────────────────────────────────────────── */
 .edit-pane-body {
-  padding: 1.25rem 1.5rem;
+  padding: var(--spacing-2xl) var(--spacing-3xl);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -43,25 +43,25 @@
 .edit-field {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 1rem;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
 }
 
 .edit-field label {
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   font-weight: 500;
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .edit-field input,
 .edit-field select,
 .edit-field textarea {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-medium);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--color-border-medium);
   border-radius: var(--radius);
   font-family: inherit;
-  font-size: 0.95rem;
-  background: var(--bg-surface);
+  font-size: var(--font-size-md);
+  background: var(--color-surface-bg);
 }
 
 .edit-field input:focus,
@@ -80,23 +80,23 @@
 /* ── Actions ──────────────────────────────────────────────────── */
 .edit-actions {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 0.25rem;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-sm);
 }
 
 .edit-actions button {
-  padding: 0.5rem 1.25rem;
+  padding: var(--spacing-md) var(--spacing-2xl);
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
   transition: background var(--transition-fast);
 }
 
 #edit-save {
   background: var(--color-primary);
-  color: var(--bg-surface);
+  color: var(--color-surface-bg);
 }
 
 #edit-save:hover:not(:disabled) {
@@ -109,10 +109,10 @@
 }
 
 #edit-cancel {
-  background: var(--border);
-  color: var(--text-primary);
+  background: var(--color-border);
+  color: var(--color-text-primary);
 }
 
 #edit-cancel:hover {
-  background: var(--border-medium);
+  background: var(--color-border-medium);
 }

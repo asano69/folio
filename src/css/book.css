@@ -1,16 +1,16 @@
-/* ── Book page list layout ────────────────────────────────────── */
+/* ── Book page list layout ────────────────────────────────── */
 .pages-book-link {
   color: inherit;
   text-decoration: none;
 }
 
 .pages-book-link:hover {
-  color: var(--text-light);
+  color: var(--color-text-light);
 }
 
 .pages-count {
-  font-size: 0.95rem;
-  color: var(--text-muted);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
 }
 
 /* Columns are at least 300px wide and grow to fill available space */
@@ -29,7 +29,7 @@
 .page-thumbnail {
   width: 100%;
   height: 150px;
-  background: var(--bg-subtle);
+  background: var(--color-surface-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -45,8 +45,8 @@
 }
 
 .page-thumbnail .thumbnail-placeholder {
-  color: var(--text-faint);
-  font-size: 0.9rem;
+  color: var(--color-text-faint);
+  font-size: var(--font-size-md);
 }
 
 /* ── Page card info row ───────────────────────────────────────── */
@@ -54,21 +54,21 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.5rem 0.75rem;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
   min-height: 2.4rem;
 }
 
 .page-number {
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
   flex-shrink: 0;
 }
 
 .page-note-title {
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

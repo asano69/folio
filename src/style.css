@@ -1,10 +1,25 @@
+/* ── CSS Entry Point ──────────────────────────────────────────
+   Imports all component stylesheets in dependency order.
+   This ensures design tokens are loaded first, followed by
+   base components, then page-specific and interactive components.
+──────────────────────────────────────────────────────────────── */
+
+/* Foundation: Design tokens (required first) */
 @import "./css/base.css";
+
+/* Base components: Panes and layouts */
 @import "./css/pane.css";
-@import "./css/shelf.css";
+
+/* Page layouts */
 @import "./css/sidebar.css";
+@import "./css/shelf.css";
 @import "./css/viewer.css";
+
+/* Viewer sub-panes */
 @import "./css/toc.css";
 @import "./css/editor.css";
-@import "./css/book.css";
 @import "./css/drawing.css";
+
+/* Page-specific components */
+@import "./css/book.css";
 @import "./css/overview.css";

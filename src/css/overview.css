@@ -2,15 +2,15 @@
 .book-view-tabs {
   display: flex;
   gap: 0;
-  border-bottom: 2px solid var(--border);
-  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: var(--spacing-3xl);
 }
 
 .book-view-tab {
-  padding: 0.5rem 1.25rem;
+  padding: var(--spacing-md) var(--spacing-2xl);
   text-decoration: none;
-  color: var(--text-muted);
-  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
   font-weight: 500;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
@@ -18,7 +18,7 @@
 }
 
 .book-view-tab:hover {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .book-view-tab--active {
@@ -29,8 +29,7 @@
 /* ── Page card status tints ───────────────────────────────────── */
 .page-card--reading { background: #eef3ff; }
 .page-card--read    { background: #eef8f0; }
-.page-card--skip    { background: var(--bg-subtle); opacity: 0.65; }
-/* unread = default card background, no override needed */
+.page-card--skip    { background: var(--color-surface-subtle); opacity: 0.65; }
 
 /* ── Page card link fills the card ───────────────────────────── */
 .page-card-link {
@@ -40,7 +39,6 @@
 }
 
 /* ── Status button overlay ────────────────────────────────────── */
-/* Positioned at the bottom of the card, over the info row, on hover. */
 .page-card {
   position: relative;
 }
@@ -52,11 +50,11 @@
   right: 0;
   display: flex;
   justify-content: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.5rem;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(2px);
-  border-top: 1px solid var(--border-light);
+  border-top: 1px solid var(--color-border-light);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition-fast);
@@ -69,24 +67,24 @@
 
 .status-btn {
   flex: 1;
-  padding: 0.25rem 0;
-  border: 1px solid var(--border-medium);
+  padding: var(--spacing-sm) 0;
+  border: 1px solid var(--color-border-medium);
   border-radius: var(--radius-sm);
-  background: var(--bg-surface);
-  color: var(--text-muted);
-  font-size: 0.8rem;
+  background: var(--color-surface-bg);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
   cursor: pointer;
   font-family: inherit;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .status-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-secondary);
+  background: var(--color-hover-bg);
+  color: var(--color-text-secondary);
 }
 
 .status-btn--active {
-  background: var(--color-primary-bg);
+  background: var(--color-primary-light);
   color: var(--color-primary);
   border-color: var(--color-primary);
   font-weight: 600;
@@ -96,96 +94,96 @@
 .bibliographic-layout {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: var(--spacing-5xl);
   max-width: 680px;
 }
 
 .bibliographic-section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--spacing-lg);
 }
 
 .bibliographic-section-title {
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* ── Stats ────────────────────────────────────────────────────── */
 .bibliographic-stats {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 0.25rem 1.5rem;
-  font-size: 0.95rem;
+  gap: var(--spacing-sm) var(--spacing-3xl);
+  font-size: var(--font-size-md);
 }
 
 .bibliographic-stats dt {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
   font-weight: 500;
 }
 
 .bibliographic-stats dd {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 /* ── TOC ──────────────────────────────────────────────────────── */
 .bibliographic-toc {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: var(--spacing-sm);
 }
 
 .bibliographic-toc-entry {
   display: flex;
   align-items: baseline;
-  gap: 0.75rem;
-  padding: 0.45rem 0.75rem;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
   text-decoration: none;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   border-radius: var(--radius);
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
   transition: background var(--transition-fast);
 }
 
 .bibliographic-toc-entry:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--color-hover-bg);
+  color: var(--color-text-primary);
 }
 
 .bibliographic-toc-page {
   flex-shrink: 0;
-  font-size: 0.8rem;
-  color: var(--text-faint);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
   min-width: 3rem;
 }
 
 .bibliographic-empty {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  line-height: 1.6;
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-relaxed);
 }
 
 /* ── Note form ────────────────────────────────────────────────── */
 .bibliographic-note-form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--spacing-lg);
 }
 
 .bibliographic-note-textarea {
   width: 100%;
   min-height: 12rem;
-  padding: 0.75rem;
-  border: 1px solid var(--border-medium);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-border-medium);
   border-radius: var(--radius);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
   resize: vertical;
-  background: var(--bg-surface);
-  line-height: 1.6;
+  background: var(--color-surface-bg);
+  line-height: var(--line-height-relaxed);
 }
 
 .bibliographic-note-textarea:focus {
@@ -195,13 +193,13 @@
 
 .bibliographic-note-save {
   align-self: flex-start;
-  padding: 0.45rem 1.25rem;
+  padding: var(--spacing-md) var(--spacing-2xl);
   background: var(--color-primary);
-  color: var(--bg-surface);
+  color: var(--color-surface-bg);
   border: none;
   border-radius: var(--radius);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
   transition: background var(--transition-fast);

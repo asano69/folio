@@ -12,14 +12,14 @@ main:has(.library-layout) {
 .library-header {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
+  gap: var(--spacing-3xl);
+  margin-bottom: var(--spacing-3xl);
   flex-wrap: wrap;
 }
 
 .library-header h2 {
-  font-size: 1.8rem;
-  color: #222;
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-primary);
   white-space: nowrap;
 }
 
@@ -34,12 +34,12 @@ main:has(.library-layout) {
 
 .search-input {
   width: 100%;
-  padding: 0.45rem 2rem 0.45rem 0.75rem;
-  border: 1px solid var(--border-medium);
+  padding: var(--spacing-md) var(--spacing-2xl) var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--color-border-medium);
   border-radius: var(--radius);
   font-family: inherit;
-  font-size: 0.95rem;
-  background: var(--bg-surface);
+  font-size: var(--font-size-md);
+  background: var(--color-surface-bg);
   -webkit-appearance: none;
 }
 
@@ -54,41 +54,41 @@ main:has(.library-layout) {
 
 .search-clear-btn {
   position: absolute;
-  right: 0.4rem;
+  right: var(--spacing-md);
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-faint);
-  font-size: 0.85rem;
-  padding: 0.2rem 0.3rem;
-  line-height: 1;
+  color: var(--color-text-faint);
+  font-size: var(--font-size-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  line-height: var(--line-height-tight);
 }
 
 .search-clear-btn:hover {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 /* ── Shelf edit button ────────────────────────────────────────── */
 .shelf-edit-btn {
   margin-left: auto;
   background: none;
-  border: 1px solid var(--border-medium);
+  border: 1px solid var(--color-border-medium);
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  padding: 0.3rem 0.75rem;
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  padding: var(--spacing-sm) var(--spacing-lg);
   font-family: inherit;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .shelf-edit-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-tertiary);
+  background: var(--color-hover-bg);
+  color: var(--color-text-tertiary);
 }
 
 .shelf-edit-btn.active {
-  background: var(--color-primary-bg);
+  background: var(--color-primary-light);
   color: var(--color-primary);
   border-color: var(--color-primary);
 }
@@ -97,11 +97,11 @@ main:has(.library-layout) {
 .books-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1.5rem;
+  gap: var(--spacing-3xl);
 }
 
 .book-card {
-  background: var(--bg-surface);
+  background: var(--color-surface-bg);
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-md);
@@ -140,22 +140,22 @@ main:has(.library-layout) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-faint);
-  font-size: 0.9rem;
+  color: var(--color-text-faint);
+  font-size: var(--font-size-md);
 }
 
 /* ── Book title row ───────────────────────────────────────────── */
 .book-info {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1rem;
-  gap: 0.5rem;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  gap: var(--spacing-md);
 }
 
 .book-title {
   flex: 1;
   min-width: 0;
-  font-size: 1.1rem;
+  font-size: var(--font-size-lg);
   font-weight: 500;
 }
 
@@ -179,33 +179,33 @@ main:has(.library-layout) {
   flex: 1;
   min-width: 0;
   font-family: inherit;
-  font-size: 1.1rem;
+  font-size: var(--font-size-lg);
   font-weight: 500;
   border: 1px solid var(--color-primary);
   border-radius: var(--radius);
-  padding: 0.15rem 0.4rem;
+  padding: var(--spacing-sm) var(--spacing-md);
   outline: none;
 }
 
 .no-books {
-  color: var(--text-light);
-  font-size: 1.1rem;
+  color: var(--color-text-light);
+  font-size: var(--font-size-lg);
   text-align: center;
-  padding: 3rem;
+  padding: var(--spacing-5xl);
 }
 
 /* ── Missing books section ────────────────────────────────────── */
 .missing-section {
-  margin-top: 2.5rem;
+  margin-top: var(--spacing-5xl);
 }
 
 .missing-summary {
   display: inline-block;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
-  color: var(--text-muted);
-  padding: 0.4rem 0;
+  color: var(--color-text-muted);
+  padding: var(--spacing-md) 0;
   user-select: none;
   list-style: none;
 }
@@ -214,17 +214,23 @@ main:has(.library-layout) {
   display: none;
 }
 
-.missing-summary::before         { content: '▶ '; font-size: 0.75rem; }
-details[open] .missing-summary::before { content: '▼ '; }
+.missing-summary::before {
+  content: '▶ ';
+  font-size: var(--font-size-xs);
+}
+
+details[open] .missing-summary::before {
+  content: '▼ ';
+}
 
 .missing-grid {
-  margin-top: 1rem;
+  margin-top: var(--spacing-xl);
 }
 
 .book-card--missing {
   opacity: 0.55;
   box-shadow: none;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
 }
 
 .book-card--missing:hover {
@@ -238,7 +244,7 @@ details[open] .missing-summary::before { content: '▼ '; }
 }
 
 .book-title--missing {
-  color: #999;
+  color: var(--color-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -246,22 +252,21 @@ details[open] .missing-summary::before { content: '▼ '; }
 
 .missing-badge {
   flex-shrink: 0;
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   color: #b05000;
   background: #fff0e0;
   border: 1px solid #f0c080;
   border-radius: var(--radius-sm);
-  padding: 0.1rem 0.4rem;
+  padding: var(--spacing-xs) var(--spacing-md);
   white-space: nowrap;
 }
 
 /* ── Remove-from-collection button ───────────────────────────── */
-/* Positioned at the top-left corner of the thumbnail image */
 .collection-remove-btn {
   position: absolute;
-  top: 0.4rem;
-  left: 0.4rem;
+  top: var(--spacing-md);
+  left: var(--spacing-md);
   z-index: 1;
   display: none;
   align-items: center;
@@ -270,16 +275,15 @@ details[open] .missing-summary::before { content: '▼ '; }
   height: 1.6rem;
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(2px);
-  border: 1px solid var(--border-medium);
+  border: 1px solid var(--color-border-medium);
   border-radius: var(--radius);
   cursor: pointer;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  line-height: 1;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-/* Shown only when the shelf is in edit mode */
 .shelf--edit .collection-remove-btn {
   display: flex;
 }
@@ -291,8 +295,6 @@ details[open] .missing-summary::before { content: '▼ '; }
 }
 
 /* ── Multi-select ─────────────────────────────────────────────── */
-
-/* Selected card: blue outline + checkmark badge in the thumbnail corner */
 .book-card--selected {
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
@@ -301,17 +303,17 @@ details[open] .missing-summary::before { content: '▼ '; }
 .book-card--selected .book-thumbnail::after {
   content: '✓';
   position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
   width: 1.4rem;
   height: 1.4rem;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-surface-bg);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   pointer-events: none;
   z-index: 1;
@@ -329,14 +331,14 @@ details[open] .missing-summary::before { content: '▼ '; }
 /* Floating badge showing how many books are selected */
 .selection-badge {
   position: fixed;
-  bottom: 2rem;
+  bottom: var(--spacing-4xl);
   left: 50%;
   transform: translateX(-50%);
   background: var(--color-primary);
-  color: #fff;
-  padding: 0.4rem 1.1rem;
+  color: var(--color-surface-bg);
+  padding: var(--spacing-md) var(--spacing-2xl);
   border-radius: 2rem;
-  font-size: 0.88rem;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   box-shadow: var(--shadow-md);
   pointer-events: none;
