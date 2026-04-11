@@ -34,13 +34,20 @@ func newServer(cfg *config.Config) (*server, error) {
 }
 
 func (s *server) setupRoutes() {
+	// favicon served from embedded binary
+	s.mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/x-icon")
+		w.Write(faviconData)
+	})
+
 	fs := http.FileServer(http.Dir("./static"))
 	s.mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	funcMap := template.FuncMap{
-		"add": func(a, b int) int { return a + b },
-		"sub": func(a, b int) int { return a - b },
-		"inc": func(i int) int { return i + 1 },
+		"add":     func(a, b int) int { return a + b },
+		"sub":     func(a, b int) int { return a - b },
+		"inc":     func(i int) int { return i + 1 },
+		"logoSVG": func() template.HTML { return template.HTML(folioLogoSVG) },
 	}
 
 	// sidebar.html is included in both home and collection template sets so

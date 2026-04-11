@@ -115,9 +115,11 @@ header h1 a {
   text-decoration: none;
 }
 
-.logo {
+/* Logo SVG is inlined; size is controlled via the svg element directly */
+header h1 a svg {
   width: 20px;
   height: 20px;
+  vertical-align: middle;
 }
 
 header h1 a:hover {
