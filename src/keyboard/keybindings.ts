@@ -82,9 +82,22 @@ export function onlyOnViewerPage(ctx: KeyBindingContext): boolean {
   return ctx.isViewerPage;
 }
 
+// Text-entry input types that should block keyboard shortcuts while focused.
+// Non-text inputs (color, range, checkbox, radio, etc.) do not capture text,
+// so shortcuts remain active when they hold focus.
+const TEXT_INPUT_TYPES = new Set([
+  'text', 'search', 'email', 'password', 'url', 'tel', 'number',
+]);
+
 export function notWhenEditingText(ctx: KeyBindingContext): boolean {
   const elem = ctx.focusedElement;
-  return elem?.tagName !== 'INPUT' && elem?.tagName !== 'TEXTAREA';
+  if (!elem) return true;
+  if (elem.tagName === 'TEXTAREA') return false;
+  if (elem.tagName === 'INPUT') {
+    const type = (elem as HTMLInputElement).type.toLowerCase();
+    return !TEXT_INPUT_TYPES.has(type);
+  }
+  return true;
 }
 
 export function whenDrawPaneOpen(ctx: KeyBindingContext): boolean {
