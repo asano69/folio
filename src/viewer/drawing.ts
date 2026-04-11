@@ -272,31 +272,24 @@ export function initDrawing(): void {
     state.unsavedChanges++;
   };
 
-  // Local keyboard handler for undo/redo within the draw pane.
-  document.addEventListener('keydown', (e: KeyboardEvent) => {
+  // Undo/redo is dispatched by the centralized keyboard manager in
+  // src/keyboard/init.ts via folio:draw-undo and folio:draw-redo custom events.
+  // A local keydown listener is intentionally absent here to avoid double-firing:
+  // KeyBindingManager calls e.preventDefault() but not e.stopPropagation(), so
+  // any additional keydown listener on document would also receive the same event,
+  // causing undoEntry / redoEntry to run twice per keystroke.
+  document.addEventListener('folio:draw-undo', () => {
     if (!pane.classList.contains('open')) return;
-    const active = document.activeElement;
-    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
-
-    if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
-      e.preventDefault();
-      undoEntry(undoStack, redoStack, inkLayer);
-      markDirty();
-    } else if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) {
-      e.preventDefault();
-      redoEntry(undoStack, redoStack, inkLayer);
-      markDirty();
-    }
+    undoEntry(undoStack, redoStack, inkLayer);
+    markDirty();
   });
 
-  // Listen for external undo/redo events (from centralized keyboard manager).
-	document.addEventListener('folio:draw-undo', () => {
-	  undoEntry(undoStack, redoStack, inkLayer);
-	});
+  document.addEventListener('folio:draw-redo', () => {
+    if (!pane.classList.contains('open')) return;
+    redoEntry(undoStack, redoStack, inkLayer);
+    markDirty();
+  });
 
-	document.addEventListener('folio:draw-redo', () => {
-	  redoEntry(undoStack, redoStack, inkLayer);
-	});
   // ── Drawing interaction ────────────────────────────────────────────────────
 
   let currentPath: SVGPathElement | null = null;
