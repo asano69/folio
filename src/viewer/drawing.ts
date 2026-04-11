@@ -1,19 +1,9 @@
-// SVG drawing overlay for the page viewer.
-//
-// Architecture:
-//   - A transparent SVG element is absolutely positioned over the page image.
-//   - The SVG shares the image's CSS transform (synced via MutationObserver) so
-//     that zoom and pan apply to both simultaneously.
-//   - Ink strokes live in <g id="drawing-ink">.
-//   - The eraser works by hit-testing ink paths and removing matching elements
-//     from the DOM, so new strokes drawn after erasing are never affected.
-//
-// Undo/redo history tracks two kinds of entries:
-//   - 'add'   : a single ink path that was appended
-//   - 'erase' : a set of ink paths that were removed (restored on undo)
+// src/viewer/drawing.ts
 
 import { saveDrawing } from '../api';
 import { PANE_EVENT_DRAW_OPEN, PANE_EVENT_EDIT_OPEN } from './pane-events';
+
+// ── Type definitions ───────────────────────────────────────────
 
 interface PenSettings {
   color:   string;
@@ -30,6 +20,39 @@ interface EraserSettings {
 type HistoryEntry =
   | { kind: 'add';   element: SVGPathElement }
   | { kind: 'erase'; removed: SVGPathElement[] };
+
+// ── Drawing state management ───────────────────────────────────
+// Tracks whether the drawing has unsaved changes and save status.
+
+interface DrawingState {
+  isDirty: boolean;
+  isSaving: boolean;
+  lastSavedSVG: string | null;
+  unsavedChanges: number; // Count of strokes since last save
+}
+
+// ── SVG Validation ─────────────────────────────────────────────
+// validateSVG checks that the SVG markup is well-formed and parseable.
+// Returns true if valid, false otherwise.
+
+function validateSVG(svg: string): boolean {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(
+      `<svg xmlns="http://www.w3.org/2000/svg">${svg}</svg>`,
+      'image/svg+xml',
+    );
+
+    // DOMParser silently creates a <parsererror> element on failure.
+    // Check for this element to detect parse errors.
+    const hasParseError = doc.querySelector('parsererror') !== null;
+    return !hasParseError;
+  } catch {
+    return false;
+  }
+}
+
+// ── Main initialization ────────────────────────────────────────
 
 export function initDrawing(): void {
   const toggleBtn = document.getElementById('draw-toggle')  as HTMLButtonElement | null;
@@ -62,7 +85,14 @@ export function initDrawing(): void {
   const undoStack: HistoryEntry[] = [];
   const redoStack: HistoryEntry[] = [];
 
-  // ── SVG viewBox ────────────────────────────────────────────────────────────
+  const state: DrawingState = {
+    isDirty: false,
+    isSaving: false,
+    lastSavedSVG: null,
+    unsavedChanges: 0,
+  };
+
+  // ── SVG viewBox ────────────────────────────────────────────────────────
 
   const applyViewBox = (): void => {
     if (image.naturalWidth && image.naturalHeight) {
@@ -94,7 +124,12 @@ export function initDrawing(): void {
 
   const existingData = overlay.dataset.drawing;
   if (existingData) {
-    restoreDrawing(existingData, inkLayer);
+    if (!validateSVG(existingData)) {
+      console.error('Stored SVG is malformed. Starting with empty canvas.');
+    } else {
+      restoreDrawing(existingData, inkLayer);
+      state.lastSavedSVG = existingData;
+    }
   }
 
   // ── Pane open / close ──────────────────────────────────────────────────────
@@ -114,6 +149,13 @@ export function initDrawing(): void {
   };
 
   const closePane = (): void => {
+    // Warn user if there are unsaved changes.
+    if (state.isDirty && state.unsavedChanges > 0) {
+      const confirmed = confirm(
+        'You have unsaved drawing changes. Close anyway?'
+      );
+      if (!confirmed) return;
+    }
     pane.classList.remove('open');
     toggleBtn.classList.remove('active');
     setDrawingMode(false);
@@ -174,23 +216,63 @@ export function initDrawing(): void {
 
   syncToolUI();
 
-  // ── Save ───────────────────────────────────────────────────────────────────
+  // ── Save with validation and error handling ────────────────────────────────
 
   saveBtn?.addEventListener('click', async () => {
     if (!saveBtn) return;
+    if (state.isSaving) return; // Prevent duplicate submissions.
+
     saveBtn.disabled = true;
+    state.isSaving = true;
+
     try {
       const svg = serializeDrawing(inkLayer);
+
+      // Validate the SVG before sending.
+      if (svg !== null && !validateSVG(svg)) {
+        throw new Error('Drawing contains invalid SVG markup. Cannot save.');
+      }
+
       await saveDrawing(bookId, pageHash, svg);
+
+      // Update state after successful save.
+      state.lastSavedSVG = svg;
+      state.isDirty = false;
+      state.unsavedChanges = 0;
+
+      // Provide visual feedback.
+      saveBtn.textContent = '✓ Saved';
+      setTimeout(() => {
+        saveBtn.textContent = 'Save';
+      }, 2000);
     } catch (err) {
       console.error('Failed to save drawing:', err);
+
+      // Rollback: restore the last successfully saved state.
+      if (state.lastSavedSVG !== null) {
+        inkLayer.innerHTML = '';
+        restoreDrawing(state.lastSavedSVG, inkLayer);
+      }
+
+      // Alert the user.
+      alert(
+        'Failed to save drawing. Your changes have been reverted to the last saved state.' +
+        '\n\nError: ' + (err instanceof Error ? err.message : String(err))
+      );
     } finally {
       saveBtn.disabled = false;
+      state.isSaving = false;
     }
   });
 
   // ── Undo / redo ────────────────────────────────────────────────────────────
 
+  const markDirty = (): void => {
+    state.isDirty = true;
+    state.unsavedChanges++;
+  };
+
+  // Local keyboard handler for undo/redo within the draw pane.
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     if (!pane.classList.contains('open')) return;
     const active = document.activeElement;
@@ -199,12 +281,22 @@ export function initDrawing(): void {
     if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
       e.preventDefault();
       undoEntry(undoStack, redoStack, inkLayer);
+      markDirty();
     } else if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) {
       e.preventDefault();
       redoEntry(undoStack, redoStack, inkLayer);
+      markDirty();
     }
   });
 
+  // Listen for external undo/redo events (from centralized keyboard manager).
+	document.addEventListener('folio:draw-undo', () => {
+	  undoEntry(undoStack, redoStack, inkLayer);
+	});
+
+	document.addEventListener('folio:draw-redo', () => {
+	  redoEntry(undoStack, redoStack, inkLayer);
+	});
   // ── Drawing interaction ────────────────────────────────────────────────────
 
   let currentPath: SVGPathElement | null = null;
@@ -221,6 +313,7 @@ export function initDrawing(): void {
 
     // Any new stroke invalidates the redo history.
     redoStack.splice(0);
+    markDirty();
 
     const pt = toSVGPoint(overlay, e.clientX, e.clientY);
 
@@ -267,7 +360,7 @@ export function initDrawing(): void {
   overlay.addEventListener('pointercancel', endStroke);
 }
 
-// ── Eraser hit-testing ─────────────────────────────────────────────────────────
+// ── Helper functions ───────────────────────────────────────────
 
 // eraseAt removes all ink paths whose bounding box overlaps with a circle of
 // the given radius centred at (x, y). Removed elements are appended to the
@@ -300,7 +393,7 @@ function eraseAt(
   }
 }
 
-// ── Undo / redo helpers ────────────────────────────────────────────────────────
+// ── Undo / redo helpers ────────────────────────────────────────
 
 function undoEntry(
   undoStack: HistoryEntry[],
@@ -340,7 +433,7 @@ function redoEntry(
   undoStack.push(entry);
 }
 
-// ── Geometry helpers ───────────────────────────────────────────────────────────
+// ── Geometry helpers ───────────────────────────────────────────
 
 function toSVGPoint(svg: SVGSVGElement, clientX: number, clientY: number): DOMPoint {
   const pt = svg.createSVGPoint();
@@ -361,7 +454,7 @@ function makePenPath(p: PenSettings, x: number, y: number): SVGPathElement {
   return el;
 }
 
-// ── Serialization ──────────────────────────────────────────────────────────────
+// ── Serialization ──────────────────────────────────────────────
 
 // serializeDrawing returns the inner SVG markup to persist, or null when the
 // ink layer is empty (nothing to save).
@@ -371,17 +464,22 @@ function serializeDrawing(inkLayer: SVGGElement): string | null {
 }
 
 // restoreDrawing parses previously saved markup and populates the ink layer.
-// Restored strokes are intentionally excluded from the undo stack so that
-// Ctrl+Z only operates on strokes drawn in the current session.
+// Only called after validateSVG() has confirmed the markup is well-formed.
 function restoreDrawing(data: string, inkLayer: SVGGElement): void {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(
-    `<svg xmlns="http://www.w3.org/2000/svg">${data}</svg>`,
-    'image/svg+xml',
-  );
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(
+      `<svg xmlns="http://www.w3.org/2000/svg">${data}</svg>`,
+      'image/svg+xml',
+    );
 
-  const savedInk = doc.querySelector('#drawing-ink');
-  savedInk?.childNodes.forEach(node => {
-    inkLayer.appendChild(document.importNode(node, true));
-  });
+    const savedInk = doc.querySelector('#drawing-ink');
+    if (savedInk) {
+      savedInk.childNodes.forEach(node => {
+        inkLayer.appendChild(document.importNode(node, true));
+      });
+    }
+  } catch (err) {
+    console.error('Failed to restore drawing:', err);
+  }
 }

@@ -9,10 +9,21 @@ import type { NotePayload } from './types';
 async function request(url: string, options?: RequestInit): Promise<Response> {
   const res = await fetch(url, options);
   if (!res.ok) {
-    throw new Error(`${options?.method ?? 'GET'} ${url} — ${res.status} ${res.statusText}`);
+    const method = options?.method ?? 'GET';
+    const status = res.status;
+    const statusText = res.statusText;
+
+    // 404 は特別に扱う：ページハッシュが無効である可能性が高い
+    if (status === 404) {
+      throw new Error(`Page not found (${method} ${url}). The page may have been removed during a re-scan.`);
+    }
+
+    throw new Error(`${method} ${url} — ${status} ${statusText}`);
   }
   return res;
 }
+
+
 
 // ── Books ─────────────────────────────────────────────────────
 

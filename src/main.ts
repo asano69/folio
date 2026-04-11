@@ -1,3 +1,4 @@
+import { initKeyboard } from './keyboard/init';
 import { initViewer } from './viewer/navigation';
 import { initImageDisplay } from './viewer/display';
 import { initRename } from './ui/rename';
@@ -10,6 +11,9 @@ import { initPageStatus } from './ui/page-status';
 import { initBookNote } from './ui/book-note';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize keyboard bindings first, so all other modules can assume it's ready.
+    initKeyboard();
+
     initViewer();
     initImageDisplay();
     initRename();

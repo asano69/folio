@@ -705,3 +705,17 @@ func (s *Store) ListBookIDsWithThumbnails() (map[string]bool, error) {
 	}
 	return set, rows.Err()
 }
+
+// GetImageByHash returns the image matching the given hash, or nil if not found.
+func (s *Store) GetImageByHash(bookID, pageHash string) (*Image, error) {
+	var img Image
+	err := s.db.QueryRow(`
+		SELECT id, book_id, number, filename, hash
+		FROM pages
+		WHERE book_id = ? AND hash = ?
+	`, bookID, pageHash).Scan(&img.ID, &img.BookID, &img.Number, &img.Filename, &img.Hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return &img, err
+}

@@ -18,7 +18,6 @@ export function initPageStatus(): void {
     const status = btn.dataset.status;
     if (!pageHash || !status) return;
 
-    // Prevent the click from following the page-card-link anchor.
     e.preventDefault();
     e.stopPropagation();
 
@@ -26,7 +25,16 @@ export function initPageStatus(): void {
       await updatePageStatus(bookId, pageHash, status);
       applyStatus(card, status);
     } catch (err) {
-      console.error(err);
+      // ページハッシュが無効な場合の明示的なフィードバック
+      if (err instanceof Error && err.message.includes('Page not found')) {
+        console.error('Page hash mismatch:', err);
+        // ページを再読み込みしてハッシュを再同期
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+        return;
+      }
+      console.error('Failed to update page status:', err);
     }
   });
 }
@@ -35,7 +43,6 @@ const statusClasses = ['page-card--unread', 'page-card--reading', 'page-card--re
 
 function applyStatus(card: HTMLElement, status: string): void {
   card.classList.remove(...statusClasses);
-  // unread is the default style — no class needed, but we keep it consistent.
   card.classList.add(`page-card--${status}`);
 
   card.querySelectorAll<HTMLButtonElement>('.status-btn').forEach(btn => {
