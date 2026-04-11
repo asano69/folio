@@ -61,5 +61,22 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: folio [server|scan [path]|thumbnail <uuid>|page-thumbnails [uuid]|hash <uuid>]\n")
+	fmt.Fprintf(os.Stderr, `Usage: folio <subcommand> [arguments]
+
+Subcommands:
+  server                     Start the HTTP server
+  scan [path]                Scan CBZ files and sync the database
+                             (default path: FOLIO_LIBRARY_PATH)
+  thumbnail <uuid>           Regenerate the book-level thumbnail for one book
+  page-thumbnails [uuid]     Generate page-level thumbnails (all books if omitted)
+  hash <uuid>                Recompute image hashes for one book
+
+Environment:
+  FOLIO_LIBRARY_PATH   CBZ library root        (default: ./library)
+  FOLIO_DATA_PATH      SQLite database dir     (default: ./data)
+  FOLIO_HOST           Server bind address     (default: 0.0.0.0)
+  FOLIO_PORT           Server port             (default: 3000)
+
+For full documentation see docs/cli.md.
+`)
 }
