@@ -1,8 +1,9 @@
 /folio
 tmp/
-
 library/
 data/
+backup/
+
 *.db
 *~
 

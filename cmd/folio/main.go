@@ -54,6 +54,20 @@ func main() {
 			fmt.Fprintf(os.Stderr, "hash: %v\n", err)
 			os.Exit(1)
 		}
+	case "backup":
+		if err := runBackup(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "backup: %v\n", err)
+			os.Exit(1)
+		}
+	case "restore":
+		if len(os.Args) < 3 {
+			fmt.Fprintf(os.Stderr, "usage: folio restore <backup-file>\n")
+			os.Exit(1)
+		}
+		if err := runRestore(cfg, os.Args[2]); err != nil {
+			fmt.Fprintf(os.Stderr, "restore: %v\n", err)
+			os.Exit(1)
+		}
 	default:
 		usage()
 		os.Exit(1)
@@ -70,10 +84,13 @@ Subcommands:
   thumbnail <uuid>           Regenerate the book-level thumbnail for one book
   page-thumbnails [uuid]     Generate page-level thumbnails (all books if omitted)
   hash <uuid>                Recompute image hashes for one book
+  backup                     Copy the database to the backup directory
+  restore <backup-file>      Replace the active database with a backup file
 
 Environment:
   FOLIO_LIBRARY_PATH   CBZ library root        (default: ./library)
   FOLIO_DATA_PATH      SQLite database dir     (default: ./data)
+  FOLIO_BACKUP_PATH    Backup output directory (default: ./backup)
   FOLIO_HOST           Server bind address     (default: 0.0.0.0)
   FOLIO_PORT           Server port             (default: 3000)
 
