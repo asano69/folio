@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -8,14 +9,14 @@ import (
 	"time"
 
 	"folio/internal/config"
+
+	_ "modernc.org/sqlite"
 )
 
-// runBackup copies the SQLite database file to the backup directory.
-// The destination filename includes a timestamp so each backup is distinct.
-// SQLite's WAL mode means the file may be accompanied by -shm and -wal
-// sidecar files during active writes; copying the main .db file alone is
-// safe when no write transaction is in progress (which is the case here
-// because we open no DB connection before copying).
+// runBackup creates a consistent snapshot of the live database using VACUUM INTO.
+// VACUUM INTO holds a read transaction for its duration, so it is safe to run
+// while the server is active; ongoing writes are simply reflected or excluded
+// depending on when they commit relative to the snapshot.
 func runBackup(cfg *config.Config) error {
 	srcPath := filepath.Join(cfg.DataPath, "folio.db")
 	if _, err := os.Stat(srcPath); err != nil {
@@ -27,11 +28,18 @@ func runBackup(cfg *config.Config) error {
 	}
 
 	timestamp := time.Now().Format("20060102-150405")
-	destFilename := fmt.Sprintf("folio-%s.db", timestamp)
-	destPath := filepath.Join(cfg.BackupPath, destFilename)
+	destPath := filepath.Join(cfg.BackupPath, fmt.Sprintf("folio-%s.db", timestamp))
 
-	if err := copyFile(srcPath, destPath); err != nil {
-		return fmt.Errorf("copy database to %s: %w", destPath, err)
+	db, err := sql.Open("sqlite", srcPath)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer db.Close()
+
+	// VACUUM INTO writes a compacted, consistent copy to destPath.
+	// Safe to run against a WAL-mode database under concurrent read/write load.
+	if _, err := db.Exec("VACUUM INTO ?", destPath); err != nil {
+		return fmt.Errorf("vacuum into %s: %w", destPath, err)
 	}
 
 	fmt.Printf("Backup written to %s\n", destPath)
@@ -39,11 +47,17 @@ func runBackup(cfg *config.Config) error {
 }
 
 // runRestore replaces the active database file with the specified backup file.
-// The current database is overwritten; there is no automatic pre-restore backup.
-// The caller should ensure the server is not running before restoring.
+//
+// The server must be stopped before running this command. Restoring while the
+// server is running risks data corruption because SQLite connections hold file
+// locks and may be mid-transaction when the file is replaced.
 func runRestore(cfg *config.Config, backupPath string) error {
-	if _, err := os.Stat(backupPath); err != nil {
-		return fmt.Errorf("backup file not found at %s: %w", backupPath, err)
+	absBackupPath, err := filepath.Abs(backupPath)
+	if err != nil {
+		return fmt.Errorf("resolve backup path: %w", err)
+	}
+	if _, err := os.Stat(absBackupPath); err != nil {
+		return fmt.Errorf("backup file not found at %s: %w", absBackupPath, err)
 	}
 
 	if err := os.MkdirAll(cfg.DataPath, 0755); err != nil {
@@ -52,15 +66,16 @@ func runRestore(cfg *config.Config, backupPath string) error {
 
 	destPath := filepath.Join(cfg.DataPath, "folio.db")
 
-	if err := copyFile(backupPath, destPath); err != nil {
-		return fmt.Errorf("restore database from %s: %w", backupPath, err)
+	if err := copyFile(absBackupPath, destPath); err != nil {
+		return fmt.Errorf("restore database: %w", err)
 	}
 
-	fmt.Printf("Database restored from %s to %s\n", backupPath, destPath)
+	fmt.Printf("Database restored from %s to %s\n", absBackupPath, destPath)
 	return nil
 }
 
 // copyFile copies the file at src to dst, creating or truncating dst.
+// Sync is called before closing so the data is flushed to disk.
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
