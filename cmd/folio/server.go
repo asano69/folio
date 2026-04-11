@@ -34,10 +34,10 @@ func newServer(cfg *config.Config) (*server, error) {
 }
 
 func (s *server) setupRoutes() {
-	// favicon served from embedded binary
-	s.mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/x-icon")
-		w.Write(faviconData)
+
+	s.mux.HandleFunc("/favicon.svg", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml") // image/x-icon → image/svg+xml
+		w.Write([]byte(faviconSVG))                     // faviconData → []byte(faviconSVG)
 	})
 
 	fs := http.FileServer(http.Dir("./static"))

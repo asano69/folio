@@ -72,16 +72,6 @@ reset-db:  ## (*) Deploy stack via Komodo
 	docker exec -it komodo km x -y deploy-stack dbgate
 
 
-# ─────────────────────────────────────────
-# icon
-# ─────────────────────────────────────────
-.PHONY: icon
-icon:
-	magick -background none cmd/folio/assets/folio.svg \
-	  \( -clone 0 -resize 16x16 \) \
-	  \( -clone 0 -resize 32x32 \) \
-	  \( -clone 0 -resize 48x48 \) \
-	  -delete 0 cmd/folio/assets/favicon.ico
 
 # ─────────────────────────────────────────
 # Clean
