@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 
 	"folio/internal/config"
 	"folio/internal/handlers"
@@ -124,4 +125,16 @@ func (s *server) Start() error {
 	addr := s.config.Address()
 	fmt.Printf("Starting server at %s\n", addr)
 	return http.ListenAndServe(addr, s.mux)
+}
+
+func runServer(cfg *config.Config) {
+	srv, err := newServer(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "server: %v\n", err)
+		os.Exit(1)
+	}
+	if err := srv.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "server: %v\n", err)
+		os.Exit(1)
+	}
 }

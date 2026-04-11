@@ -63,13 +63,19 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Fetch all thumbnail states in one query to avoid N+1.
+	thumbnailSet, err := h.Store.ListBookIDsWithThumbnails()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	var present, missing []bookView
 	for _, b := range dbBooks {
-		has, _ := h.Store.HasThumbnail(b.ID)
 		view := bookView{
 			ID:           b.ID,
 			Title:        b.Title,
-			HasThumbnail: has,
+			HasThumbnail: thumbnailSet[b.ID],
 		}
 		if b.MissingSince != nil {
 			view.MissingSince = *b.MissingSince

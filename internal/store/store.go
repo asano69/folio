@@ -3,8 +3,10 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -208,9 +210,17 @@ func Open(dataPath string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
+// applyMigrations runs each migration statement once. A "duplicate column name"
+// error means the migration already ran on a previous startup and is silently
+// ignored. Any other error is unexpected and logged as a warning so it is never
+// silently swallowed.
 func applyMigrations(db *sql.DB) {
 	for _, m := range migrations {
-		db.Exec(m) // error intentionally ignored; see migrations comment above
+		if _, err := db.Exec(m); err != nil {
+			if !strings.Contains(err.Error(), "duplicate column name") {
+				log.Printf("migration warning: %v (sql: %s)", err, m)
+			}
+		}
 	}
 }
 

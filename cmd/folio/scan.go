@@ -1,0 +1,172 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"folio/internal/config"
+	"folio/internal/storage"
+	"folio/internal/store"
+)
+
+func runScan(cfg *config.Config, scanPath string) error {
+	db, err := store.Open(cfg.DataPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	absScanPath, err := filepath.Abs(scanPath)
+	if err != nil {
+		return fmt.Errorf("resolve scan path: %w", err)
+	}
+
+	// Restrict missing-book detection to books under the scanned directory.
+	allBooks, err := db.ListBooksUnderPath(absScanPath)
+	if err != nil {
+		return fmt.Errorf("list books: %w", err)
+	}
+
+	fmt.Printf("Scanning %s\n", absScanPath)
+
+	// Phase 1: lightweight meta scan — reads only folio.json from each CBZ.
+	metaBooks, err := storage.ScanMeta(absScanPath)
+	if err != nil {
+		return err
+	}
+
+	// Classify books: unchanged (mtime matches DB) vs. need full open.
+	var unchangedBooks []storage.Book
+	var fullOpenPaths []string
+
+	for _, b := range metaBooks {
+		if b.ID == "" {
+			fullOpenPaths = append(fullOpenPaths, b.Source)
+			continue
+		}
+		existing, err := db.GetBook(b.ID)
+		if err != nil {
+			return err
+		}
+		if existing == nil || existing.FileMtime != b.FileMtime {
+			fullOpenPaths = append(fullOpenPaths, b.Source)
+		} else {
+			unchangedBooks = append(unchangedBooks, b)
+		}
+	}
+
+	// Phase 2: full open (with hash computation) only for new/changed books.
+	type openResult struct {
+		book storage.Book
+		path string
+		err  error
+	}
+	rawResults := runWorkerPool(fullOpenPaths, func(path string) openResult {
+		book, err := storage.OpenBook(path)
+		return openResult{book, path, err}
+	})
+
+	var changedBooks []storage.Book
+	for _, r := range rawResults {
+		if r.err != nil {
+			fmt.Fprintf(os.Stderr, "scan: skip %s: %v\n", r.path, r.err)
+			continue
+		}
+		changedBooks = append(changedBooks, r.book)
+	}
+
+	foundIDs := make(map[string]struct{}, len(unchangedBooks)+len(changedBooks))
+
+	// Upsert unchanged books to keep source path current and clear missing_since.
+	for _, b := range unchangedBooks {
+		foundIDs[b.ID] = struct{}{}
+		if err := db.UpsertBook(b); err != nil {
+			return fmt.Errorf("upsert book %s: %w", b.ID, err)
+		}
+	}
+
+	// Upsert new/changed books and refresh their image records.
+	for _, b := range changedBooks {
+		foundIDs[b.ID] = struct{}{}
+		if err := db.UpsertBook(b); err != nil {
+			return fmt.Errorf("upsert book %s: %w", b.ID, err)
+		}
+		if err := db.UpsertImages(b.ID, b.Pages); err != nil {
+			return fmt.Errorf("upsert images %s: %w", b.ID, err)
+		}
+		fmt.Printf("  %s (%d images)\n", b.Title, len(b.Pages))
+	}
+
+	allFound := make([]storage.Book, 0, len(unchangedBooks)+len(changedBooks))
+	allFound = append(allFound, unchangedBooks...)
+	allFound = append(allFound, changedBooks...)
+
+	if err := generateMissingBookThumbnails(db, allFound); err != nil {
+		return err
+	}
+
+	// Mark books that were in the DB but not found on disk.
+	var missingCount int
+	for _, b := range allBooks {
+		if _, found := foundIDs[b.ID]; !found {
+			missingCount++
+			if err := db.MarkBookMissing(b.ID); err != nil {
+				return fmt.Errorf("mark missing %s: %w", b.ID, err)
+			}
+		}
+	}
+
+	fmt.Printf("Done. %d books found (%d updated), %d missing.\n",
+		len(allFound), len(changedBooks), missingCount)
+	return nil
+}
+
+// generateMissingBookThumbnails generates and stores book-level thumbnails for
+// any book that does not yet have one. Generation is parallelised via
+// runWorkerPool; DB writes are sequential to stay within SQLite's single-writer
+// model.
+func generateMissingBookThumbnails(db *store.Store, books []storage.Book) error {
+	type thumbJob struct {
+		bookID string
+		source string
+		title  string
+	}
+	type thumbResult struct {
+		bookID string
+		title  string
+		data   []byte
+		err    error
+	}
+
+	var jobs []thumbJob
+	for _, b := range books {
+		exists, err := db.HasThumbnail(b.ID)
+		if err != nil {
+			return fmt.Errorf("check thumbnail %s: %w", b.ID, err)
+		}
+		if !exists {
+			jobs = append(jobs, thumbJob{b.ID, b.Source, b.Title})
+		}
+	}
+
+	if len(jobs) == 0 {
+		return nil
+	}
+
+	results := runWorkerPool(jobs, func(j thumbJob) thumbResult {
+		data, err := storage.GenerateThumbnail(j.source)
+		return thumbResult{j.bookID, j.title, data, err}
+	})
+
+	for _, r := range results {
+		if r.err != nil {
+			fmt.Fprintf(os.Stderr, "  thumbnail skip %s: %v\n", r.title, r.err)
+			continue
+		}
+		if err := db.UpsertThumbnail(r.bookID, r.data); err != nil {
+			return fmt.Errorf("store thumbnail %s: %w", r.bookID, err)
+		}
+	}
+	return nil
+}

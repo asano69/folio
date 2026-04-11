@@ -684,3 +684,24 @@ func (s *Store) UpsertPageStatus(bookID, pageHash, status string) error {
 	`, bookID, pageHash, status)
 	return err
 }
+
+// ListBookIDsWithThumbnails returns the set of book IDs that have a stored
+// thumbnail. Use this instead of calling HasThumbnail per book to avoid N+1
+// queries when rendering a book grid.
+func (s *Store) ListBookIDsWithThumbnails() (map[string]bool, error) {
+	rows, err := s.db.Query(`SELECT book_id FROM thumbnails`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	set := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		set[id] = true
+	}
+	return set, rows.Err()
+}
