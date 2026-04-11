@@ -47,10 +47,14 @@ func runBackup(cfg *config.Config) error {
 }
 
 // runRestore replaces the active database file with the specified backup file.
+// The server must be stopped before running this command.
 //
-// The server must be stopped before running this command. Restoring while the
-// server is running risks data corruption because SQLite connections hold file
-// locks and may be mid-transaction when the file is replaced.
+// Before copying, an exclusive lock is acquired on the live database to confirm
+// no other process holds it open. If the lock cannot be acquired the server is
+// likely still running and the command exits with an error.
+//
+// After copying, the WAL sidecar files (-shm, -wal) are removed so that SQLite
+// opens the restored database in a clean state on next startup.
 func runRestore(cfg *config.Config, backupPath string) error {
 	absBackupPath, err := filepath.Abs(backupPath)
 	if err != nil {
@@ -66,12 +70,60 @@ func runRestore(cfg *config.Config, backupPath string) error {
 
 	destPath := filepath.Join(cfg.DataPath, "folio.db")
 
+	// Verify that no other process holds the database open by attempting to
+	// acquire an exclusive lock. busy_timeout = 0 means fail immediately rather
+	// than waiting, so a running server is detected at once.
+	if err := checkDatabaseNotInUse(destPath); err != nil {
+		return err
+	}
+
 	if err := copyFile(absBackupPath, destPath); err != nil {
 		return fmt.Errorf("restore database: %w", err)
 	}
 
+	// Remove WAL sidecar files left over from the previous database session.
+	// If these are not removed, SQLite may try to apply stale WAL entries to
+	// the newly restored database on next open, corrupting it.
+	removeWALSidecars(destPath)
+
 	fmt.Printf("Database restored from %s to %s\n", absBackupPath, destPath)
 	return nil
+}
+
+// checkDatabaseNotInUse opens the database with busy_timeout = 0 and attempts
+// to acquire an exclusive lock. If another process holds the file open (e.g.
+// the server is running), SQLite returns SQLITE_BUSY immediately and we surface
+// a clear error to the user.
+func checkDatabaseNotInUse(dbPath string) error {
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		// No existing database; nothing to lock-check.
+		return nil
+	}
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return fmt.Errorf("open database for lock check: %w", err)
+	}
+	defer db.Close()
+
+	if _, err := db.Exec("PRAGMA busy_timeout = 0"); err != nil {
+		return fmt.Errorf("set busy_timeout: %w", err)
+	}
+
+	// BEGIN EXCLUSIVE fails immediately if another connection holds any lock.
+	if _, err := db.Exec("BEGIN EXCLUSIVE"); err != nil {
+		return fmt.Errorf("database is in use (is the server running?): %w", err)
+	}
+	db.Exec("ROLLBACK")
+
+	return nil
+}
+
+// removeWALSidecars deletes the -shm and -wal files that accompany a WAL-mode
+// SQLite database. Errors are ignored because the files may not exist.
+func removeWALSidecars(dbPath string) {
+	os.Remove(dbPath + "-shm")
+	os.Remove(dbPath + "-wal")
 }
 
 // copyFile copies the file at src to dst, creating or truncating dst.
