@@ -30,7 +30,7 @@
                     <a href="/books/{{.ID}}/overview">
                         <div class="book-thumbnail">
                             {{if .HasThumbnail}}
-                            <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
+                            <img src="/book-thumbnails/{{.ID}}.jpg" alt="{{.Title}} cover">
                             {{else}}
                             <div class="thumbnail-placeholder">No thumbnail</div>
                             {{end}}
@@ -61,7 +61,7 @@
                     <div class="book-card book-card--missing">
                         <div class="book-thumbnail">
                             {{if .HasThumbnail}}
-                            <img src="/thumbnails/{{.ID}}" alt="{{.Title}} cover">
+                            <img src="/book-thumbnails/{{.ID}}.jpg" alt="{{.Title}} cover">
                             {{else}}
                             <div class="thumbnail-placeholder">No thumbnail</div>
                             {{end}}

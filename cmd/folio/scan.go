@@ -102,7 +102,7 @@ func runScan(cfg *config.Config, scanPath string) error {
 	allFound = append(allFound, unchangedBooks...)
 	allFound = append(allFound, changedBooks...)
 
-	if err := generateMissingBookThumbnails(db, allFound); err != nil {
+	if err := generateMissingBookThumbnails(cfg.CachePath, allFound); err != nil {
 		return err
 	}
 
@@ -123,10 +123,9 @@ func runScan(cfg *config.Config, scanPath string) error {
 }
 
 // generateMissingBookThumbnails generates and stores book-level thumbnails for
-// any book that does not yet have one. Generation is parallelised via
-// runWorkerPool; DB writes are sequential to stay within SQLite's single-writer
-// model.
-func generateMissingBookThumbnails(db *store.Store, books []storage.Book) error {
+// any book that does not yet have a cached thumbnail file. Generation is
+// parallelised via runWorkerPool; file writes are sequential.
+func generateMissingBookThumbnails(cachePath string, books []storage.Book) error {
 	type thumbJob struct {
 		bookID string
 		source string
@@ -141,11 +140,7 @@ func generateMissingBookThumbnails(db *store.Store, books []storage.Book) error 
 
 	var jobs []thumbJob
 	for _, b := range books {
-		exists, err := db.HasThumbnail(b.ID)
-		if err != nil {
-			return fmt.Errorf("check thumbnail %s: %w", b.ID, err)
-		}
-		if !exists {
+		if !storage.BookThumbnailExists(cachePath, b.ID) {
 			jobs = append(jobs, thumbJob{b.ID, b.Source, b.Title})
 		}
 	}
@@ -164,8 +159,8 @@ func generateMissingBookThumbnails(db *store.Store, books []storage.Book) error 
 			fmt.Fprintf(os.Stderr, "  thumbnail skip %s: %v\n", r.title, r.err)
 			continue
 		}
-		if err := db.UpsertThumbnail(r.bookID, r.data); err != nil {
-			return fmt.Errorf("store thumbnail %s: %w", r.bookID, err)
+		if err := storage.WriteBookThumbnail(cachePath, r.bookID, r.data); err != nil {
+			return fmt.Errorf("write thumbnail %s: %w", r.bookID, err)
 		}
 	}
 	return nil

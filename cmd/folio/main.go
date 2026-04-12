@@ -41,7 +41,7 @@ func main() {
 		if len(os.Args) >= 3 {
 			bookID = os.Args[2]
 		}
-		if err := runImageThumbnails(cfg, bookID); err != nil {
+		if err := runPageThumbnails(cfg, bookID); err != nil {
 			fmt.Fprintf(os.Stderr, "page-thumbnails: %v\n", err)
 			os.Exit(1)
 		}
@@ -90,6 +90,7 @@ Subcommands:
 Environment:
   FOLIO_LIBRARY_PATH   CBZ library root        (default: ./library)
   FOLIO_DATA_PATH      SQLite database dir     (default: ./data)
+  FOLIO_CACHE_PATH     Thumbnail cache dir     (default: ./cache)
   FOLIO_BACKUP_PATH    Backup output directory (default: ./backup)
   FOLIO_HOST           Server bind address     (default: 0.0.0.0)
   FOLIO_PORT           Server port             (default: 3000)

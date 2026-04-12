@@ -3,6 +3,7 @@ tmp/
 library/
 data/
 backup/
+cache/
 
 *.db
 *~

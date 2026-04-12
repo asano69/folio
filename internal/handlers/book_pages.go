@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"folio/internal/storage"
 	"folio/internal/store"
 )
 
@@ -13,6 +14,7 @@ import (
 // and /books/{uuid}/pages/{page_num}.
 type BookDispatchHandler struct {
 	Store                 *store.Store
+	CachePath             string
 	OverviewTemplate      *template.Template
 	BibliographicTemplate *template.Template
 	ViewerTemplate        *template.Template
@@ -76,7 +78,8 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	thumbSet, err := h.Store.ListImageHashesWithThumbnails(bookID)
+	// Read the cache directory once to avoid N individual stat calls.
+	thumbSet, err := storage.ListPageThumbnailHashes(h.CachePath, bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

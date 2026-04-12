@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"folio/internal/config"
 	"folio/internal/handlers"
@@ -56,6 +57,15 @@ func (s *server) setupRoutes() {
 	fs := http.FileServer(http.Dir("./static"))
 	s.mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
+	// Thumbnails are served directly from the cache directory via http.FileServer.
+	// This gives ETag, Last-Modified, and conditional GET support for free.
+	// URLs: /book-thumbnails/{bookID}.jpg  and  /page-thumbnails/{bookID}/{pageHash}.jpg
+	bookThumbFS := http.FileServer(http.Dir(filepath.Join(s.config.CachePath, "book-thumbnails")))
+	s.mux.Handle("/book-thumbnails/", http.StripPrefix("/book-thumbnails/", bookThumbFS))
+
+	pageThumbFS := http.FileServer(http.Dir(filepath.Join(s.config.CachePath, "page-thumbnails")))
+	s.mux.Handle("/page-thumbnails/", http.StripPrefix("/page-thumbnails/", pageThumbFS))
+
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
@@ -98,26 +108,30 @@ func (s *server) setupRoutes() {
 	))
 
 	s.mux.Handle("/", &handlers.HomeHandler{
-		Store:    s.store,
-		Template: homeTemplate,
+		Store:     s.store,
+		CachePath: s.config.CachePath,
+		Template:  homeTemplate,
 	})
 
 	s.mux.Handle("/collections/", &handlers.CollectionPageHandler{
-		Store:    s.store,
-		Template: collectionTemplate,
+		Store:     s.store,
+		CachePath: s.config.CachePath,
+		Template:  collectionTemplate,
 	})
 
 	// /books/uncategorized is registered as an exact (fixed) pattern so it
 	// takes priority over the /books/ subtree pattern below.
 	s.mux.Handle("/books/uncategorized", &handlers.UncategorizedPageHandler{
-		Store:    s.store,
-		Template: uncategorizedTemplate,
+		Store:     s.store,
+		CachePath: s.config.CachePath,
+		Template:  uncategorizedTemplate,
 	})
 
 	// Routes /books/{uuid}/overview, /books/{uuid}/bibliography,
 	// and /books/{uuid}/pages/{page_num}.
 	s.mux.Handle("/books/", &handlers.BookDispatchHandler{
 		Store:                 s.store,
+		CachePath:             s.config.CachePath,
 		OverviewTemplate:      overviewTemplate,
 		BibliographicTemplate: bibliographicTemplate,
 		ViewerTemplate:        viewerTemplate,
@@ -127,14 +141,11 @@ func (s *server) setupRoutes() {
 		Store: s.store,
 	})
 
-	s.mux.Handle("/thumbnails/", &handlers.BookThumbnailHandler{
-		Store: s.store,
-	})
-
 	// Handles PUT /api/books/{id}, PUT /api/books/{id}/note,
 	// and POST /api/books/{id}/thumbnail.
 	s.mux.Handle("/api/books/", &handlers.BooksAPIHandler{
-		Store: s.store,
+		Store:     s.store,
+		CachePath: s.config.CachePath,
 	})
 
 	// Handles PUT /api/pages/{bookID}/{pageHash},
@@ -147,10 +158,6 @@ func (s *server) setupRoutes() {
 	cHandler := &handlers.CollectionsAPIHandler{Store: s.store}
 	s.mux.Handle("/api/collections", cHandler)
 	s.mux.Handle("/api/collections/", cHandler)
-
-	s.mux.Handle("/page-thumbnails/", &handlers.PageThumbnailHandler{
-		Store: s.store,
-	})
 }
 
 func (s *server) Start() error {

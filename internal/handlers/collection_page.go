@@ -6,13 +6,15 @@ import (
 	"strconv"
 	"strings"
 
+	"folio/internal/storage"
 	"folio/internal/store"
 )
 
 // CollectionPageHandler serves GET /collections/{id} — a single collection's book list.
 type CollectionPageHandler struct {
-	Store    *store.Store
-	Template *template.Template
+	Store     *store.Store
+	CachePath string
+	Template  *template.Template
 }
 
 func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -69,8 +71,8 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Fetch all thumbnail states in one query to avoid N+1.
-	thumbnailSet, err := h.Store.ListBookIDsWithThumbnails()
+	// Read the cache directory once to avoid N individual stat calls.
+	thumbnailSet, err := storage.ListBookThumbnailIDs(h.CachePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
