@@ -13,10 +13,16 @@
             aria-label="Filter collections">
     </div>
     <nav class="collection-nav">
-        <a href="/" class="collection-item{{if eq .ActiveCollectionID 0}} collection-item--active{{end}}">
+        <a href="/" class="collection-item{{if and (not .IsUncategorizedPage) (eq .ActiveCollectionID 0)}} collection-item--active{{end}}">
             <span class="collection-count">({{.TotalBookCount}})</span>
             <span class="collection-title">All Books</span>
         </a>
+        {{if gt .UncategorizedCount 0}}
+        <a href="/books/uncategorized" class="collection-item{{if .IsUncategorizedPage}} collection-item--active{{end}}">
+            <span class="collection-count">({{.UncategorizedCount}})</span>
+            <span class="collection-title">Uncategorized</span>
+        </a>
+        {{end}}
         {{range .Collections}}
         <div class="collection-item collection-drop-zone{{if eq .ID $.ActiveCollectionID}} collection-item--active{{end}}"
              data-collection-id="{{.ID}}">

@@ -706,6 +706,48 @@ func (s *Store) ListBookIDsWithThumbnails() (map[string]bool, error) {
 	return set, rows.Err()
 }
 
+// ListUncategorizedBooks returns non-missing books that do not belong to any
+// collection, ordered by title.
+func (s *Store) ListUncategorizedBooks() ([]Book, error) {
+	rows, err := s.db.Query(`
+		SELECT id, title, source, status, file_mtime, missing_since
+		FROM books
+		WHERE missing_since IS NULL
+		  AND NOT EXISTS (
+		      SELECT 1 FROM collection_books cb WHERE cb.book_id = books.id
+		  )
+		ORDER BY title
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var books []Book
+	for rows.Next() {
+		var b Book
+		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince); err != nil {
+			return nil, err
+		}
+		books = append(books, b)
+	}
+	return books, rows.Err()
+}
+
+// CountUncategorizedBooks returns the number of non-missing books that do not
+// belong to any collection.
+func (s *Store) CountUncategorizedBooks() (int, error) {
+	var n int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM books
+		WHERE missing_since IS NULL
+		  AND NOT EXISTS (
+		      SELECT 1 FROM collection_books cb WHERE cb.book_id = books.id
+		  )
+	`).Scan(&n)
+	return n, err
+}
+
 // GetImageByHash returns the image matching the given hash, or nil if not found.
 func (s *Store) GetImageByHash(bookID, pageHash string) (*Image, error) {
 	var img Image

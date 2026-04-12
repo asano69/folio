@@ -76,6 +76,12 @@ func (s *server) setupRoutes() {
 		"templates/collection.html",
 	))
 
+	uncategorizedTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+		"templates/layout.html",
+		"templates/sidebar.html",
+		"templates/uncategorized.html",
+	))
+
 	viewerTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
 		"templates/layout.html",
 		"templates/viewer.html",
@@ -99,6 +105,13 @@ func (s *server) setupRoutes() {
 	s.mux.Handle("/collections/", &handlers.CollectionPageHandler{
 		Store:    s.store,
 		Template: collectionTemplate,
+	})
+
+	// /books/uncategorized is registered as an exact (fixed) pattern so it
+	// takes priority over the /books/ subtree pattern below.
+	s.mux.Handle("/books/uncategorized", &handlers.UncategorizedPageHandler{
+		Store:    s.store,
+		Template: uncategorizedTemplate,
 	})
 
 	// Routes /books/{uuid}/overview, /books/{uuid}/bibliography,

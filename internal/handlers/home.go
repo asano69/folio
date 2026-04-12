@@ -8,7 +8,7 @@ import (
 )
 
 // bookView is the template model for a single book card.
-// Shared by HomeHandler and CollectionHandler.
+// Shared by HomeHandler, CollectionPageHandler, and UncategorizedPageHandler.
 type bookView struct {
 	ID           string
 	Title        string
@@ -46,6 +46,12 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uncategorizedCount, err := h.Store.CountUncategorizedBooks()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Fetch all thumbnail states in one query to avoid N+1.
 	thumbnailSet, err := h.Store.ListBookIDsWithThumbnails()
 	if err != nil {
@@ -69,17 +75,21 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Books              []bookView
-		MissingBooks       []bookView
-		Collections        []store.Collection
-		ActiveCollectionID int
-		TotalBookCount     int
+		Books               []bookView
+		MissingBooks        []bookView
+		Collections         []store.Collection
+		ActiveCollectionID  int
+		TotalBookCount      int
+		UncategorizedCount  int
+		IsUncategorizedPage bool
 	}{
-		Books:              present,
-		MissingBooks:       missing,
-		Collections:        collections,
-		ActiveCollectionID: 0,
-		TotalBookCount:     totalCount,
+		Books:               present,
+		MissingBooks:        missing,
+		Collections:         collections,
+		ActiveCollectionID:  0,
+		TotalBookCount:      totalCount,
+		UncategorizedCount:  uncategorizedCount,
+		IsUncategorizedPage: false,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {
