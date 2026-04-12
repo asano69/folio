@@ -4,14 +4,16 @@ import (
 	"html/template"
 	"net/http"
 
+	"folio/internal/storage"
 	"folio/internal/store"
 )
 
 // UncategorizedPageHandler serves GET /books/uncategorized — books that do not
 // belong to any collection.
 type UncategorizedPageHandler struct {
-	Store    *store.Store
-	Template *template.Template
+	Store     *store.Store
+	CachePath string
+	Template  *template.Template
 }
 
 func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -39,8 +41,8 @@ func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Fetch all thumbnail states in one query to avoid N+1.
-	thumbnailSet, err := h.Store.ListBookIDsWithThumbnails()
+	// Read the cache directory once to avoid N individual stat calls.
+	thumbnailSet, err := storage.ListBookThumbnailIDs(h.CachePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

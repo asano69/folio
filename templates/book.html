@@ -13,7 +13,7 @@
         <a href="/books/{{$.Book.ID}}/pages/{{.Number}}" class="book-card page-card">
             <div class="book-thumbnail page-thumbnail">
                 {{if .HasThumb}}
-                <img src="/page-thumbnails/{{$.Book.ID}}/{{.Hash}}" alt="Page {{.Number}}">
+                <img src="/page-thumbnails/{{$.Book.ID}}/{{.Hash}}.jpg" alt="Page {{.Number}}">
                 {{else}}
                 <div class="thumbnail-placeholder">{{.Number}}</div>
                 {{end}}

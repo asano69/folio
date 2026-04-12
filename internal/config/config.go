@@ -8,6 +8,7 @@ import (
 type Config struct {
 	LibraryPath string
 	DataPath    string
+	CachePath   string
 	BackupPath  string
 	Host        string
 	Port        int
@@ -17,6 +18,7 @@ func Load() *Config {
 	return &Config{
 		LibraryPath: getEnv("FOLIO_LIBRARY_PATH", "./library"),
 		DataPath:    getEnv("FOLIO_DATA_PATH", "./data"),
+		CachePath:   getEnv("FOLIO_CACHE_PATH", "./cache"),
 		BackupPath:  getEnv("FOLIO_BACKUP_PATH", "./backup"),
 		Host:        getEnv("FOLIO_HOST", "0.0.0.0"),
 		Port:        getEnvInt("FOLIO_PORT", 3000),

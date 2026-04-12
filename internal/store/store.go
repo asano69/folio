@@ -42,22 +42,6 @@ CREATE TABLE IF NOT EXISTS pages (
     UNIQUE(book_id, number)
 );
 
--- Book-level thumbnail.
-CREATE TABLE IF NOT EXISTS thumbnails (
-    book_id    TEXT PRIMARY KEY REFERENCES books(id),
-    data       BLOB NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- Page-level thumbnail, keyed by page_hash for re-scan safety.
-CREATE TABLE IF NOT EXISTS page_thumbnails (
-    book_id    TEXT NOT NULL REFERENCES books(id),
-    page_hash  TEXT NOT NULL,
-    data       BLOB NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY(book_id, page_hash)
-);
-
 -- Per-page notes including optional SVG drawing.
 -- Keyed by (book_id, page_hash) for re-scan safety.
 -- svg_drawing holds raw SVG markup; NULL when no drawing exists.

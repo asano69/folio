@@ -7,6 +7,9 @@ import (
 	"image"
 	"image/jpeg"
 	_ "image/png"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"golang.org/x/image/draw"
 )
@@ -125,4 +128,105 @@ func resizeToWidth(src image.Image, w int) image.Image {
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
 	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, bounds, draw.Over, nil)
 	return dst
+}
+
+// ── Filesystem cache helpers ───────────────────────────────────
+//
+// Thumbnails are stored as plain JPEG files under the cache directory:
+//
+//   cache/
+//   ├── book-thumbnails/
+//   │   └── {bookID}.jpg
+//   └── page-thumbnails/
+//       └── {bookID}/
+//           └── {pageHash}.jpg
+//
+// These functions handle path resolution, existence checks, directory
+// creation, and file writes. The HTTP layer serves files directly via
+// http.FileServer; no handler reads them back through this package.
+
+// BookThumbnailPath returns the filesystem path for a book-level thumbnail.
+func BookThumbnailPath(cachePath, bookID string) string {
+	return filepath.Join(cachePath, "book-thumbnails", bookID+".jpg")
+}
+
+// PageThumbnailPath returns the filesystem path for a page-level thumbnail.
+func PageThumbnailPath(cachePath, bookID, pageHash string) string {
+	return filepath.Join(cachePath, "page-thumbnails", bookID, pageHash+".jpg")
+}
+
+// WriteBookThumbnail writes book-level thumbnail bytes to the cache directory,
+// creating any missing parent directories.
+func WriteBookThumbnail(cachePath, bookID string, data []byte) error {
+	path := BookThumbnailPath(cachePath, bookID)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("create book-thumbnails dir: %w", err)
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+// WritePageThumbnail writes a page-level thumbnail bytes to the cache directory,
+// creating any missing parent directories.
+func WritePageThumbnail(cachePath, bookID, pageHash string, data []byte) error {
+	path := PageThumbnailPath(cachePath, bookID, pageHash)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("create page-thumbnails dir: %w", err)
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+// BookThumbnailExists reports whether a cached thumbnail file exists for the given book.
+func BookThumbnailExists(cachePath, bookID string) bool {
+	_, err := os.Stat(BookThumbnailPath(cachePath, bookID))
+	return err == nil
+}
+
+// PageThumbnailExists reports whether a cached thumbnail file exists for the given page.
+func PageThumbnailExists(cachePath, bookID, pageHash string) bool {
+	_, err := os.Stat(PageThumbnailPath(cachePath, bookID, pageHash))
+	return err == nil
+}
+
+// ListBookThumbnailIDs returns the set of book IDs that have a cached
+// book-level thumbnail file. Returns an empty map (not an error) when the
+// book-thumbnails directory does not yet exist.
+func ListBookThumbnailIDs(cachePath string) (map[string]bool, error) {
+	dir := filepath.Join(cachePath, "book-thumbnails")
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read book-thumbnails dir: %w", err)
+	}
+	set := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasSuffix(name, ".jpg") {
+			set[strings.TrimSuffix(name, ".jpg")] = true
+		}
+	}
+	return set, nil
+}
+
+// ListPageThumbnailHashes returns the set of page hashes that have a cached
+// page-level thumbnail file for the given book. Returns an empty map (not an
+// error) when the directory does not yet exist.
+func ListPageThumbnailHashes(cachePath, bookID string) (map[string]bool, error) {
+	dir := filepath.Join(cachePath, "page-thumbnails", bookID)
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read page-thumbnails dir: %w", err)
+	}
+	set := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasSuffix(name, ".jpg") {
+			set[strings.TrimSuffix(name, ".jpg")] = true
+		}
+	}
+	return set, nil
 }

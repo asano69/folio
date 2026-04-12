@@ -31,7 +31,7 @@ func runThumbnail(cfg *config.Config, bookID string) error {
 		return err
 	}
 
-	if err := db.UpsertThumbnail(bookID, data); err != nil {
+	if err := storage.WriteBookThumbnail(cfg.CachePath, bookID, data); err != nil {
 		return err
 	}
 
@@ -39,10 +39,10 @@ func runThumbnail(cfg *config.Config, bookID string) error {
 	return nil
 }
 
-// runImageThumbnails generates page-level thumbnails for one book (when bookID
+// runPageThumbnails generates page-level thumbnails for one book (when bookID
 // is non-empty) or for all non-missing books. Images that already have a
-// thumbnail in page_thumbnails are skipped.
-func runImageThumbnails(cfg *config.Config, bookID string) error {
+// cached thumbnail file are skipped.
+func runPageThumbnails(cfg *config.Config, bookID string) error {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
 		return err
@@ -94,11 +94,7 @@ func runImageThumbnails(cfg *config.Config, bookID string) error {
 				fmt.Fprintf(os.Stderr, "  skip image %d of %s: no hash (run folio hash <uuid>)\n", img.Number, b.ID)
 				continue
 			}
-			exists, err := db.HasImageThumbnail(b.ID, img.Hash)
-			if err != nil {
-				return fmt.Errorf("check image thumbnail %s/%s: %w", b.ID, img.Hash, err)
-			}
-			if !exists {
+			if !storage.PageThumbnailExists(cfg.CachePath, b.ID, img.Hash) {
 				reqs = append(reqs, storage.ImageThumbnailRequest{Filename: img.Filename, Hash: img.Hash})
 			}
 		}
@@ -108,7 +104,7 @@ func runImageThumbnails(cfg *config.Config, bookID string) error {
 	}
 
 	if len(jobs) == 0 {
-		fmt.Println("All image thumbnails are up to date.")
+		fmt.Println("All page thumbnails are up to date.")
 		return nil
 	}
 
@@ -116,7 +112,7 @@ func runImageThumbnails(cfg *config.Config, bookID string) error {
 	for _, j := range jobs {
 		total += j.reqCount
 	}
-	fmt.Printf("Generating %d image thumbnails across %d books...\n", total, len(jobs))
+	fmt.Printf("Generating %d page thumbnails across %d books...\n", total, len(jobs))
 
 	// Each worker opens a CBZ once and processes all queued images in a single
 	// pass, amortising the cost of reading the ZIP central directory.
@@ -133,8 +129,8 @@ func runImageThumbnails(cfg *config.Config, bookID string) error {
 			continue
 		}
 		for _, it := range r.results {
-			if err := db.UpsertImageThumbnail(r.bookID, it.Hash, it.Data); err != nil {
-				return fmt.Errorf("store image thumbnail: %w", err)
+			if err := storage.WritePageThumbnail(cfg.CachePath, r.bookID, it.Hash, it.Data); err != nil {
+				return fmt.Errorf("write page thumbnail: %w", err)
 			}
 			done++
 		}

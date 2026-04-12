@@ -186,57 +186,6 @@ func rebuildSections(tx *sql.Tx, bookID string) error {
 	return err
 }
 
-// UpsertThumbnail inserts or replaces a book thumbnail.
-func (s *Store) UpsertThumbnail(bookID string, data []byte) error {
-	_, err := s.db.Exec(`
-		INSERT INTO thumbnails (book_id, data)
-		VALUES (?, ?)
-		ON CONFLICT(book_id) DO UPDATE SET
-			data       = excluded.data,
-			created_at = CURRENT_TIMESTAMP
-	`, bookID, data)
-	return err
-}
-
-// GetThumbnail returns the JPEG thumbnail bytes for a book, or nil if not found.
-func (s *Store) GetThumbnail(bookID string) ([]byte, error) {
-	var data []byte
-	err := s.db.QueryRow(`SELECT data FROM thumbnails WHERE book_id = ?`, bookID).Scan(&data)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	return data, err
-}
-
-// HasThumbnail reports whether a thumbnail exists for the given book.
-func (s *Store) HasThumbnail(bookID string) (bool, error) {
-	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM thumbnails WHERE book_id = ?`, bookID).Scan(&count)
-	return count > 0, err
-}
-
-// HasImageThumbnail reports whether a thumbnail exists for the given image.
-func (s *Store) HasImageThumbnail(bookID, pageHash string) (bool, error) {
-	var count int
-	err := s.db.QueryRow(
-		`SELECT COUNT(*) FROM page_thumbnails WHERE book_id = ? AND page_hash = ?`,
-		bookID, pageHash,
-	).Scan(&count)
-	return count > 0, err
-}
-
-// UpsertImageThumbnail inserts or replaces an image-level thumbnail.
-func (s *Store) UpsertImageThumbnail(bookID, pageHash string, data []byte) error {
-	_, err := s.db.Exec(`
-		INSERT INTO page_thumbnails (book_id, page_hash, data)
-		VALUES (?, ?, ?)
-		ON CONFLICT(book_id, page_hash) DO UPDATE SET
-			data       = excluded.data,
-			created_at = CURRENT_TIMESTAMP
-	`, bookID, pageHash, data)
-	return err
-}
-
 // UpdateBookTitle updates the title of an existing book.
 func (s *Store) UpdateBookTitle(id, title string) error {
 	_, err := s.db.Exec(`UPDATE books SET title = ? WHERE id = ?`, title, id)
@@ -587,41 +536,6 @@ func (s *Store) ListNotesByBook(bookID string) (map[string]Note, error) {
 	return notes, rows.Err()
 }
 
-// ListImageHashesWithThumbnails returns the set of image hashes that have a
-// stored thumbnail for the given book, allowing a single query instead of N.
-func (s *Store) ListImageHashesWithThumbnails(bookID string) (map[string]bool, error) {
-	rows, err := s.db.Query(
-		`SELECT page_hash FROM page_thumbnails WHERE book_id = ?`, bookID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	set := make(map[string]bool)
-	for rows.Next() {
-		var h string
-		if err := rows.Scan(&h); err != nil {
-			return nil, err
-		}
-		set[h] = true
-	}
-	return set, rows.Err()
-}
-
-// GetImageThumbnail returns the JPEG thumbnail bytes for an image, or nil if not found.
-func (s *Store) GetImageThumbnail(bookID, pageHash string) ([]byte, error) {
-	var data []byte
-	err := s.db.QueryRow(
-		`SELECT data FROM page_thumbnails WHERE book_id = ? AND page_hash = ?`,
-		bookID, pageHash,
-	).Scan(&data)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	return data, err
-}
-
 // CountPages returns the total number of pages registered for a book.
 func (s *Store) CountPages(bookID string) (int, error) {
 	var n int
@@ -683,27 +597,6 @@ func (s *Store) UpsertPageStatus(bookID, pageHash, status string) error {
 			updated_at = CURRENT_TIMESTAMP
 	`, bookID, pageHash, status)
 	return err
-}
-
-// ListBookIDsWithThumbnails returns the set of book IDs that have a stored
-// thumbnail. Use this instead of calling HasThumbnail per book to avoid N+1
-// queries when rendering a book grid.
-func (s *Store) ListBookIDsWithThumbnails() (map[string]bool, error) {
-	rows, err := s.db.Query(`SELECT book_id FROM thumbnails`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	set := make(map[string]bool)
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		set[id] = true
-	}
-	return set, rows.Err()
 }
 
 // ListUncategorizedBooks returns non-missing books that do not belong to any
