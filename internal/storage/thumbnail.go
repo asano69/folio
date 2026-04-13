@@ -9,6 +9,7 @@ import (
 	_ "image/png"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"golang.org/x/image/draw"
@@ -19,9 +20,9 @@ const (
 	pageThumbnailWidth = 300
 )
 
-// GenerateThumbnail opens the first image in a CBZ and returns a
+// GenerateBookThumbnail opens the first image in a CBZ and returns a
 // JPEG-encoded thumbnail scaled to bookThumbnailWidth pixels wide.
-func GenerateThumbnail(cbzPath string) ([]byte, error) {
+func GenerateBookThumbnail(cbzPath string) ([]byte, error) {
 	r, err := zip.OpenReader(cbzPath)
 	if err != nil {
 		return nil, fmt.Errorf("open cbz %s: %w", cbzPath, err)
@@ -45,26 +46,24 @@ func GenerateThumbnail(cbzPath string) ([]byte, error) {
 	return nil, fmt.Errorf("image entry %s not found in %s", first, cbzPath)
 }
 
-// ImageThumbnailRequest pairs an image filename with its content hash.
-// Hash is carried through so callers can key the result without re-deriving it.
+// ImageThumbnailRequest pairs a page ID with its filename for thumbnail generation.
+// PageID is the stable integer primary key from the pages table.
 type ImageThumbnailRequest struct {
+	PageID   int
 	Filename string
-	Hash     string
 }
 
-// ImageThumbnailResult holds the generated thumbnail for one image.
+// ImageThumbnailResult holds the generated thumbnail data for one page.
 type ImageThumbnailResult struct {
-	Hash string
-	Data []byte
+	PageID int
+	Data   []byte
 }
 
-// GenerateImageThumbnails opens cbzPath once and generates JPEG thumbnails for
-// every requested image. Images not found in the archive are silently skipped.
-//
-// Opening the ZIP once amortises the cost of reading the central directory
-// (stored at the end of the file) across all images, which is significantly
-// faster than calling a per-image function in a loop.
-func GenerateImageThumbnails(cbzPath string, reqs []ImageThumbnailRequest) ([]ImageThumbnailResult, error) {
+// GeneratePageThumbnails opens cbzPath once and generates JPEG thumbnails for
+// every requested page. Opening the ZIP once amortises the central-directory
+// read cost across all pages in the batch.
+// Pages whose filename is not found in the archive are silently skipped.
+func GeneratePageThumbnails(cbzPath string, reqs []ImageThumbnailRequest) ([]ImageThumbnailResult, error) {
 	r, err := zip.OpenReader(cbzPath)
 	if err != nil {
 		return nil, fmt.Errorf("open cbz %s: %w", cbzPath, err)
@@ -72,14 +71,14 @@ func GenerateImageThumbnails(cbzPath string, reqs []ImageThumbnailRequest) ([]Im
 	defer r.Close()
 
 	// Index requests by filename for O(1) lookup while iterating the archive.
-	need := make(map[string]string, len(reqs))
+	need := make(map[string]int, len(reqs)) // filename -> pageID
 	for _, req := range reqs {
-		need[req.Filename] = req.Hash
+		need[req.Filename] = req.PageID
 	}
 
 	var results []ImageThumbnailResult
 	for _, f := range r.File {
-		hash, ok := need[f.Name]
+		pageID, ok := need[f.Name]
 		if !ok {
 			continue
 		}
@@ -87,7 +86,7 @@ func GenerateImageThumbnails(cbzPath string, reqs []ImageThumbnailRequest) ([]Im
 		if err != nil {
 			return nil, fmt.Errorf("thumbnail %s: %w", f.Name, err)
 		}
-		results = append(results, ImageThumbnailResult{Hash: hash, Data: data})
+		results = append(results, ImageThumbnailResult{PageID: pageID, Data: data})
 	}
 	return results, nil
 }
@@ -113,17 +112,15 @@ func thumbnailFromEntry(f *zip.File, width int) ([]byte, error) {
 }
 
 // resizeToWidth scales img proportionally so its width equals w.
-// ApproxBiLinear is used in place of BiLinear: quality is indistinguishable at
-// thumbnail sizes and the performance is significantly better.
+// ApproxBiLinear is used instead of BiLinear: quality is indistinguishable at
+// thumbnail sizes and performance is significantly better.
 func resizeToWidth(src image.Image, w int) image.Image {
 	bounds := src.Bounds()
 	srcW := bounds.Dx()
 	srcH := bounds.Dy()
-
 	if srcW == 0 {
 		return src
 	}
-
 	h := w * srcH / srcW
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
 	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, bounds, draw.Over, nil)
@@ -132,18 +129,11 @@ func resizeToWidth(src image.Image, w int) image.Image {
 
 // ── Filesystem cache helpers ───────────────────────────────────
 //
-// Thumbnails are stored as plain JPEG files under the cache directory:
+// Book thumbnails:  {cachePath}/book-thumbnails/{bookID}.jpg
+// Page thumbnails:  {cachePath}/page-thumbnails/{bookID}/{pageID}.jpg
 //
-//   cache/
-//   ├── book-thumbnails/
-//   │   └── {bookID}.jpg
-//   └── page-thumbnails/
-//       └── {bookID}/
-//           └── {pageHash}.jpg
-//
-// These functions handle path resolution, existence checks, directory
-// creation, and file writes. The HTTP layer serves files directly via
-// http.FileServer; no handler reads them back through this package.
+// Page thumbnails are keyed by stable integer page ID rather than content hash,
+// so they survive re-scans and in-place image replacements.
 
 // BookThumbnailPath returns the filesystem path for a book-level thumbnail.
 func BookThumbnailPath(cachePath, bookID string) string {
@@ -151,8 +141,10 @@ func BookThumbnailPath(cachePath, bookID string) string {
 }
 
 // PageThumbnailPath returns the filesystem path for a page-level thumbnail.
-func PageThumbnailPath(cachePath, bookID, pageHash string) string {
-	return filepath.Join(cachePath, "page-thumbnails", bookID, pageHash+".jpg")
+// Thumbnails are organised under a per-book subdirectory to keep the
+// page-thumbnails directory manageable.
+func PageThumbnailPath(cachePath, bookID string, pageID int) string {
+	return filepath.Join(cachePath, "page-thumbnails", bookID, strconv.Itoa(pageID)+".jpg")
 }
 
 // WriteBookThumbnail writes book-level thumbnail bytes to the cache directory,
@@ -165,10 +157,10 @@ func WriteBookThumbnail(cachePath, bookID string, data []byte) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-// WritePageThumbnail writes a page-level thumbnail bytes to the cache directory,
+// WritePageThumbnail writes a page-level thumbnail to the cache directory,
 // creating any missing parent directories.
-func WritePageThumbnail(cachePath, bookID, pageHash string, data []byte) error {
-	path := PageThumbnailPath(cachePath, bookID, pageHash)
+func WritePageThumbnail(cachePath, bookID string, pageID int, data []byte) error {
+	path := PageThumbnailPath(cachePath, bookID, pageID)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("create page-thumbnails dir: %w", err)
 	}
@@ -182,14 +174,14 @@ func BookThumbnailExists(cachePath, bookID string) bool {
 }
 
 // PageThumbnailExists reports whether a cached thumbnail file exists for the given page.
-func PageThumbnailExists(cachePath, bookID, pageHash string) bool {
-	_, err := os.Stat(PageThumbnailPath(cachePath, bookID, pageHash))
+func PageThumbnailExists(cachePath, bookID string, pageID int) bool {
+	_, err := os.Stat(PageThumbnailPath(cachePath, bookID, pageID))
 	return err == nil
 }
 
 // ListBookThumbnailIDs returns the set of book IDs that have a cached
-// book-level thumbnail file. Returns an empty map (not an error) when the
-// book-thumbnails directory does not yet exist.
+// book-level thumbnail. Returns an empty map (not an error) when the directory
+// does not yet exist.
 func ListBookThumbnailIDs(cachePath string) (map[string]bool, error) {
 	dir := filepath.Join(cachePath, "book-thumbnails")
 	entries, err := os.ReadDir(dir)
@@ -209,24 +201,29 @@ func ListBookThumbnailIDs(cachePath string) (map[string]bool, error) {
 	return set, nil
 }
 
-// ListPageThumbnailHashes returns the set of page hashes that have a cached
-// page-level thumbnail file for the given book. Returns an empty map (not an
-// error) when the directory does not yet exist.
-func ListPageThumbnailHashes(cachePath, bookID string) (map[string]bool, error) {
+// ListPageThumbnailIDs returns the set of page IDs (integers) that have a
+// cached page-level thumbnail for the given book. Returns an empty map (not
+// an error) when the directory does not yet exist.
+func ListPageThumbnailIDs(cachePath, bookID string) (map[int]bool, error) {
 	dir := filepath.Join(cachePath, "page-thumbnails", bookID)
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
-		return map[string]bool{}, nil
+		return map[int]bool{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read page-thumbnails dir: %w", err)
 	}
-	set := make(map[string]bool, len(entries))
+	set := make(map[int]bool, len(entries))
 	for _, e := range entries {
 		name := e.Name()
-		if strings.HasSuffix(name, ".jpg") {
-			set[strings.TrimSuffix(name, ".jpg")] = true
+		if !strings.HasSuffix(name, ".jpg") {
+			continue
 		}
+		id, err := strconv.Atoi(strings.TrimSuffix(name, ".jpg"))
+		if err != nil {
+			continue // skip files that are not integer-named
+		}
+		set[id] = true
 	}
 	return set, nil
 }

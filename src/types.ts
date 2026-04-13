@@ -2,7 +2,9 @@
 
 export type ReadStatus = 'unread' | 'reading' | 'read' | 'skip';
 
-export interface NotePayload {
+// PageEditPayload carries the user-editable fields for a single page.
+// title and attribute are stored on the pages row; body is stored in notes.
+export interface PageEditPayload {
   title: string;
   attribute: string;
   body: string;

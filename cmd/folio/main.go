@@ -32,7 +32,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "usage: folio thumbnail <book-uuid>\n")
 			os.Exit(1)
 		}
-		if err := runThumbnail(cfg, os.Args[2]); err != nil {
+		if err := runBookThumbnail(cfg, os.Args[2]); err != nil {
 			fmt.Fprintf(os.Stderr, "thumbnail: %v\n", err)
 			os.Exit(1)
 		}

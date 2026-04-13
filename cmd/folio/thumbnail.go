@@ -9,9 +9,9 @@ import (
 	"folio/internal/store"
 )
 
-// runThumbnail regenerates the book-level thumbnail for a single book
+// runBookThumbnail regenerates the book-level thumbnail for a single book
 // identified by UUID.
-func runThumbnail(cfg *config.Config, bookID string) error {
+func runBookThumbnail(cfg *config.Config, bookID string) error {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func runThumbnail(cfg *config.Config, bookID string) error {
 		return fmt.Errorf("book %s not found", bookID)
 	}
 
-	data, err := storage.GenerateThumbnail(book.Source)
+	data, err := storage.GenerateBookThumbnail(book.Source)
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func runThumbnail(cfg *config.Config, bookID string) error {
 }
 
 // runPageThumbnails generates page-level thumbnails for one book (when bookID
-// is non-empty) or for all non-missing books. Images that already have a
+// is non-empty) or for all non-missing books. Pages that already have a
 // cached thumbnail file are skipped.
 func runPageThumbnails(cfg *config.Config, bookID string) error {
 	db, err := store.Open(cfg.DataPath)
@@ -67,10 +67,9 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 	}
 
 	type bookJob struct {
-		bookID   string
-		source   string
-		reqCount int
-		reqs     []storage.ImageThumbnailRequest
+		bookID string
+		source string
+		reqs   []storage.ImageThumbnailRequest
 	}
 	type bookResult struct {
 		bookID   string
@@ -84,22 +83,21 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 		if b.MissingSince != nil {
 			continue // CBZ file is gone; nothing to read
 		}
-		images, err := db.ListImages(b.ID)
+		pages, err := db.ListPages(b.ID)
 		if err != nil {
-			return fmt.Errorf("list images %s: %w", b.ID, err)
+			return fmt.Errorf("list pages %s: %w", b.ID, err)
 		}
 		var reqs []storage.ImageThumbnailRequest
-		for _, img := range images {
-			if img.Hash == "" {
-				fmt.Fprintf(os.Stderr, "  skip image %d of %s: no hash (run folio hash <uuid>)\n", img.Number, b.ID)
-				continue
-			}
-			if !storage.PageThumbnailExists(cfg.CachePath, b.ID, img.Hash) {
-				reqs = append(reqs, storage.ImageThumbnailRequest{Filename: img.Filename, Hash: img.Hash})
+		for _, p := range pages {
+			if !storage.PageThumbnailExists(cfg.CachePath, b.ID, p.ID) {
+				reqs = append(reqs, storage.ImageThumbnailRequest{
+					PageID:   p.ID,
+					Filename: p.Filename,
+				})
 			}
 		}
 		if len(reqs) > 0 {
-			jobs = append(jobs, bookJob{b.ID, b.Source, len(reqs), reqs})
+			jobs = append(jobs, bookJob{b.ID, b.Source, reqs})
 		}
 	}
 
@@ -110,15 +108,15 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 
 	total := 0
 	for _, j := range jobs {
-		total += j.reqCount
+		total += len(j.reqs)
 	}
 	fmt.Printf("Generating %d page thumbnails across %d books...\n", total, len(jobs))
 
-	// Each worker opens a CBZ once and processes all queued images in a single
+	// Each worker opens a CBZ once and processes all queued pages in a single
 	// pass, amortising the cost of reading the ZIP central directory.
 	results := runWorkerPool(jobs, func(j bookJob) bookResult {
-		res, err := storage.GenerateImageThumbnails(j.source, j.reqs)
-		return bookResult{j.bookID, j.reqCount, res, err}
+		res, err := storage.GeneratePageThumbnails(j.source, j.reqs)
+		return bookResult{j.bookID, len(j.reqs), res, err}
 	})
 
 	var done, skipped int
@@ -129,7 +127,7 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 			continue
 		}
 		for _, it := range r.results {
-			if err := storage.WritePageThumbnail(cfg.CachePath, r.bookID, it.Hash, it.Data); err != nil {
+			if err := storage.WritePageThumbnail(cfg.CachePath, r.bookID, it.PageID, it.Data); err != nil {
 				return fmt.Errorf("write page thumbnail: %w", err)
 			}
 			done++

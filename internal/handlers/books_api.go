@@ -15,7 +15,7 @@ import (
 //
 //	PUT  /api/books/{id}           — rename a book
 //	PUT  /api/books/{id}/note      — save book-level memo
-//	POST /api/books/{id}/thumbnail — regenerate thumbnail
+//	POST /api/books/{id}/thumbnail — regenerate book-level thumbnail
 type BooksAPIHandler struct {
 	Store     *store.Store
 	CachePath string
@@ -132,7 +132,6 @@ func (h *BooksAPIHandler) saveBookNote(w http.ResponseWriter, r *http.Request, b
 }
 
 // regenerateThumbnail handles POST /api/books/{id}/thumbnail.
-// Generating thumbnails via an API endpoint allows future web UI integration.
 func (h *BooksAPIHandler) regenerateThumbnail(w http.ResponseWriter, r *http.Request, bookID string) {
 	book, err := h.Store.GetBook(bookID)
 	if err != nil || book == nil {
@@ -140,7 +139,7 @@ func (h *BooksAPIHandler) regenerateThumbnail(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	data, err := storage.GenerateThumbnail(book.Source)
+	data, err := storage.GenerateBookThumbnail(book.Source)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

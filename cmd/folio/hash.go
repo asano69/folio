@@ -9,8 +9,9 @@ import (
 )
 
 // runHash recomputes image hashes for a single book identified by UUID and
-// updates the DB. Use this after manually modifying a CBZ's image contents
-// when file mtime alone is not sufficient to trigger a re-hash during folio scan.
+// updates the DB via the stable-ID merge. Use this after manually modifying a
+// CBZ's image contents when file mtime alone is not sufficient to trigger a
+// re-hash during folio scan.
 func runHash(cfg *config.Config, bookID string) error {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
@@ -31,10 +32,10 @@ func runHash(cfg *config.Config, bookID string) error {
 		return err
 	}
 
-	if err := db.UpsertImages(bookID, b.Pages); err != nil {
+	if err := db.UpsertPages(bookID, b.Pages); err != nil {
 		return err
 	}
 
-	fmt.Printf("Images updated for %s (%s): %d images\n", book.Title, bookID, len(b.Pages))
+	fmt.Printf("Pages updated for %s (%s): %d pages\n", book.Title, bookID, len(b.Pages))
 	return nil
 }

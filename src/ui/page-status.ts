@@ -14,26 +14,20 @@ export function initPageStatus(): void {
     const card = btn.closest<HTMLElement>('.page-card');
     if (!card) return;
 
-    const pageHash = card.dataset.pageHash;
-    const status = btn.dataset.status;
-    if (!pageHash || !status) return;
+    const pageIdStr = card.dataset.pageId;
+    const status    = btn.dataset.status;
+    if (!pageIdStr || !status) return;
+
+    const pageId = parseInt(pageIdStr, 10);
+    if (isNaN(pageId)) return;
 
     e.preventDefault();
     e.stopPropagation();
 
     try {
-      await updatePageStatus(bookId, pageHash, status);
+      await updatePageStatus(pageId, status);
       applyStatus(card, status);
     } catch (err) {
-      // ページハッシュが無効な場合の明示的なフィードバック
-      if (err instanceof Error && err.message.includes('Page not found')) {
-        console.error('Page hash mismatch:', err);
-        // ページを再読み込みしてハッシュを再同期
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-        return;
-      }
       console.error('Failed to update page status:', err);
     }
   });

@@ -4,7 +4,7 @@
 // responses so callers get consistent error objects without repeating the
 // res.ok check everywhere.
 
-import type { NotePayload } from './types';
+import type { PageEditPayload } from './types';
 
 async function request(url: string, options?: RequestInit): Promise<Response> {
   const res = await fetch(url, options);
@@ -12,18 +12,10 @@ async function request(url: string, options?: RequestInit): Promise<Response> {
     const method = options?.method ?? 'GET';
     const status = res.status;
     const statusText = res.statusText;
-
-    // 404 は特別に扱う：ページハッシュが無効である可能性が高い
-    if (status === 404) {
-      throw new Error(`Page not found (${method} ${url}). The page may have been removed during a re-scan.`);
-    }
-
     throw new Error(`${method} ${url} — ${status} ${statusText}`);
   }
   return res;
 }
-
-
 
 // ── Books ─────────────────────────────────────────────────────
 
@@ -35,10 +27,22 @@ export async function renameBook(bookId: string, title: string): Promise<void> {
   });
 }
 
-// ── Pages ─────────────────────────────────────────────────────
+export async function saveBookNote(bookId: string, body: string): Promise<void> {
+  await request(`/api/books/${bookId}/note`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  });
+}
 
-export async function saveNote(bookId: string, pageHash: string, payload: NotePayload): Promise<void> {
-  await request(`/api/pages/${bookId}/${pageHash}`, {
+// ── Pages ─────────────────────────────────────────────────────
+//
+// Page endpoints use the stable integer page ID (pages.id) rather than a
+// (bookID, pageHash) pair. The ID is embedded in the template as data-page-id
+// and remains valid across re-scans and CBZ modifications.
+
+export async function savePageEdit(pageId: number, payload: PageEditPayload): Promise<void> {
+  await request(`/api/pages/${pageId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -46,11 +50,19 @@ export async function saveNote(bookId: string, pageHash: string, payload: NotePa
 }
 
 // svg is null to clear an existing drawing.
-export async function saveDrawing(bookId: string, pageHash: string, svg: string | null): Promise<void> {
-  await request(`/api/pages/${bookId}/${pageHash}/drawing`, {
+export async function savePageDrawing(pageId: number, svg: string | null): Promise<void> {
+  await request(`/api/pages/${pageId}/drawing`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ svg_drawing: svg }),
+  });
+}
+
+export async function updatePageStatus(pageId: number, status: string): Promise<void> {
+  await request(`/api/pages/${pageId}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
   });
 }
 
@@ -96,20 +108,4 @@ export async function renameCollection(id: number, title: string): Promise<void>
 
 export async function deleteCollection(id: number): Promise<void> {
   await request(`/api/collections/${id}`, { method: 'DELETE' });
-}
-
-export async function saveBookNote(bookId: string, body: string): Promise<void> {
-  await request(`/api/books/${bookId}/note`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body }),
-  });
-}
-
-export async function updatePageStatus(bookId: string, pageHash: string, status: string): Promise<void> {
-  await request(`/api/pages/${bookId}/${pageHash}/status`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
-  });
 }

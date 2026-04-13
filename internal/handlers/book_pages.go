@@ -22,8 +22,8 @@ type BookDispatchHandler struct {
 
 // overviewItem is the template model for a single page card in the overview grid.
 type overviewItem struct {
+	ID        int // stable page ID, used for thumbnail URL
 	Number    int
-	Hash      string
 	HasThumb  bool
 	NoteTitle string
 	Attribute string
@@ -31,8 +31,6 @@ type overviewItem struct {
 }
 
 func (h *BookDispatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Expect /books/{uuid}/overview, /books/{uuid}/bibliography,
-	// or /books/{uuid}/pages/{num}.
 	path := strings.TrimPrefix(r.URL.Path, "/books/")
 	path = strings.Trim(path, "/")
 	parts := strings.SplitN(path, "/", 3)
@@ -66,48 +64,42 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	images, err := h.Store.ListImages(bookID)
+	pages, err := h.Store.ListPages(bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	notes, err := h.Store.ListNotesByBook(bookID)
+	// Page thumbnail existence is keyed by stable page ID.
+	thumbSet, err := storage.ListPageThumbnailIDs(h.CachePath, bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Read the cache directory once to avoid N individual stat calls.
-	thumbSet, err := storage.ListPageThumbnailHashes(h.CachePath, bookID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
+	// Page statuses are keyed by stable page ID.
 	statuses, err := h.Store.ListPageStatuses(bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	items := make([]overviewItem, 0, len(images))
-	for _, img := range images {
-		status := statuses[img.Hash]
+	// Title and attribute come directly from the pages table; no separate
+	// notes query is needed for the overview grid.
+	items := make([]overviewItem, 0, len(pages))
+	for _, p := range pages {
+		status := statuses[p.ID]
 		if status == "" {
 			status = "unread"
 		}
-		item := overviewItem{
-			Number:   img.Number,
-			Hash:     img.Hash,
-			HasThumb: thumbSet[img.Hash],
-			Status:   status,
-		}
-		if n, ok := notes[img.Hash]; ok {
-			item.NoteTitle = n.Title
-			item.Attribute = n.Attribute
-		}
-		items = append(items, item)
+		items = append(items, overviewItem{
+			ID:        p.ID,
+			Number:    p.Number,
+			HasThumb:  thumbSet[p.ID],
+			NoteTitle: p.Title,
+			Attribute: p.Attribute,
+			Status:    status,
+		})
 	}
 
 	data := struct {
@@ -172,28 +164,34 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	images, err := h.Store.ListImages(bookID)
+	pages, err := h.Store.ListPages(bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	totalPages := len(images)
+	totalPages := len(pages)
 
 	if pageNum > totalPages && totalPages > 0 {
 		pageNum = totalPages
 	}
 
-	var currentImage *store.Image
+	var currentPage *store.Page
 	if totalPages > 0 {
-		currentImage = &images[pageNum-1]
+		currentPage = &pages[pageNum-1]
 	}
 
-	// Fetch note keyed by the image's content hash, which is stable across
-	// re-scans and CBZ image deletions.
-	var note store.Note
-	if currentImage != nil {
-		note, err = h.Store.GetNote(bookID, currentImage.Hash)
+	// Fetch the note body and SVG drawing independently; they are stored in
+	// separate tables to allow either to be updated without touching the other.
+	var noteBody string
+	var svgDrawing string
+	if currentPage != nil {
+		noteBody, err = h.Store.GetPageNote(currentPage.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		svgDrawing, err = h.Store.GetPageDrawing(currentPage.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -206,8 +204,8 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// ActiveTocIdx is the index of the last section whose page number is <= current page.
-	// -1 means no section is active (current page precedes all sections).
+	// ActiveTocIdx is the index of the last section whose page number is <=
+	// the current page. -1 means no section is active.
 	activeTocIdx := -1
 	for i, e := range toc {
 		if e.PageNum <= pageNum {
@@ -217,25 +215,27 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 
 	data := struct {
 		Book         *store.Book
-		CurrentImage *store.Image
-		Images       []store.Image
+		CurrentPage  *store.Page
+		Pages        []store.Page
 		PageNum      int
 		TotalPages   int
 		HasPrev      bool
 		HasNext      bool
-		Note         store.Note
+		NoteBody     string
+		SvgDrawing   string
 		Attributes   []store.AttributeOption
 		TOC          []store.TocEntry
 		ActiveTocIdx int
 	}{
 		Book:         book,
-		CurrentImage: currentImage,
-		Images:       images,
+		CurrentPage:  currentPage,
+		Pages:        pages,
 		PageNum:      pageNum,
 		TotalPages:   totalPages,
 		HasPrev:      pageNum > 1,
 		HasNext:      pageNum < totalPages,
-		Note:         note,
+		NoteBody:     noteBody,
+		SvgDrawing:   svgDrawing,
 		Attributes:   store.AllAttributeOptions,
 		TOC:          toc,
 		ActiveTocIdx: activeTocIdx,

@@ -1,6 +1,6 @@
 // src/viewer/drawing.ts
 
-import { saveDrawing } from '../api';
+import { savePageDrawing } from '../api';
 import { PANE_EVENT_DRAW_OPEN, PANE_EVENT_EDIT_OPEN } from './pane-events';
 
 // ── Type definitions ───────────────────────────────────────────
@@ -22,18 +22,15 @@ type HistoryEntry =
   | { kind: 'erase'; removed: SVGPathElement[] };
 
 // ── Drawing state management ───────────────────────────────────
-// Tracks whether the drawing has unsaved changes and save status.
 
 interface DrawingState {
-  isDirty: boolean;
-  isSaving: boolean;
-  lastSavedSVG: string | null;
-  unsavedChanges: number; // Count of strokes since last save
+  isDirty:        boolean;
+  isSaving:       boolean;
+  lastSavedSVG:   string | null;
+  unsavedChanges: number; // count of strokes since last save
 }
 
 // ── SVG Validation ─────────────────────────────────────────────
-// validateSVG checks that the SVG markup is well-formed and parseable.
-// Returns true if valid, false otherwise.
 
 function validateSVG(svg: string): boolean {
   try {
@@ -42,11 +39,7 @@ function validateSVG(svg: string): boolean {
       `<svg xmlns="http://www.w3.org/2000/svg">${svg}</svg>`,
       'image/svg+xml',
     );
-
-    // DOMParser silently creates a <parsererror> element on failure.
-    // Check for this element to detect parse errors.
-    const hasParseError = doc.querySelector('parsererror') !== null;
-    return !hasParseError;
+    return doc.querySelector('parsererror') === null;
   } catch {
     return false;
   }
@@ -55,22 +48,26 @@ function validateSVG(svg: string): boolean {
 // ── Main initialization ────────────────────────────────────────
 
 export function initDrawing(): void {
-  const toggleBtn = document.getElementById('draw-toggle')  as HTMLButtonElement | null;
-  const pane      = document.getElementById('draw-pane')    as HTMLElement       | null;
-  const closeBtn  = document.getElementById('draw-close')   as HTMLButtonElement | null;
-  const backdrop  = document.getElementById('draw-backdrop') as HTMLElement      | null;
-  const image     = document.getElementById('page-image')   as HTMLImageElement  | null;
-  const overlay   = document.getElementById('drawing-overlay') as SVGSVGElement  | null;
+  const toggleBtn = document.getElementById('draw-toggle')   as HTMLButtonElement | null;
+  const pane      = document.getElementById('draw-pane')     as HTMLElement       | null;
+  const closeBtn  = document.getElementById('draw-close')    as HTMLButtonElement | null;
+  const backdrop  = document.getElementById('draw-backdrop') as HTMLElement       | null;
+  const image     = document.getElementById('page-image')    as HTMLImageElement  | null;
+  const overlay   = document.getElementById('drawing-overlay') as SVGSVGElement   | null;
 
   if (!toggleBtn || !pane || !image || !overlay) return;
 
-  const bookId   = overlay.dataset.bookId   ?? '';
-  const pageHash = overlay.dataset.pageHash ?? '';
-
-  // Drawing requires a page hash (computed by `folio hash` or `folio scan`).
-  if (!bookId || !pageHash) {
+  // Page ID is the stable integer primary key embedded in the template.
+  const pageIdStr = overlay.dataset.pageId;
+  if (!pageIdStr) {
     toggleBtn.disabled = true;
-    toggleBtn.title    = 'Drawing unavailable: page hash not computed yet';
+    toggleBtn.title    = 'Drawing unavailable: page ID missing';
+    return;
+  }
+  const pageId = parseInt(pageIdStr, 10);
+  if (isNaN(pageId)) {
+    toggleBtn.disabled = true;
+    toggleBtn.title    = 'Drawing unavailable: invalid page ID';
     return;
   }
 
@@ -78,7 +75,7 @@ export function initDrawing(): void {
 
   // ── State ──────────────────────────────────────────────────────────────────
 
-  const pen: PenSettings = { color: '#dd3', opacity: 0.3, size: 50 };
+  const pen: PenSettings     = { color: '#dd3', opacity: 0.3, size: 50 };
   const eraser: EraserSettings = { size: 20 };
   let activeTool: 'ink' | 'erase' = 'ink';
 
@@ -86,13 +83,13 @@ export function initDrawing(): void {
   const redoStack: HistoryEntry[] = [];
 
   const state: DrawingState = {
-    isDirty: false,
-    isSaving: false,
-    lastSavedSVG: null,
+    isDirty:        false,
+    isSaving:       false,
+    lastSavedSVG:   null,
     unsavedChanges: 0,
   };
 
-  // ── SVG viewBox ────────────────────────────────────────────────────────
+  // ── SVG viewBox ────────────────────────────────────────────────────────────
 
   const applyViewBox = (): void => {
     if (image.naturalWidth && image.naturalHeight) {
@@ -149,11 +146,8 @@ export function initDrawing(): void {
   };
 
   const closePane = (): void => {
-    // Warn user if there are unsaved changes.
     if (state.isDirty && state.unsavedChanges > 0) {
-      const confirmed = confirm(
-        'You have unsaved drawing changes. Close anyway?'
-      );
+      const confirmed = confirm('You have unsaved drawing changes. Close anyway?');
       if (!confirmed) return;
     }
     pane.classList.remove('open');
@@ -174,7 +168,7 @@ export function initDrawing(): void {
 
   const penBtn       = document.getElementById('draw-tool-pen')    as HTMLButtonElement | null;
   const eraserBtn    = document.getElementById('draw-tool-eraser') as HTMLButtonElement | null;
-  const colorPicker  = document.getElementById('draw-color-picker') as HTMLElement | null;
+  const colorPicker  = document.getElementById('draw-color-picker') as HTMLElement      | null;
   const opacityInput = document.getElementById('draw-opacity')     as HTMLInputElement  | null;
   const sizeInput    = document.getElementById('draw-size')        as HTMLInputElement  | null;
   const opacityVal   = document.getElementById('draw-opacity-val');
@@ -196,23 +190,21 @@ export function initDrawing(): void {
     if (sizeVal) sizeVal.textContent = `${sizeInput?.value ?? '4'}px`;
   };
 
-  penBtn?.addEventListener('click',   () => { activeTool = 'ink';   syncToolUI(); });
+  penBtn?.addEventListener('click',    () => { activeTool = 'ink';   syncToolUI(); });
   eraserBtn?.addEventListener('click', () => { activeTool = 'erase'; syncToolUI(); });
 
   colorPicker?.querySelectorAll<HTMLAnchorElement>('[data-color]').forEach(swatch => {
-      swatch.addEventListener('click', (e: MouseEvent) => {
-          e.preventDefault();
-          const color = swatch.dataset.color;
-          if (!color) return;
-          pen.color = color;
-          colorPicker.querySelectorAll('[data-color]').forEach(s =>
-              s.classList.remove('color-picker-active')
-          );
-          swatch.classList.add('color-picker-active');
-      });
+    swatch.addEventListener('click', (e: MouseEvent) => {
+      e.preventDefault();
+      const color = swatch.dataset.color;
+      if (!color) return;
+      pen.color = color;
+      colorPicker.querySelectorAll('[data-color]').forEach(s =>
+        s.classList.remove('color-picker-active'),
+      );
+      swatch.classList.add('color-picker-active');
+    });
   });
-
-
 
   opacityInput?.addEventListener('input', () => {
     pen.opacity = parseInt(opacityInput.value, 10) / 100;
@@ -227,52 +219,46 @@ export function initDrawing(): void {
 
   syncToolUI();
 
-  // ── Save with validation and error handling ────────────────────────────────
+  // ── Save ───────────────────────────────────────────────────────────────────
 
   saveBtn?.addEventListener('click', async () => {
     if (!saveBtn) return;
-    if (state.isSaving) return; // Prevent duplicate submissions.
+    if (state.isSaving) return;
 
     saveBtn.disabled = true;
-    state.isSaving = true;
+    state.isSaving   = true;
 
     try {
       const svg = serializeDrawing(inkLayer);
 
-      // Validate the SVG before sending.
       if (svg !== null && !validateSVG(svg)) {
         throw new Error('Drawing contains invalid SVG markup. Cannot save.');
       }
 
-      await saveDrawing(bookId, pageHash, svg);
+      await savePageDrawing(pageId, svg);
 
-      // Update state after successful save.
-      state.lastSavedSVG = svg;
-      state.isDirty = false;
+      state.lastSavedSVG   = svg;
+      state.isDirty        = false;
       state.unsavedChanges = 0;
 
-      // Provide visual feedback.
       saveBtn.textContent = '✓ Saved';
-      setTimeout(() => {
-        saveBtn.textContent = 'Save';
-      }, 2000);
+      setTimeout(() => { saveBtn.textContent = 'Save'; }, 2000);
     } catch (err) {
       console.error('Failed to save drawing:', err);
 
-      // Rollback: restore the last successfully saved state.
+      // Rollback to the last successfully saved state.
       if (state.lastSavedSVG !== null) {
         inkLayer.innerHTML = '';
         restoreDrawing(state.lastSavedSVG, inkLayer);
       }
 
-      // Alert the user.
       alert(
         'Failed to save drawing. Your changes have been reverted to the last saved state.' +
-        '\n\nError: ' + (err instanceof Error ? err.message : String(err))
+        '\n\nError: ' + (err instanceof Error ? err.message : String(err)),
       );
     } finally {
       saveBtn.disabled = false;
-      state.isSaving = false;
+      state.isSaving   = false;
     }
   });
 
@@ -285,10 +271,6 @@ export function initDrawing(): void {
 
   // Undo/redo is dispatched by the centralized keyboard manager in
   // src/keyboard/init.ts via folio:draw-undo and folio:draw-redo custom events.
-  // A local keydown listener is intentionally absent here to avoid double-firing:
-  // KeyBindingManager calls e.preventDefault() but not e.stopPropagation(), so
-  // any additional keydown listener on document would also receive the same event,
-  // causing undoEntry / redoEntry to run twice per keystroke.
   document.addEventListener('folio:draw-undo', () => {
     if (!pane.classList.contains('open')) return;
     undoEntry(undoStack, redoStack, inkLayer);
@@ -315,7 +297,6 @@ export function initDrawing(): void {
     e.preventDefault();
     overlay.setPointerCapture(e.pointerId);
 
-    // Any new stroke invalidates the redo history.
     redoStack.splice(0);
     markDirty();
 
@@ -366,13 +347,9 @@ export function initDrawing(): void {
 
 // ── Helper functions ───────────────────────────────────────────
 
-// eraseAt removes all ink paths whose bounding box overlaps with a circle of
-// the given radius centred at (x, y). Removed elements are appended to the
-// `removed` array so the caller can record them for undo.
-//
-// Bounding-box intersection is a conservative approximation: it may match paths
-// whose strokes do not visually overlap the eraser, but is fast and reliable
-// across all browsers without needing getIntersectionList.
+// eraseAt removes all ink paths whose bounding box overlaps a circle of the
+// given radius centred at (x, y). Removed elements are appended to `removed`
+// so the caller can record them for undo.
 function eraseAt(
   inkLayer: SVGGElement,
   x: number,
@@ -381,13 +358,12 @@ function eraseAt(
   removed: SVGPathElement[],
 ): void {
   const half = size / 2;
-  // Iterate a static snapshot because we mutate the live collection.
   const children = Array.from(inkLayer.children) as SVGPathElement[];
   for (const path of children) {
     const bb = path.getBBox();
     const overlaps =
-      bb.x            < x + half &&
-      bb.x + bb.width > x - half &&
+      bb.x             < x + half &&
+      bb.x + bb.width  > x - half &&
       bb.y             < y + half &&
       bb.y + bb.height > y - half;
     if (overlaps) {
@@ -409,13 +385,7 @@ function undoEntry(
   if (entry.kind === 'add') {
     entry.element.remove();
   } else {
-    // Restore removed paths. Order is preserved; they are re-appended at the
-    // end of the layer, which may differ from the original Z-order when paths
-    // from multiple erase operations are interleaved, but is acceptable for
-    // annotation use.
-    for (const el of entry.removed) {
-      inkLayer.appendChild(el);
-    }
+    for (const el of entry.removed) inkLayer.appendChild(el);
   }
   redoStack.push(entry);
 }
@@ -430,9 +400,7 @@ function redoEntry(
   if (entry.kind === 'add') {
     inkLayer.appendChild(entry.element);
   } else {
-    for (const el of entry.removed) {
-      el.remove();
-    }
+    for (const el of entry.removed) el.remove();
   }
   undoStack.push(entry);
 }
@@ -476,7 +444,6 @@ function restoreDrawing(data: string, inkLayer: SVGGElement): void {
       `<svg xmlns="http://www.w3.org/2000/svg">${data}</svg>`,
       'image/svg+xml',
     );
-
     const savedInk = doc.querySelector('#drawing-ink');
     if (savedInk) {
       savedInk.childNodes.forEach(node => {
