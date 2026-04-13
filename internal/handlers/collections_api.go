@@ -9,7 +9,7 @@ import (
 	"folio/internal/store"
 )
 
-// CollectionsAPIHandler handles REST API requests for collections.
+// CollectionsAPIHandler handles REST API requests for book collections.
 //
 // Routes:
 //
@@ -75,19 +75,19 @@ func (h *CollectionsAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 func (h *CollectionsAPIHandler) createCollection(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Title string `json:"title"`
+		Name string `json:"name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	title := strings.TrimSpace(body.Title)
-	if title == "" {
-		http.Error(w, "title cannot be empty", http.StatusBadRequest)
+	name := strings.TrimSpace(body.Name)
+	if name == "" {
+		http.Error(w, "name cannot be empty", http.StatusBadRequest)
 		return
 	}
 
-	id, err := h.Store.CreateCollection(title)
+	id, err := h.Store.CreateBookCollection(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -96,39 +96,39 @@ func (h *CollectionsAPIHandler) createCollection(w http.ResponseWriter, r *http.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(struct {
-		ID    int64  `json:"id"`
-		Title string `json:"title"`
-	}{ID: id, Title: title})
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+	}{ID: id, Name: name})
 }
 
 func (h *CollectionsAPIHandler) renameCollection(w http.ResponseWriter, r *http.Request, id int) {
 	var body struct {
-		Title string `json:"title"`
+		Name string `json:"name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	title := strings.TrimSpace(body.Title)
-	if title == "" {
-		http.Error(w, "title cannot be empty", http.StatusBadRequest)
+	name := strings.TrimSpace(body.Name)
+	if name == "" {
+		http.Error(w, "name cannot be empty", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.Store.RenameCollection(id, title); err != nil {
+	if err := h.Store.RenameBookCollection(id, name); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(struct {
-		ID    int    `json:"id"`
-		Title string `json:"title"`
-	}{ID: id, Title: title})
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}{ID: id, Name: name})
 }
 
 func (h *CollectionsAPIHandler) deleteCollection(w http.ResponseWriter, r *http.Request, id int) {
-	if err := h.Store.DeleteCollection(id); err != nil {
+	if err := h.Store.DeleteBookCollection(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -136,7 +136,7 @@ func (h *CollectionsAPIHandler) deleteCollection(w http.ResponseWriter, r *http.
 }
 
 func (h *CollectionsAPIHandler) addBook(w http.ResponseWriter, _ *http.Request, collectionID int, bookID string) {
-	added, err := h.Store.AddBookToCollection(collectionID, bookID)
+	added, err := h.Store.AddBookToBookCollection(collectionID, bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -151,7 +151,7 @@ func (h *CollectionsAPIHandler) addBook(w http.ResponseWriter, _ *http.Request, 
 }
 
 func (h *CollectionsAPIHandler) removeBook(w http.ResponseWriter, _ *http.Request, collectionID int, bookID string) {
-	if err := h.Store.RemoveBookFromCollection(collectionID, bookID); err != nil {
+	if err := h.Store.RemoveBookFromBookCollection(collectionID, bookID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

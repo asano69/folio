@@ -89,20 +89,20 @@ export async function removeBookFromCollection(
   await request(`/api/collections/${collectionId}/books/${bookId}`, { method: 'DELETE' });
 }
 
-export async function createCollection(title: string): Promise<{ id: number; title: string }> {
+export async function createCollection(name: string): Promise<{ id: number; name: string }> {
   const res = await request('/api/collections/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ name }),
   });
   return res.json();
 }
 
-export async function renameCollection(id: number, title: string): Promise<void> {
+export async function renameCollection(id: number, name: string): Promise<void> {
   await request(`/api/collections/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ name }),
   });
 }
 

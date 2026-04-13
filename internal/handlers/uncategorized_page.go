@@ -9,7 +9,7 @@ import (
 )
 
 // UncategorizedPageHandler serves GET /books/uncategorized — books that do not
-// belong to any collection.
+// belong to any book collection.
 type UncategorizedPageHandler struct {
 	Store     *store.Store
 	CachePath string
@@ -17,7 +17,7 @@ type UncategorizedPageHandler struct {
 }
 
 func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	collections, err := h.Store.ListCollections()
+	collections, err := h.Store.ListBookCollections()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -60,7 +60,7 @@ func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	data := struct {
 		Books               []bookView
 		MissingBooks        []bookView
-		Collections         []store.Collection
+		Collections         []store.BookCollection
 		ActiveCollectionID  int
 		TotalBookCount      int
 		UncategorizedCount  int

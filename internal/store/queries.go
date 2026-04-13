@@ -47,8 +47,8 @@ type Book struct {
 
 // Page is the DB representation of a single scanned image inside a CBZ.
 // ID is stable across re-scans: UpsertPages merges by hash then by position
-// rather than deleting and reinserting, so foreign keys from notes, page_status,
-// page_drawings, etc. remain valid after a scan.
+// rather than deleting and reinserting, so foreign keys from page_notes,
+// page_status, page_drawings, etc. remain valid after a scan.
 type Page struct {
 	ID        int
 	BookID    string
@@ -65,11 +65,14 @@ type TocEntry struct {
 	Title   string
 }
 
-// Collection is the DB representation of a user-defined book list.
-type Collection struct {
-	ID        int
-	Title     string
-	BookCount int
+// BookCollection is the DB representation of a named group of books.
+// BookCount is populated by ListBookCollections.
+type BookCollection struct {
+	ID          int
+	Name        string
+	Color       string
+	Description string
+	BookCount   int
 }
 
 // ── Books ──────────────────────────────────────────────────────
@@ -184,7 +187,7 @@ func (s *Store) CountAllBooks() (int, error) {
 //
 // Pages with no match are inserted as new rows.
 // Existing pages with no match are deleted; ON DELETE CASCADE propagates to
-// notes, page_status, page_drawings, page_tags, and page_thumbnails.
+// page_notes, page_status, page_drawings, page_tags, and page_ocr.
 //
 // Because sections reference pages by the stable pages.id FK, no section
 // rebuild is required after this operation.
@@ -357,9 +360,9 @@ func (s *Store) CountPages(bookID string) (int, error) {
 // ── Page annotations (title, attribute) and notes (body) ──────
 
 // UpsertPageEdit updates a page's title and attribute (stored on the pages row)
-// and upserts the note body (stored in the unified notes table) in a single
-// transaction. It also keeps the sections table in sync when the attribute
-// changes to or from 'section'.
+// and upserts the note body (stored in page_notes) in a single transaction.
+// It also keeps the sections table in sync when the attribute changes to or
+// from 'section'.
 func (s *Store) UpsertPageEdit(pageID int, title, attribute, body string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -380,7 +383,7 @@ func (s *Store) UpsertPageEdit(pageID int, title, attribute, body string) error 
 	}
 
 	if _, err := tx.Exec(`
-		INSERT INTO notes (page_id, body, updated_at)
+		INSERT INTO page_notes (page_id, body, updated_at)
 		VALUES (?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(page_id) DO UPDATE SET
 			body       = excluded.body,
@@ -399,7 +402,7 @@ func (s *Store) UpsertPageEdit(pageID int, title, attribute, body string) error 
 // GetPageNote returns the note body for a page, or an empty string if none exists.
 func (s *Store) GetPageNote(pageID int) (string, error) {
 	var body string
-	err := s.db.QueryRow(`SELECT body FROM notes WHERE page_id = ?`, pageID).Scan(&body)
+	err := s.db.QueryRow(`SELECT body FROM page_notes WHERE page_id = ?`, pageID).Scan(&body)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -525,7 +528,7 @@ func syncSection(tx *sql.Tx, pageID int, bookID, attribute, title string) error 
 // GetBookNote returns the memo body for a book, or an empty string if none exists.
 func (s *Store) GetBookNote(bookID string) (string, error) {
 	var body string
-	err := s.db.QueryRow(`SELECT body FROM notes WHERE book_id = ?`, bookID).Scan(&body)
+	err := s.db.QueryRow(`SELECT body FROM book_notes WHERE book_id = ?`, bookID).Scan(&body)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -535,7 +538,7 @@ func (s *Store) GetBookNote(bookID string) (string, error) {
 // UpsertBookNote inserts or updates the memo for a book.
 func (s *Store) UpsertBookNote(bookID, body string) error {
 	_, err := s.db.Exec(`
-		INSERT INTO notes (book_id, body, updated_at)
+		INSERT INTO book_notes (book_id, body, updated_at)
 		VALUES (?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(book_id) DO UPDATE SET
 			body       = excluded.body,
@@ -544,26 +547,27 @@ func (s *Store) UpsertBookNote(bookID, body string) error {
 	return err
 }
 
-// ── Collections ────────────────────────────────────────────────
+// ── Book collections ───────────────────────────────────────────
 
-// ListCollections returns all collections ordered by title, with book counts.
-func (s *Store) ListCollections() ([]Collection, error) {
+// ListBookCollections returns all book collections ordered by name, with
+// member counts.
+func (s *Store) ListBookCollections() ([]BookCollection, error) {
 	rows, err := s.db.Query(`
-		SELECT c.id, c.title, COUNT(cb.book_id)
-		FROM collections c
-		LEFT JOIN collection_books cb ON cb.collection_id = c.id
+		SELECT c.id, c.name, c.color, c.description, COUNT(m.book_id)
+		FROM book_collections c
+		LEFT JOIN book_collection_members m ON m.collection_id = c.id
 		GROUP BY c.id
-		ORDER BY c.title
+		ORDER BY c.name
 	`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var cols []Collection
+	var cols []BookCollection
 	for rows.Next() {
-		var c Collection
-		if err := rows.Scan(&c.ID, &c.Title, &c.BookCount); err != nil {
+		var c BookCollection
+		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Description, &c.BookCount); err != nil {
 			return nil, err
 		}
 		cols = append(cols, c)
@@ -571,33 +575,33 @@ func (s *Store) ListCollections() ([]Collection, error) {
 	return cols, rows.Err()
 }
 
-// CreateCollection inserts a new collection and returns its ID.
-func (s *Store) CreateCollection(title string) (int64, error) {
-	res, err := s.db.Exec(`INSERT INTO collections (title) VALUES (?)`, title)
+// CreateBookCollection inserts a new book collection and returns its ID.
+func (s *Store) CreateBookCollection(name string) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO book_collections (name) VALUES (?)`, name)
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
 }
 
-// RenameCollection updates the title of an existing collection.
-func (s *Store) RenameCollection(id int, title string) error {
-	_, err := s.db.Exec(`UPDATE collections SET title = ? WHERE id = ?`, title, id)
+// RenameBookCollection updates the name of an existing book collection.
+func (s *Store) RenameBookCollection(id int, name string) error {
+	_, err := s.db.Exec(`UPDATE book_collections SET name = ? WHERE id = ?`, name, id)
 	return err
 }
 
-// DeleteCollection removes a collection and all its book memberships.
-// ON DELETE CASCADE handles collection_books, collection_tags, and collection notes.
-func (s *Store) DeleteCollection(id int) error {
-	_, err := s.db.Exec(`DELETE FROM collections WHERE id = ?`, id)
+// DeleteBookCollection removes a book collection and all its memberships.
+// ON DELETE CASCADE handles book_collection_members.
+func (s *Store) DeleteBookCollection(id int) error {
+	_, err := s.db.Exec(`DELETE FROM book_collections WHERE id = ?`, id)
 	return err
 }
 
-// AddBookToCollection adds a book to a collection.
+// AddBookToBookCollection adds a book to a book collection.
 // Returns whether the book was newly added (false means it was already a member).
-func (s *Store) AddBookToCollection(collectionID int, bookID string) (added bool, err error) {
+func (s *Store) AddBookToBookCollection(collectionID int, bookID string) (added bool, err error) {
 	res, err := s.db.Exec(`
-		INSERT OR IGNORE INTO collection_books (collection_id, book_id) VALUES (?, ?)
+		INSERT OR IGNORE INTO book_collection_members (collection_id, book_id) VALUES (?, ?)
 	`, collectionID, bookID)
 	if err != nil {
 		return false, err
@@ -606,21 +610,22 @@ func (s *Store) AddBookToCollection(collectionID int, bookID string) (added bool
 	return n > 0, err
 }
 
-// RemoveBookFromCollection removes a book from a collection.
-func (s *Store) RemoveBookFromCollection(collectionID int, bookID string) error {
+// RemoveBookFromBookCollection removes a book from a book collection.
+func (s *Store) RemoveBookFromBookCollection(collectionID int, bookID string) error {
 	_, err := s.db.Exec(`
-		DELETE FROM collection_books WHERE collection_id = ? AND book_id = ?
+		DELETE FROM book_collection_members WHERE collection_id = ? AND book_id = ?
 	`, collectionID, bookID)
 	return err
 }
 
-// ListBooksInCollection returns books belonging to a collection, ordered by title.
-func (s *Store) ListBooksInCollection(collectionID int) ([]Book, error) {
+// ListBooksInBookCollection returns books belonging to a book collection,
+// ordered by title.
+func (s *Store) ListBooksInBookCollection(collectionID int) ([]Book, error) {
 	rows, err := s.db.Query(`
 		SELECT b.id, b.title, b.source, b.status, b.file_mtime, b.missing_since
 		FROM books b
-		JOIN collection_books cb ON cb.book_id = b.id
-		WHERE cb.collection_id = ?
+		JOIN book_collection_members m ON m.book_id = b.id
+		WHERE m.collection_id = ?
 		ORDER BY b.title
 	`, collectionID)
 	if err != nil {
@@ -640,14 +645,14 @@ func (s *Store) ListBooksInCollection(collectionID int) ([]Book, error) {
 }
 
 // ListUncategorizedBooks returns non-missing books that do not belong to any
-// collection, ordered by title.
+// book collection, ordered by title.
 func (s *Store) ListUncategorizedBooks() ([]Book, error) {
 	rows, err := s.db.Query(`
 		SELECT id, title, source, status, file_mtime, missing_since
 		FROM books
 		WHERE missing_since IS NULL
 		  AND NOT EXISTS (
-		      SELECT 1 FROM collection_books cb WHERE cb.book_id = books.id
+		      SELECT 1 FROM book_collection_members m WHERE m.book_id = books.id
 		  )
 		ORDER BY title
 	`)
@@ -668,14 +673,14 @@ func (s *Store) ListUncategorizedBooks() ([]Book, error) {
 }
 
 // CountUncategorizedBooks returns the number of non-missing books that do not
-// belong to any collection.
+// belong to any book collection.
 func (s *Store) CountUncategorizedBooks() (int, error) {
 	var n int
 	err := s.db.QueryRow(`
 		SELECT COUNT(*) FROM books
 		WHERE missing_since IS NULL
 		  AND NOT EXISTS (
-		      SELECT 1 FROM collection_books cb WHERE cb.book_id = books.id
+		      SELECT 1 FROM book_collection_members m WHERE m.book_id = books.id
 		  )
 	`).Scan(&n)
 	return n, err
