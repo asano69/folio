@@ -30,7 +30,7 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	collections, err := h.Store.ListCollections()
+	collections, err := h.Store.ListBookCollections()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -79,7 +79,7 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Books               []bookView
 		MissingBooks        []bookView
-		Collections         []store.Collection
+		Collections         []store.BookCollection
 		ActiveCollectionID  int
 		TotalBookCount      int
 		UncategorizedCount  int

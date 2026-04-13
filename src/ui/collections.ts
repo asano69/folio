@@ -219,7 +219,7 @@ function setupDragAndDrop(): void {
       zone.classList.remove('drag-over');
       const bookId = e.dataTransfer!.getData('text/plain');
       // Parse to number immediately on extraction from the DOM so the type
-      // matches the api.ts signature and Collection.id throughout.
+      // matches the api.ts signature and BookCollection.id throughout.
       const collectionId = parseInt(zone.dataset.collectionId!, 10);
       if (bookId && !isNaN(collectionId)) handleDrop(zone, collectionId, bookId);
     });
@@ -332,10 +332,10 @@ async function startCreateCollection(addItem: HTMLElement): Promise<void> {
   const finish = async (): Promise<void> => {
     if (finishing) return;
     finishing = true;
-    const title = input.value.trim();
-    if (title) {
+    const name = input.value.trim();
+    if (name) {
       try {
-        await createCollection(title);
+        await createCollection(name);
         window.location.reload();
         return;
       } catch (err) {
@@ -353,11 +353,11 @@ async function startCreateCollection(addItem: HTMLElement): Promise<void> {
 }
 
 async function startRenameCollection(collectionId: number, titleEl: HTMLElement): Promise<void> {
-  const currentTitle = titleEl.textContent ?? '';
+  const currentName = titleEl.textContent ?? '';
 
   const input = document.createElement('input');
   input.type = 'text';
-  input.value = currentTitle;
+  input.value = currentName;
   input.className = 'collection-rename-input';
   titleEl.replaceWith(input);
   input.focus();
@@ -369,11 +369,11 @@ async function startRenameCollection(collectionId: number, titleEl: HTMLElement)
   const finish = async (): Promise<void> => {
     if (finishing) return;
     finishing = true;
-    const newTitle = input.value.trim();
-    if (!cancelled && newTitle && newTitle !== currentTitle) {
+    const newName = input.value.trim();
+    if (!cancelled && newName && newName !== currentName) {
       try {
-        await renameCollection(collectionId, newTitle);
-        titleEl.textContent = newTitle;
+        await renameCollection(collectionId, newName);
+        titleEl.textContent = newName;
       } catch (err) {
         console.error(err);
       }

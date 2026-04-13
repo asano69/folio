@@ -10,7 +10,8 @@ import (
 	"folio/internal/store"
 )
 
-// CollectionPageHandler serves GET /collections/{id} — a single collection's book list.
+// CollectionPageHandler serves GET /collections/{id} — a single book
+// collection's book list.
 type CollectionPageHandler struct {
 	Store     *store.Store
 	CachePath string
@@ -33,7 +34,7 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	collections, err := h.Store.ListCollections()
+	collections, err := h.Store.ListBookCollections()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -41,7 +42,7 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	// Locate the active collection within the already-fetched list to avoid a
 	// second DB query. 404 if the ID does not exist.
-	var activeCollection *store.Collection
+	var activeCollection *store.BookCollection
 	for i := range collections {
 		if collections[i].ID == collectionID {
 			activeCollection = &collections[i]
@@ -53,7 +54,7 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	dbBooks, err := h.Store.ListBooksInCollection(collectionID)
+	dbBooks, err := h.Store.ListBooksInBookCollection(collectionID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -96,9 +97,9 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	data := struct {
 		Books               []bookView
 		MissingBooks        []bookView
-		Collections         []store.Collection
+		Collections         []store.BookCollection
 		ActiveCollectionID  int
-		Collection          *store.Collection
+		Collection          *store.BookCollection
 		TotalBookCount      int
 		UncategorizedCount  int
 		IsUncategorizedPage bool

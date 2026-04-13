@@ -20,6 +20,8 @@ PRAGMA foreign_keys = ON;
 -- WAL mode allows concurrent reads during writes.
 PRAGMA journal_mode = WAL;
 
+-- ── Core entities ──────────────────────────────────────────────
+
 CREATE TABLE IF NOT EXISTS books (
     id            TEXT PRIMARY KEY,
     title         TEXT NOT NULL,
@@ -31,7 +33,7 @@ CREATE TABLE IF NOT EXISTS books (
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- pages.id is stable across re-scans. UpsertImages uses a merge algorithm
+-- pages.id is stable across re-scans. UpsertPages uses a merge algorithm
 -- (hash-first, then position) to preserve IDs even when the CBZ changes.
 -- title and attribute are page-level metadata edited by the user.
 CREATE TABLE IF NOT EXISTS pages (
@@ -45,14 +47,9 @@ CREATE TABLE IF NOT EXISTS pages (
     UNIQUE(book_id, number)
 );
 
-CREATE TABLE IF NOT EXISTS collections (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    title      TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+-- ── Per-book derived structure ─────────────────────────────────
 
--- Sections reference pages by stable pages.id so they survive re-scans
--- without requiring a rebuild step.
+-- Sections reference pages by stable pages.id so they survive re-scans.
 CREATE TABLE IF NOT EXISTS sections (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id       TEXT    NOT NULL REFERENCES books(id),
@@ -63,26 +60,16 @@ CREATE TABLE IF NOT EXISTS sections (
     UNIQUE(book_id, start_page_id)
 );
 
--- Unified notes table: one text body per page, book, or collection.
--- Exactly one of page_id, book_id, collection_id is non-NULL (enforced by CHECK).
--- The UNIQUE constraint on each nullable FK guarantees at most one note per entity;
--- SQLite treats NULLs as distinct so multiple NULL values are allowed.
-CREATE TABLE IF NOT EXISTS notes (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    page_id       INTEGER UNIQUE REFERENCES pages(id)       ON DELETE CASCADE,
-    book_id       TEXT    UNIQUE REFERENCES books(id),
-    collection_id INTEGER UNIQUE REFERENCES collections(id) ON DELETE CASCADE,
-    body          TEXT    NOT NULL DEFAULT '',
-    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    CHECK(
-        (page_id IS NOT NULL) +
-        (book_id IS NOT NULL) +
-        (collection_id IS NOT NULL) = 1
-    )
+-- ── Per-page annotations ───────────────────────────────────────
+
+-- One text note per page.
+CREATE TABLE IF NOT EXISTS page_notes (
+    page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
+    body       TEXT    NOT NULL DEFAULT '',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- SVG annotation drawings stored separately from text notes.
--- One drawing per page; NULL drawing is represented by the absence of a row.
+-- SVG annotation drawing per page; absence of a row means no drawing.
 CREATE TABLE IF NOT EXISTS page_drawings (
     page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
     svg        TEXT    NOT NULL,
@@ -97,60 +84,67 @@ CREATE TABLE IF NOT EXISTS page_status (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- OCR text per page, keyed by stable page ID.
+-- OCR text per page.
 CREATE TABLE IF NOT EXISTS page_ocr (
     page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
     body       TEXT    NOT NULL DEFAULT '',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ── Per-book annotations ───────────────────────────────────────
 
--- Tags scoped per entity type; not shared across scopes.
--- color is stored as a CSS hex string e.g. '#ff0000'.
-CREATE TABLE IF NOT EXISTS tags (
-    id    INTEGER PRIMARY KEY AUTOINCREMENT,
-    scope TEXT    NOT NULL CHECK(scope IN ('book','page','note','collection')),
-    name  TEXT    NOT NULL,
-    color TEXT    NOT NULL DEFAULT '#888888',
-    UNIQUE(scope, name)
+-- One memo per book.
+CREATE TABLE IF NOT EXISTS book_notes (
+    book_id    TEXT PRIMARY KEY REFERENCES books(id),
+    body       TEXT NOT NULL DEFAULT '',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS book_tags (
-    book_id TEXT    NOT NULL REFERENCES books(id)  ON DELETE CASCADE,
-    tag_id  INTEGER NOT NULL REFERENCES tags(id)   ON DELETE CASCADE,
-    PRIMARY KEY(book_id, tag_id)
+-- ── Collections ────────────────────────────────────────────────
+--
+-- Collections serve as named, colored groups for organizing entities.
+-- Tags and collections were previously separate concepts but are unified
+-- here: both are named groups with optional color, differing only in
+-- the entity type they group.
+
+-- Named groups of books (used for sidebar navigation and filtering).
+CREATE TABLE IF NOT EXISTS book_collections (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,
+    color       TEXT NOT NULL DEFAULT '#888888',
+    description TEXT NOT NULL DEFAULT '',
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS page_tags (
-    page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
-    tag_id  INTEGER NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
-    PRIMARY KEY(page_id, tag_id)
+-- Named groups of pages (for cross-book page organization).
+CREATE TABLE IF NOT EXISTS page_collections (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,
+    color       TEXT NOT NULL DEFAULT '#888888',
+    description TEXT NOT NULL DEFAULT '',
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS note_tags (
-    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
-    tag_id  INTEGER NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
-    PRIMARY KEY(note_id, tag_id)
-);
+-- ── Collection members ─────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS collection_tags (
-    collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
-    tag_id        INTEGER NOT NULL REFERENCES tags(id)        ON DELETE CASCADE,
-    PRIMARY KEY(collection_id, tag_id)
-);
-
-CREATE TABLE IF NOT EXISTS collection_books (
-    collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS book_collection_members (
+    collection_id INTEGER NOT NULL REFERENCES book_collections(id) ON DELETE CASCADE,
     book_id       TEXT    NOT NULL REFERENCES books(id),
     PRIMARY KEY(collection_id, book_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_pages_book          ON pages(book_id);
-CREATE INDEX IF NOT EXISTS idx_sections_book       ON sections(book_id);
-CREATE INDEX IF NOT EXISTS idx_book_tags_tag       ON book_tags(tag_id);
-CREATE INDEX IF NOT EXISTS idx_page_tags_tag       ON page_tags(tag_id);
-CREATE INDEX IF NOT EXISTS idx_note_tags_tag       ON note_tags(tag_id);
-CREATE INDEX IF NOT EXISTS idx_collection_tags_tag ON collection_tags(tag_id);
+CREATE TABLE IF NOT EXISTS page_collection_members (
+    collection_id INTEGER NOT NULL REFERENCES page_collections(id) ON DELETE CASCADE,
+    page_id       INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+    PRIMARY KEY(collection_id, page_id)
+);
+
+-- ── Indexes ────────────────────────────────────────────────────
+
+CREATE INDEX IF NOT EXISTS idx_pages_book                   ON pages(book_id);
+CREATE INDEX IF NOT EXISTS idx_sections_book                ON sections(book_id);
+CREATE INDEX IF NOT EXISTS idx_book_collection_members_book ON book_collection_members(book_id);
+CREATE INDEX IF NOT EXISTS idx_page_collection_members_page ON page_collection_members(page_id);
 `
 
 func Open(dataPath string) (*Store, error) {
