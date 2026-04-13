@@ -26,11 +26,10 @@
     </div>
 
     {{/* Edit pane - slides in from right */}}
-    {{if .CurrentImage}}
+    {{if .CurrentPage}}
     <div id="edit-backdrop" class="pane-backdrop"></div>
     <div id="edit-pane" class="pane pane--right"
-         data-book-id="{{.Book.ID}}"
-         data-page-hash="{{.CurrentImage.Hash}}">
+         data-page-id="{{.CurrentPage.ID}}">
         <div class="pane-header">
             <span class="pane-heading">Edit Page</span>
             <button class="pane-close-btn" id="edit-close">✕</button>
@@ -38,20 +37,20 @@
         <div class="edit-pane-body pane-body">
             <div class="edit-field">
                 <label for="edit-title">Title</label>
-                <input type="text" id="edit-title" value="{{.Note.Title}}" placeholder="Page title">
+                <input type="text" id="edit-title" value="{{.CurrentPage.Title}}" placeholder="Page title">
             </div>
             <div class="edit-field">
                 <label for="edit-attribute">Attribute</label>
                 <select id="edit-attribute">
                     <option value="">— none —</option>
                     {{range .Attributes}}
-                    <option value="{{.Value}}" {{if eq .Value $.Note.Attribute}}selected{{end}}>{{.Label}}</option>
+                    <option value="{{.Value}}" {{if eq .Value $.CurrentPage.Attribute}}selected{{end}}>{{.Label}}</option>
                     {{end}}
                 </select>
             </div>
             <div class="edit-field">
                 <label for="edit-body">Comment</label>
-                <textarea id="edit-body" rows="8" placeholder="Notes for this page...">{{.Note.Body}}</textarea>
+                <textarea id="edit-body" rows="8" placeholder="Notes for this page...">{{.NoteBody}}</textarea>
             </div>
             <div class="edit-actions">
                 <button id="edit-save">Save</button>
@@ -76,11 +75,11 @@
                 <label>
                     <span>Color</span>
                     <span id="draw-color-picker" class="color-picker">
-                    		<a data-color="#000" title="Black"   href="#" style="background:#000"></a>
-												<a data-color="#dd3" title="Yellow"  href="#" class="color-picker-active" style="background:#dd3"></a>
-												<a data-color="#d3d" title="Magenta" href="#" style="background:#d3d"></a>
-												<a data-color="#3dd" title="Cyan"    href="#" style="background:#3dd"></a>
-												<a data-color="#3d3" title="Green"   href="#" style="background:#3d3"></a>
+                        <a data-color="#000" title="Black"   href="#" style="background:#000"></a>
+                        <a data-color="#dd3" title="Yellow"  href="#" class="color-picker-active" style="background:#dd3"></a>
+                        <a data-color="#d3d" title="Magenta" href="#" style="background:#d3d"></a>
+                        <a data-color="#3dd" title="Cyan"    href="#" style="background:#3dd"></a>
+                        <a data-color="#3d3" title="Green"   href="#" style="background:#3d3"></a>
                         <a data-color="#d33" title="Red"     href="#" style="background:#d33"></a>
                         <a data-color="#33d" title="Blue"    href="#" style="background:#33d"></a>
                     </span>
@@ -105,7 +104,7 @@
 
     {{/* Overlay buttons - fixed position, sit on top of the image */}}
     <button class="viewer-overlay-btn viewer-overlay-btn--left" id="toc-toggle">☰ Contents</button>
-    {{if .CurrentImage}}
+    {{if .CurrentPage}}
     <div class="viewer-overlay-right">
         <button class="viewer-overlay-btn" id="draw-toggle">✍ Draw</button>
         <button class="viewer-overlay-btn" id="edit-toggle">✎ Edit</button>
@@ -125,24 +124,23 @@
         <span class="next-btn disabled" hidden></span>
         {{end}}
 
-        {{if .CurrentImage}}
+        {{if .CurrentPage}}
         <div class="viewer-image">
             <div class="drawing-canvas">
-                <img src="/images/{{.Book.ID}}/{{.CurrentImage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
-								<svg id="drawing-overlay" class="drawing-overlay"
-								     data-book-id="{{.Book.ID}}"
-								     data-page-hash="{{.CurrentImage.Hash}}"
-								     {{if .Note.SvgDrawing}}data-drawing="{{.Note.SvgDrawing}}"{{end}}
-								     xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">
-								    <g id="drawing-ink"></g>
-								</svg>
+                <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
+                <svg id="drawing-overlay" class="drawing-overlay"
+                     data-page-id="{{.CurrentPage.ID}}"
+                     {{if .SvgDrawing}}data-drawing="{{.SvgDrawing}}"{{end}}
+                     xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">
+                    <g id="drawing-ink"></g>
+                </svg>
             </div>
         </div>
         {{end}}
 
-        {{if .Note.Body}}
+        {{if .NoteBody}}
         <div class="page-note" id="page-note">
-            <pre class="note-body" id="note-body">{{.Note.Body}}</pre>
+            <pre class="note-body" id="note-body">{{.NoteBody}}</pre>
         </div>
         {{else}}
         <div class="page-note" id="page-note" hidden>
@@ -154,7 +152,7 @@
             <div class="page-selector">
                 <label for="page-select">Jump to page:</label>
                 <select id="page-select" data-book-id="{{.Book.ID}}">
-                    {{range .Images}}
+                    {{range .Pages}}
                     <option value="{{.Number}}" {{if eq .Number $.PageNum}}selected{{end}}>
                         Page {{.Number}}
                     </option>

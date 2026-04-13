@@ -86,16 +86,18 @@ func runScan(cfg *config.Config, scanPath string) error {
 		}
 	}
 
-	// Upsert new/changed books and refresh their image records.
+	// Upsert new/changed books and merge their page records.
 	for _, b := range changedBooks {
 		foundIDs[b.ID] = struct{}{}
 		if err := db.UpsertBook(b); err != nil {
 			return fmt.Errorf("upsert book %s: %w", b.ID, err)
 		}
-		if err := db.UpsertImages(b.ID, b.Pages); err != nil {
-			return fmt.Errorf("upsert images %s: %w", b.ID, err)
+		// UpsertPages uses a merge algorithm to preserve stable page IDs:
+		// existing notes, drawings, and status records are not affected.
+		if err := db.UpsertPages(b.ID, b.Pages); err != nil {
+			return fmt.Errorf("upsert pages %s: %w", b.ID, err)
 		}
-		fmt.Printf("  %s (%d images)\n", b.Title, len(b.Pages))
+		fmt.Printf("  %s (%d pages)\n", b.Title, len(b.Pages))
 	}
 
 	allFound := make([]storage.Book, 0, len(unchangedBooks)+len(changedBooks))
@@ -150,7 +152,7 @@ func generateMissingBookThumbnails(cachePath string, books []storage.Book) error
 	}
 
 	results := runWorkerPool(jobs, func(j thumbJob) thumbResult {
-		data, err := storage.GenerateThumbnail(j.source)
+		data, err := storage.GenerateBookThumbnail(j.source)
 		return thumbResult{j.bookID, j.title, data, err}
 	})
 

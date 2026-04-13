@@ -15,11 +15,11 @@
     {{if .Items}}
     <div class="books-grid pages-grid" data-book-id="{{.Book.ID}}">
         {{range .Items}}
-        <div class="book-card page-card page-card--{{.Status}}" data-page-hash="{{.Hash}}">
+        <div class="book-card page-card page-card--{{.Status}}" data-page-id="{{.ID}}">
             <a href="/books/{{$.Book.ID}}/pages/{{.Number}}" class="page-card-link">
                 <div class="book-thumbnail page-thumbnail">
                     {{if .HasThumb}}
-                    <img src="/page-thumbnails/{{$.Book.ID}}/{{.Hash}}.jpg" alt="Page {{.Number}}">
+                    <img src="/page-thumbnails/{{$.Book.ID}}/{{.ID}}.jpg" alt="Page {{.Number}}">
                     {{else}}
                     <div class="thumbnail-placeholder">{{.Number}}</div>
                     {{end}}
@@ -31,8 +31,6 @@
                 </div>
             </a>
             {{/* Status buttons appear on hover. Clicking stops propagation so the card link is not followed. */}}
-            {{/* TODO: multi-select for batch status updates (see shelf.html rubber-band pattern) */}}
-            {{/* TODO: attribute editing without opening the viewer */}}
             <div class="page-status-buttons">
                 <button class="status-btn{{if eq .Status "unread"}} status-btn--active{{end}}" data-status="unread" title="Unread">−</button>
                 <button class="status-btn{{if eq .Status "reading"}} status-btn--active{{end}}" data-status="reading" title="Reading">…</button>

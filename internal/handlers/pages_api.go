@@ -2,107 +2,80 @@ package handlers
 
 import (
 	"encoding/json"
-	"folio/internal/store"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
+
+	"folio/internal/store"
 )
 
 // PagesAPIHandler handles:
 //
-//	PUT /api/pages/{bookID}/{pageHash}          — save text note
-//	PUT /api/pages/{bookID}/{pageHash}/drawing  — save SVG drawing
-//	PUT /api/pages/{bookID}/{pageHash}/status   — update read status
+//	PUT /api/pages/{pageID}          — save title, attribute, and note body
+//	PUT /api/pages/{pageID}/drawing  — save or clear SVG drawing
+//	PUT /api/pages/{pageID}/status   — update read status
+//
+// The page ID is the stable integer primary key from the pages table.
+// It remains valid across re-scans and CBZ modifications.
 type PagesAPIHandler struct {
 	Store *store.Store
-}
-
-// verifyPageHashExists checks that the given pageHash is registered for the book.
-// Returns the page number if valid, or -1 if not found.
-func (h *PagesAPIHandler) verifyPageHashExists(bookID, pageHash string) (int, error) {
-	img, err := h.Store.GetImageByHash(bookID, pageHash)
-	if err != nil {
-		return -1, err
-	}
-	if img == nil {
-		return -1, nil
-	}
-	return img.Number, nil
-}
-
-// isSVGWellFormed performs a basic check that the SVG markup is not obviously malformed.
-// This is a simple heuristic check; full SVG validation is expensive and handled by the browser.
-func isSVGWellFormed(svg string) bool {
-	if svg == "" {
-		return true // Empty string is valid (clears drawing).
-	}
-
-	// Count opening and closing <g> and <path> tags.
-	openG := regexp.MustCompile(`<g[^>]*>`).FindAllString(svg, -1)
-	closeG := regexp.MustCompile(`</g>`).FindAllString(svg, -1)
-
-	if len(openG) != len(closeG) {
-		return false
-	}
-
-	// Check for obvious XSS patterns (defensive, since DB is internal use only).
-	if regexp.MustCompile(`(javascript|onerror|onload|onclick)`).MatchString(svg) {
-		return false
-	}
-
-	return true
 }
 
 func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/pages/")
 
-	// PUT /api/pages/{bookID}/{pageHash}/drawing
+	// PUT /api/pages/{pageID}/drawing
 	if strings.HasSuffix(path, "/drawing") {
-		inner := strings.TrimSuffix(path, "/drawing")
-		parts := strings.SplitN(inner, "/", 2)
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			http.Error(w, "invalid path", http.StatusBadRequest)
+		pageID, err := parsePageID(strings.TrimSuffix(path, "/drawing"))
+		if err != nil {
+			http.Error(w, "invalid page ID", http.StatusBadRequest)
 			return
 		}
 		if r.Method != http.MethodPut {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		h.saveDrawing(w, r, parts[0], parts[1])
+		h.saveDrawing(w, r, pageID)
 		return
 	}
 
-	// PUT /api/pages/{bookID}/{pageHash}/status
+	// PUT /api/pages/{pageID}/status
 	if strings.HasSuffix(path, "/status") {
-		inner := strings.TrimSuffix(path, "/status")
-		parts := strings.SplitN(inner, "/", 2)
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			http.Error(w, "invalid path", http.StatusBadRequest)
+		pageID, err := parsePageID(strings.TrimSuffix(path, "/status"))
+		if err != nil {
+			http.Error(w, "invalid page ID", http.StatusBadRequest)
 			return
 		}
 		if r.Method != http.MethodPut {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		h.saveStatus(w, r, parts[0], parts[1])
+		h.saveStatus(w, r, pageID)
 		return
 	}
 
-	// PUT /api/pages/{bookID}/{pageHash}
-	parts := strings.SplitN(path, "/", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		http.Error(w, "invalid path", http.StatusBadRequest)
+	// PUT /api/pages/{pageID}
+	pageID, err := parsePageID(path)
+	if err != nil {
+		http.Error(w, "invalid page ID", http.StatusBadRequest)
 		return
 	}
-
-	bookID := parts[0]
-	pageHash := parts[1]
-
 	if r.Method != http.MethodPut {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	h.savePageEdit(w, r, pageID)
+}
 
+// parsePageID strips surrounding slashes and converts the segment to int.
+func parsePageID(s string) (int, error) {
+	return strconv.Atoi(strings.Trim(s, "/"))
+}
+
+// savePageEdit handles PUT /api/pages/{pageID}.
+// Updates title and attribute on the pages row and upserts the note body.
+func (h *PagesAPIHandler) savePageEdit(w http.ResponseWriter, r *http.Request, pageID int) {
 	var body struct {
 		Title     string `json:"title"`
 		Attribute string `json:"attribute"`
@@ -113,41 +86,26 @@ func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	book, err := h.Store.GetBook(bookID)
-	if err != nil || book == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Verify that the pageHash is valid for this book.
-	pageNum, err := h.verifyPageHashExists(bookID, pageHash)
+	page, err := h.Store.GetPage(pageID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if pageNum == -1 {
-		http.Error(w, "page not found", http.StatusNotFound)
+	if page == nil {
+		http.NotFound(w, r)
 		return
 	}
 
-	note := store.Note{
-		BookID:    bookID,
-		PageHash:  pageHash,
-		Title:     strings.TrimSpace(body.Title),
-		Attribute: body.Attribute,
-		Body:      body.Body,
-	}
-
-	if err := h.Store.UpsertNote(note); err != nil {
+	if err := h.Store.UpsertPageEdit(pageID, strings.TrimSpace(body.Title), body.Attribute, body.Body); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(note)
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *PagesAPIHandler) saveDrawing(w http.ResponseWriter, r *http.Request, bookID, pageHash string) {
+// saveDrawing handles PUT /api/pages/{pageID}/drawing.
+func (h *PagesAPIHandler) saveDrawing(w http.ResponseWriter, r *http.Request, pageID int) {
 	var body struct {
 		SvgDrawing *string `json:"svg_drawing"`
 	}
@@ -156,23 +114,16 @@ func (h *PagesAPIHandler) saveDrawing(w http.ResponseWriter, r *http.Request, bo
 		return
 	}
 
-	book, err := h.Store.GetBook(bookID)
-	if err != nil || book == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	pageNum, err := h.verifyPageHashExists(bookID, pageHash)
+	page, err := h.Store.GetPage(pageID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if pageNum == -1 {
-		http.Error(w, "page not found", http.StatusNotFound)
+	if page == nil {
+		http.NotFound(w, r)
 		return
 	}
 
-	// Validate SVG if present.
 	if body.SvgDrawing != nil && *body.SvgDrawing != "" {
 		if !isSVGWellFormed(*body.SvgDrawing) {
 			http.Error(w, "SVG markup is malformed", http.StatusBadRequest)
@@ -180,7 +131,7 @@ func (h *PagesAPIHandler) saveDrawing(w http.ResponseWriter, r *http.Request, bo
 		}
 	}
 
-	if err := h.Store.UpsertDrawing(bookID, pageHash, body.SvgDrawing); err != nil {
+	if err := h.Store.UpsertPageDrawing(pageID, body.SvgDrawing); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -192,7 +143,8 @@ var validStatuses = map[string]bool{
 	"unread": true, "reading": true, "read": true, "skip": true,
 }
 
-func (h *PagesAPIHandler) saveStatus(w http.ResponseWriter, r *http.Request, bookID, pageHash string) {
+// saveStatus handles PUT /api/pages/{pageID}/status.
+func (h *PagesAPIHandler) saveStatus(w http.ResponseWriter, r *http.Request, pageID int) {
 	var body struct {
 		Status string `json:"status"`
 	}
@@ -205,27 +157,37 @@ func (h *PagesAPIHandler) saveStatus(w http.ResponseWriter, r *http.Request, boo
 		return
 	}
 
-	book, err := h.Store.GetBook(bookID)
-	if err != nil || book == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Verify that the pageHash is valid for this book.
-	pageNum, err := h.verifyPageHashExists(bookID, pageHash)
+	page, err := h.Store.GetPage(pageID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if pageNum == -1 {
-		http.Error(w, "page not found", http.StatusNotFound)
+	if page == nil {
+		http.NotFound(w, r)
 		return
 	}
 
-	if err := h.Store.UpsertPageStatus(bookID, pageHash, body.Status); err != nil {
+	if err := h.Store.UpsertPageStatus(pageID, body.Status); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// isSVGWellFormed performs a basic sanity check on SVG markup.
+// Full validation is handled by the browser; this is a lightweight guard.
+func isSVGWellFormed(svg string) bool {
+	if svg == "" {
+		return true
+	}
+	openG := regexp.MustCompile(`<g[^>]*>`).FindAllString(svg, -1)
+	closeG := regexp.MustCompile(`</g>`).FindAllString(svg, -1)
+	if len(openG) != len(closeG) {
+		return false
+	}
+	if regexp.MustCompile(`(javascript|onerror|onload|onclick)`).MatchString(svg) {
+		return false
+	}
+	return true
 }

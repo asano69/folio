@@ -45,65 +45,38 @@ type Book struct {
 	MissingSince *string
 }
 
-// Image is the DB representation of a single scanned image inside a CBZ.
-type Image struct {
-	ID       int
-	BookID   string
-	Number   int
-	Filename string
-	Hash     string
+// Page is the DB representation of a single scanned image inside a CBZ.
+// ID is stable across re-scans: UpsertPages merges by hash then by position
+// rather than deleting and reinserting, so foreign keys from notes, page_status,
+// page_drawings, etc. remain valid after a scan.
+type Page struct {
+	ID        int
+	BookID    string
+	Number    int
+	Filename  string
+	Hash      string
+	Title     string
+	Attribute string
 }
 
-// Note holds user-authored metadata for a single image.
-// ID is the integer primary key, used as a stable reference for note_tags.
-// SvgDrawing holds raw SVG markup; nil when no drawing has been saved.
-// PageHash is the SHA-256 of the image's uncompressed bytes, which
-// remains stable across re-scans and CBZ image deletions.
-type Note struct {
-	ID         int
-	BookID     string
-	PageHash   string
-	Title      string
-	Attribute  string
-	Body       string
-	SvgDrawing *string
-	UpdatedAt  string
-}
-
-// TocEntry is a single entry in the table of contents derived from section-attributed images.
+// TocEntry is a single entry in the table of contents.
 type TocEntry struct {
 	PageNum int
 	Title   string
 }
 
-// GetTOC returns all section-attributed images for a book, ordered by page number.
-func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
-	rows, err := s.db.Query(`
-		SELECT p.number, n.title
-		FROM pages p
-		JOIN notes n ON n.book_id = p.book_id AND n.page_hash = p.hash
-		WHERE p.book_id = ? AND n.attribute = 'section'
-		ORDER BY p.number
-	`, bookID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var entries []TocEntry
-	for rows.Next() {
-		var e TocEntry
-		if err := rows.Scan(&e.PageNum, &e.Title); err != nil {
-			return nil, err
-		}
-		entries = append(entries, e)
-	}
-	return entries, rows.Err()
+// Collection is the DB representation of a user-defined book list.
+type Collection struct {
+	ID        int
+	Title     string
+	BookCount int
 }
 
+// ── Books ──────────────────────────────────────────────────────
+
 // UpsertBook inserts a new book or updates its title, source, file_mtime, and
-// clears missing_since if it already exists. Status is intentionally excluded
-// from the UPDATE so that user-set status is preserved across re-scans.
+// clears missing_since. Status is excluded from the UPDATE so user-set values
+// are preserved across re-scans.
 func (s *Store) UpsertBook(b storage.Book) error {
 	_, err := s.db.Exec(`
 		INSERT INTO books (id, title, source, file_mtime)
@@ -118,71 +91,13 @@ func (s *Store) UpsertBook(b storage.Book) error {
 }
 
 // MarkBookMissing sets missing_since to the current time for a book whose
-// CBZ file was not found during a scan. It is a no-op if missing_since is
-// already set, so the original disappearance time is preserved across scans.
+// CBZ was not found during a scan. It is a no-op if missing_since is already
+// set, preserving the original disappearance timestamp across repeated scans.
 func (s *Store) MarkBookMissing(id string) error {
 	_, err := s.db.Exec(`
 		UPDATE books SET missing_since = CURRENT_TIMESTAMP
 		WHERE id = ? AND missing_since IS NULL
 	`, id)
-	return err
-}
-
-// UpsertImages replaces all image records for a book, then rebuilds the sections
-// table so that start_page values stay correct if page numbers have shifted.
-func (s *Store) UpsertImages(bookID string, entries []storage.ImageEntry) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.Exec(`DELETE FROM pages WHERE book_id = ?`, bookID); err != nil {
-		return err
-	}
-
-	for _, e := range entries {
-		if _, err := tx.Exec(`
-			INSERT INTO pages (book_id, number, filename, hash)
-			VALUES (?, ?, ?, ?)
-		`, bookID, e.Number, e.Filename, e.Hash); err != nil {
-			return err
-		}
-	}
-
-	if err := rebuildSections(tx, bookID); err != nil {
-		return err
-	}
-
-	return tx.Commit()
-}
-
-// rebuildSections re-derives the sections table from notes where attribute = 'section'.
-// Sections whose source image no longer exists are removed. Existing section status
-// values are preserved via ON CONFLICT DO UPDATE (only title is overwritten).
-func rebuildSections(tx *sql.Tx, bookID string) error {
-	_, err := tx.Exec(`
-		DELETE FROM sections
-		WHERE book_id = ?
-		  AND start_page NOT IN (
-		      SELECT p.number
-		      FROM notes n
-		      JOIN pages p ON p.book_id = n.book_id AND p.hash = n.page_hash
-		      WHERE n.book_id = ? AND n.attribute = 'section'
-		  )
-	`, bookID, bookID)
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.Exec(`
-		INSERT INTO sections (book_id, title, start_page)
-		SELECT n.book_id, n.title, p.number
-		FROM notes n
-		JOIN pages p ON p.book_id = n.book_id AND p.hash = n.page_hash
-		WHERE n.book_id = ? AND n.attribute = 'section'
-		ON CONFLICT(book_id, start_page) DO UPDATE SET title = excluded.title
-	`, bookID)
 	return err
 }
 
@@ -196,8 +111,7 @@ func (s *Store) UpdateBookTitle(id, title string) error {
 func (s *Store) ListBooks() ([]Book, error) {
 	rows, err := s.db.Query(`
 		SELECT id, title, source, status, file_mtime, missing_since
-		FROM books
-		ORDER BY title
+		FROM books ORDER BY title
 	`)
 	if err != nil {
 		return nil, err
@@ -216,8 +130,7 @@ func (s *Store) ListBooks() ([]Book, error) {
 }
 
 // ListBooksUnderPath returns books whose source path is under the given
-// directory. Used by partial scans to restrict missing-book detection to
-// the scanned subtree only.
+// directory. Used by partial scans to restrict missing-book detection.
 func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
 	rows, err := s.db.Query(
 		`SELECT id, title, source, status, file_mtime, missing_since
@@ -252,152 +165,386 @@ func (s *Store) GetBook(id string) (*Book, error) {
 	return &b, err
 }
 
-// ListImages returns all images for a book ordered by number.
-func (s *Store) ListImages(bookID string) ([]Image, error) {
-	rows, err := s.db.Query(`
-		SELECT id, book_id, number, filename, hash
-		FROM pages
-		WHERE book_id = ?
-		ORDER BY number
-	`, bookID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var images []Image
-	for rows.Next() {
-		var img Image
-		if err := rows.Scan(&img.ID, &img.BookID, &img.Number, &img.Filename, &img.Hash); err != nil {
-			return nil, err
-		}
-		images = append(images, img)
-	}
-	return images, rows.Err()
-}
-
-// GetCoverImage returns the first image of a book, or nil if none exists.
-func (s *Store) GetCoverImage(bookID string) (*Image, error) {
-	var img Image
-	err := s.db.QueryRow(`
-		SELECT id, book_id, number, filename, hash
-		FROM pages
-		WHERE book_id = ?
-		ORDER BY number
-		LIMIT 1
-	`, bookID).Scan(&img.ID, &img.BookID, &img.Number, &img.Filename, &img.Hash)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	return &img, err
-}
-
-// GetNote returns the note for an image identified by its hash, or a zero-value
-// Note if none exists.
-func (s *Store) GetNote(bookID, pageHash string) (Note, error) {
-	var n Note
-	err := s.db.QueryRow(`
-		SELECT id, book_id, page_hash, title, attribute, body, svg_drawing, updated_at
-		FROM notes
-		WHERE book_id = ? AND page_hash = ?
-	`, bookID, pageHash).Scan(
-		&n.ID, &n.BookID, &n.PageHash,
-		&n.Title, &n.Attribute, &n.Body,
-		&n.SvgDrawing, &n.UpdatedAt,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Note{BookID: bookID, PageHash: pageHash}, nil
-	}
+// CountAllBooks returns the number of non-missing books in the library.
+func (s *Store) CountAllBooks() (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM books WHERE missing_since IS NULL`).Scan(&n)
 	return n, err
 }
 
-// UpsertNote inserts or updates the text fields of an image note (title, attribute,
-// body), then synchronises the sections table. svg_drawing is intentionally
-// excluded so that saving text annotations never clobbers an existing drawing.
-// Use UpsertDrawing to update the SVG drawing independently.
-func (s *Store) UpsertNote(n Note) error {
+// ── Pages ──────────────────────────────────────────────────────
+
+// UpsertPages merges the scanned image list into the pages table while
+// preserving stable page IDs. The merge runs in two passes:
+//
+//  1. Match by hash (content identity): a page that moved to a different
+//     position keeps its ID because its image content is unchanged.
+//  2. Match remaining entries by position: a page whose content was replaced
+//     in-place keeps its ID; only its hash (and filename) is updated.
+//
+// Pages with no match are inserted as new rows.
+// Existing pages with no match are deleted; ON DELETE CASCADE propagates to
+// notes, page_status, page_drawings, page_tags, and page_thumbnails.
+//
+// Because sections reference pages by the stable pages.id FK, no section
+// rebuild is required after this operation.
+func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec(`
-		INSERT INTO notes (book_id, page_hash, title, attribute, body, updated_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(book_id, page_hash) DO UPDATE SET
-			title      = excluded.title,
-			attribute  = excluded.attribute,
-			body       = excluded.body,
-			updated_at = CURRENT_TIMESTAMP
-	`, n.BookID, n.PageHash, n.Title, n.Attribute, n.Body)
+	// Load existing pages for this book.
+	rows, err := tx.Query(
+		`SELECT id, number, hash FROM pages WHERE book_id = ? ORDER BY number`, bookID,
+	)
 	if err != nil {
 		return err
 	}
+	type existingPage struct {
+		id, number int
+		hash       string
+	}
+	var existing []existingPage
+	for rows.Next() {
+		var p existingPage
+		if err := rows.Scan(&p.id, &p.number, &p.hash); err != nil {
+			rows.Close()
+			return err
+		}
+		existing = append(existing, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
 
-	if err := syncSection(tx, n.BookID, n.PageHash, n.Attribute, n.Title); err != nil {
+	usedExisting := make([]bool, len(existing))
+	usedNew := make([]bool, len(entries))
+	// existingPage.id -> index into entries
+	matches := make(map[int]int, len(existing))
+
+	// Pass 1: match by hash (stable identity despite position change).
+	for newIdx, entry := range entries {
+		if entry.Hash == "" {
+			continue
+		}
+		for exIdx, ex := range existing {
+			if !usedExisting[exIdx] && ex.hash == entry.Hash {
+				matches[ex.id] = newIdx
+				usedExisting[exIdx] = true
+				usedNew[newIdx] = true
+				break
+			}
+		}
+	}
+
+	// Pass 2: match remaining entries by position (content replaced in-place).
+	for newIdx, entry := range entries {
+		if usedNew[newIdx] {
+			continue
+		}
+		for exIdx, ex := range existing {
+			if !usedExisting[exIdx] && ex.number == entry.Number {
+				matches[ex.id] = newIdx
+				usedExisting[exIdx] = true
+				usedNew[newIdx] = true
+				break
+			}
+		}
+	}
+
+	// Update matched pages: number, filename, or hash may have changed.
+	for exID, newIdx := range matches {
+		entry := entries[newIdx]
+		if _, err := tx.Exec(
+			`UPDATE pages SET number = ?, filename = ?, hash = ? WHERE id = ?`,
+			entry.Number, entry.Filename, entry.Hash, exID,
+		); err != nil {
+			return err
+		}
+	}
+
+	// Insert truly new pages (no existing page matched by hash or position).
+	for newIdx, entry := range entries {
+		if usedNew[newIdx] {
+			continue
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO pages (book_id, number, filename, hash) VALUES (?, ?, ?, ?)`,
+			bookID, entry.Number, entry.Filename, entry.Hash,
+		); err != nil {
+			return err
+		}
+	}
+
+	// Delete unmatched existing pages. ON DELETE CASCADE handles dependent rows.
+	for exIdx, ex := range existing {
+		if usedExisting[exIdx] {
+			continue
+		}
+		if _, err := tx.Exec(`DELETE FROM pages WHERE id = ?`, ex.id); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// ListPages returns all pages for a book ordered by number.
+func (s *Store) ListPages(bookID string) ([]Page, error) {
+	rows, err := s.db.Query(`
+		SELECT id, book_id, number, filename, hash, title, attribute
+		FROM pages WHERE book_id = ? ORDER BY number
+	`, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var pages []Page
+	for rows.Next() {
+		var p Page
+		if err := rows.Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash, &p.Title, &p.Attribute); err != nil {
+			return nil, err
+		}
+		pages = append(pages, p)
+	}
+	return pages, rows.Err()
+}
+
+// GetPage returns a single page by its stable ID, or nil if not found.
+func (s *Store) GetPage(pageID int) (*Page, error) {
+	var p Page
+	err := s.db.QueryRow(`
+		SELECT id, book_id, number, filename, hash, title, attribute
+		FROM pages WHERE id = ?
+	`, pageID).Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash, &p.Title, &p.Attribute)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return &p, err
+}
+
+// GetCoverPage returns the first page of a book, or nil if none exists.
+func (s *Store) GetCoverPage(bookID string) (*Page, error) {
+	var p Page
+	err := s.db.QueryRow(`
+		SELECT id, book_id, number, filename, hash, title, attribute
+		FROM pages WHERE book_id = ? ORDER BY number LIMIT 1
+	`, bookID).Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash, &p.Title, &p.Attribute)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return &p, err
+}
+
+// HasPages reports whether any pages are registered for the given book.
+func (s *Store) HasPages(bookID string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&count)
+	return count > 0, err
+}
+
+// CountPages returns the total number of pages registered for a book.
+func (s *Store) CountPages(bookID string) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&n)
+	return n, err
+}
+
+// ── Page annotations (title, attribute) and notes (body) ──────
+
+// UpsertPageEdit updates a page's title and attribute (stored on the pages row)
+// and upserts the note body (stored in the unified notes table) in a single
+// transaction. It also keeps the sections table in sync when the attribute
+// changes to or from 'section'.
+func (s *Store) UpsertPageEdit(pageID int, title, attribute, body string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Resolve book_id for the section sync call.
+	var bookID string
+	if err := tx.QueryRow(`SELECT book_id FROM pages WHERE id = ?`, pageID).Scan(&bookID); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(
+		`UPDATE pages SET title = ?, attribute = ? WHERE id = ?`, title, attribute, pageID,
+	); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`
+		INSERT INTO notes (page_id, body, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(page_id) DO UPDATE SET
+			body       = excluded.body,
+			updated_at = CURRENT_TIMESTAMP
+	`, pageID, body); err != nil {
+		return err
+	}
+
+	if err := syncSection(tx, pageID, bookID, attribute, title); err != nil {
 		return err
 	}
 
 	return tx.Commit()
 }
 
-// UpsertDrawing inserts or updates only the svg_drawing field of an image note.
-// Passing nil clears an existing drawing. Text fields (title, attribute, body)
-// are not touched.
-func (s *Store) UpsertDrawing(bookID, pageHash string, svg *string) error {
-	_, err := s.db.Exec(`
-		INSERT INTO notes (book_id, page_hash, svg_drawing, updated_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(book_id, page_hash) DO UPDATE SET
-			svg_drawing = excluded.svg_drawing,
-			updated_at  = CURRENT_TIMESTAMP
-	`, bookID, pageHash, svg)
-	return err
+// GetPageNote returns the note body for a page, or an empty string if none exists.
+func (s *Store) GetPageNote(pageID int) (string, error) {
+	var body string
+	err := s.db.QueryRow(`SELECT body FROM notes WHERE page_id = ?`, pageID).Scan(&body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return body, err
 }
 
-// syncSection keeps the sections table in sync with notes where attribute = 'section'.
-// Called within a transaction whenever a note is saved.
-// If the image hash cannot be resolved to a page number the sync is skipped silently.
-func syncSection(tx *sql.Tx, bookID, pageHash, attribute, title string) error {
-	var pageNum int
-	err := tx.QueryRow(
-		`SELECT number FROM pages WHERE book_id = ? AND hash = ?`, bookID, pageHash,
-	).Scan(&pageNum)
+// ── Page drawings ──────────────────────────────────────────────
+
+// GetPageDrawing returns the SVG markup for a page's drawing, or an empty
+// string if no drawing has been saved.
+func (s *Store) GetPageDrawing(pageID int) (string, error) {
+	var svg string
+	err := s.db.QueryRow(`SELECT svg FROM page_drawings WHERE page_id = ?`, pageID).Scan(&svg)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil
+		return "", nil
 	}
-	if err != nil {
+	return svg, err
+}
+
+// UpsertPageDrawing saves or replaces an SVG drawing for a page.
+// Passing nil removes any existing drawing.
+func (s *Store) UpsertPageDrawing(pageID int, svg *string) error {
+	if svg == nil {
+		_, err := s.db.Exec(`DELETE FROM page_drawings WHERE page_id = ?`, pageID)
 		return err
 	}
-
-	if attribute == AttrSection {
-		_, err = tx.Exec(`
-			INSERT INTO sections (book_id, title, start_page)
-			VALUES (?, ?, ?)
-			ON CONFLICT(book_id, start_page) DO UPDATE SET title = excluded.title
-		`, bookID, title, pageNum)
-	} else {
-		_, err = tx.Exec(
-			`DELETE FROM sections WHERE book_id = ? AND start_page = ?`, bookID, pageNum,
-		)
-	}
+	_, err := s.db.Exec(`
+		INSERT INTO page_drawings (page_id, svg, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(page_id) DO UPDATE SET
+			svg        = excluded.svg,
+			updated_at = CURRENT_TIMESTAMP
+	`, pageID, *svg)
 	return err
 }
 
-// HasImages reports whether any images are registered for the given book.
-func (s *Store) HasImages(bookID string) (bool, error) {
-	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&count)
-	return count > 0, err
+// ── Page status ────────────────────────────────────────────────
+
+// ListPageStatuses returns a map of pageID -> status for all pages in a book
+// that have an explicit status record. Pages with no record are absent from
+// the map and should be treated as 'unread'.
+func (s *Store) ListPageStatuses(bookID string) (map[int]string, error) {
+	rows, err := s.db.Query(`
+		SELECT ps.page_id, ps.status
+		FROM page_status ps
+		JOIN pages p ON p.id = ps.page_id
+		WHERE p.book_id = ?
+	`, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	m := make(map[int]string)
+	for rows.Next() {
+		var pageID int
+		var status string
+		if err := rows.Scan(&pageID, &status); err != nil {
+			return nil, err
+		}
+		m[pageID] = status
+	}
+	return m, rows.Err()
 }
 
-// Collection is the DB representation of a user-defined book list.
-type Collection struct {
-	ID        int
-	Title     string
-	BookCount int
+// UpsertPageStatus sets the read status for a page by its stable ID.
+func (s *Store) UpsertPageStatus(pageID int, status string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO page_status (page_id, status, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(page_id) DO UPDATE SET
+			status     = excluded.status,
+			updated_at = CURRENT_TIMESTAMP
+	`, pageID, status)
+	return err
 }
+
+// ── Sections ───────────────────────────────────────────────────
+
+// GetTOC returns all section entries for a book ordered by page number.
+// Each section references the page it starts on via the stable start_page_id FK.
+func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
+	rows, err := s.db.Query(`
+		SELECT p.number, s.title
+		FROM sections s
+		JOIN pages p ON p.id = s.start_page_id
+		WHERE s.book_id = ?
+		ORDER BY p.number
+	`, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []TocEntry
+	for rows.Next() {
+		var e TocEntry
+		if err := rows.Scan(&e.PageNum, &e.Title); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+// syncSection keeps the sections table in sync whenever a page's attribute is
+// saved. Must be called inside an open transaction.
+func syncSection(tx *sql.Tx, pageID int, bookID, attribute, title string) error {
+	if attribute == AttrSection {
+		_, err := tx.Exec(`
+			INSERT INTO sections (book_id, start_page_id, title)
+			VALUES (?, ?, ?)
+			ON CONFLICT(book_id, start_page_id) DO UPDATE SET title = excluded.title
+		`, bookID, pageID, title)
+		return err
+	}
+	_, err := tx.Exec(`DELETE FROM sections WHERE start_page_id = ?`, pageID)
+	return err
+}
+
+// ── Book notes ─────────────────────────────────────────────────
+
+// GetBookNote returns the memo body for a book, or an empty string if none exists.
+func (s *Store) GetBookNote(bookID string) (string, error) {
+	var body string
+	err := s.db.QueryRow(`SELECT body FROM notes WHERE book_id = ?`, bookID).Scan(&body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return body, err
+}
+
+// UpsertBookNote inserts or updates the memo for a book.
+func (s *Store) UpsertBookNote(bookID, body string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO notes (book_id, body, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(book_id) DO UPDATE SET
+			body       = excluded.body,
+			updated_at = CURRENT_TIMESTAMP
+	`, bookID, body)
+	return err
+}
+
+// ── Collections ────────────────────────────────────────────────
 
 // ListCollections returns all collections ordered by title, with book counts.
 func (s *Store) ListCollections() ([]Collection, error) {
@@ -440,24 +587,14 @@ func (s *Store) RenameCollection(id int, title string) error {
 }
 
 // DeleteCollection removes a collection and all its book memberships.
+// ON DELETE CASCADE handles collection_books, collection_tags, and collection notes.
 func (s *Store) DeleteCollection(id int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.Exec(`DELETE FROM collection_books WHERE collection_id = ?`, id); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`DELETE FROM collections WHERE id = ?`, id); err != nil {
-		return err
-	}
-	return tx.Commit()
+	_, err := s.db.Exec(`DELETE FROM collections WHERE id = ?`, id)
+	return err
 }
 
 // AddBookToCollection adds a book to a collection.
-// Reports whether the book was newly added (false means it was already a member).
+// Returns whether the book was newly added (false means it was already a member).
 func (s *Store) AddBookToCollection(collectionID int, bookID string) (added bool, err error) {
 	res, err := s.db.Exec(`
 		INSERT OR IGNORE INTO collection_books (collection_id, book_id) VALUES (?, ?)
@@ -502,103 +639,6 @@ func (s *Store) ListBooksInCollection(collectionID int) ([]Book, error) {
 	return books, rows.Err()
 }
 
-// CountAllBooks returns the number of non-missing books in the library.
-func (s *Store) CountAllBooks() (int, error) {
-	var n int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM books WHERE missing_since IS NULL`).Scan(&n)
-	return n, err
-}
-
-// ListNotesByBook returns all notes for a book keyed by image hash.
-// Used to avoid N+1 queries when rendering an image grid.
-func (s *Store) ListNotesByBook(bookID string) (map[string]Note, error) {
-	rows, err := s.db.Query(`
-		SELECT id, book_id, page_hash, title, attribute, body, svg_drawing, updated_at
-		FROM notes WHERE book_id = ?
-	`, bookID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	notes := make(map[string]Note)
-	for rows.Next() {
-		var n Note
-		if err := rows.Scan(
-			&n.ID, &n.BookID, &n.PageHash,
-			&n.Title, &n.Attribute, &n.Body,
-			&n.SvgDrawing, &n.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		notes[n.PageHash] = n
-	}
-	return notes, rows.Err()
-}
-
-// CountPages returns the total number of pages registered for a book.
-func (s *Store) CountPages(bookID string) (int, error) {
-	var n int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&n)
-	return n, err
-}
-
-// GetBookNote returns the memo body for a book, or an empty string if none exists.
-func (s *Store) GetBookNote(bookID string) (string, error) {
-	var body string
-	err := s.db.QueryRow(`SELECT body FROM book_notes WHERE book_id = ?`, bookID).Scan(&body)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	return body, err
-}
-
-// UpsertBookNote inserts or updates the memo for a book.
-func (s *Store) UpsertBookNote(bookID, body string) error {
-	_, err := s.db.Exec(`
-		INSERT INTO book_notes (book_id, body, updated_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(book_id) DO UPDATE SET
-			body       = excluded.body,
-			updated_at = CURRENT_TIMESTAMP
-	`, bookID, body)
-	return err
-}
-
-// ListPageStatuses returns a map of page_hash -> status for all pages in a book
-// that have an explicit status record. Pages with no record are absent from the map.
-func (s *Store) ListPageStatuses(bookID string) (map[string]string, error) {
-	rows, err := s.db.Query(
-		`SELECT page_hash, status FROM page_status WHERE book_id = ?`, bookID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	m := make(map[string]string)
-	for rows.Next() {
-		var hash, status string
-		if err := rows.Scan(&hash, &status); err != nil {
-			return nil, err
-		}
-		m[hash] = status
-	}
-	return m, rows.Err()
-}
-
-// UpsertPageStatus sets the read status for a page identified by its content hash.
-func (s *Store) UpsertPageStatus(bookID, pageHash, status string) error {
-	_, err := s.db.Exec(`
-		INSERT INTO page_status (book_id, page_hash, status, updated_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(book_id, page_hash) DO UPDATE SET
-			status     = excluded.status,
-			updated_at = CURRENT_TIMESTAMP
-	`, bookID, pageHash, status)
-	return err
-}
-
 // ListUncategorizedBooks returns non-missing books that do not belong to any
 // collection, ordered by title.
 func (s *Store) ListUncategorizedBooks() ([]Book, error) {
@@ -639,18 +679,4 @@ func (s *Store) CountUncategorizedBooks() (int, error) {
 		  )
 	`).Scan(&n)
 	return n, err
-}
-
-// GetImageByHash returns the image matching the given hash, or nil if not found.
-func (s *Store) GetImageByHash(bookID, pageHash string) (*Image, error) {
-	var img Image
-	err := s.db.QueryRow(`
-		SELECT id, book_id, number, filename, hash
-		FROM pages
-		WHERE book_id = ? AND hash = ?
-	`, bookID, pageHash).Scan(&img.ID, &img.BookID, &img.Number, &img.Filename, &img.Hash)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	return &img, err
 }
