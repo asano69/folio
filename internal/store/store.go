@@ -104,12 +104,6 @@ CREATE TABLE IF NOT EXISTS page_ocr (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Book-level JPEG thumbnail.
-CREATE TABLE IF NOT EXISTS thumbnails (
-    book_id    TEXT PRIMARY KEY REFERENCES books(id),
-    data       BLOB NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
 
 -- Tags scoped per entity type; not shared across scopes.
 -- color is stored as a CSS hex string e.g. '#ff0000'.
