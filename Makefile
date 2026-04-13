@@ -48,6 +48,11 @@ build:
 watch:
 	air
 
+
+.PHONY: typecheck
+typecheck:
+	cd src && tsc --noEmit
+
 # ─────────────────────────────────────────
 # Docker
 # ─────────────────────────────────────────

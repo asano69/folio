@@ -120,4 +120,4 @@ export function whenNoPaneOpen(ctx: KeyBindingContext): boolean {
   return !whenAnyPaneOpen(ctx);
 }
 
-export { KeyBinding, KeyBindingContext };
+export type { KeyBinding, KeyBindingContext };
