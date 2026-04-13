@@ -19,7 +19,7 @@
             {{end}}
             {{else}}
             <div class="toc-empty">
-                No sections yet. Use the Edit pane to mark pages with "Section" attribute to build a table of contents.
+                No sections yet. Use the Edit pane to mark a page as a section start.
             </div>
             {{end}}
         </nav>
@@ -36,21 +36,22 @@
         </div>
         <div class="edit-pane-body pane-body">
             <div class="edit-field">
-                <label for="edit-title">Title</label>
-                <input type="text" id="edit-title" value="{{.CurrentPage.Title}}" placeholder="Page title">
-            </div>
-            <div class="edit-field">
-                <label for="edit-attribute">Attribute</label>
-                <select id="edit-attribute">
-                    <option value="">— none —</option>
-                    {{range .Attributes}}
-                    <option value="{{.Value}}" {{if eq .Value $.CurrentPage.Attribute}}selected{{end}}>{{.Label}}</option>
-                    {{end}}
-                </select>
+                <label for="edit-note-title">Note Title</label>
+                <input type="text" id="edit-note-title" value="{{.NoteTitle}}" placeholder="Note title">
             </div>
             <div class="edit-field">
                 <label for="edit-body">Comment</label>
                 <textarea id="edit-body" rows="8" placeholder="Notes for this page...">{{.NoteBody}}</textarea>
+            </div>
+            <div class="edit-field edit-field--section-toggle">
+                <label>
+                    <input type="checkbox" id="edit-section-toggle" {{if .IsSection}}checked{{end}}>
+                    Section start
+                </label>
+            </div>
+            <div class="edit-field" id="edit-section-title-field" {{if not .IsSection}}hidden{{end}}>
+                <label for="edit-section-title">Section Title</label>
+                <input type="text" id="edit-section-title" value="{{.SectionTitle}}" placeholder="Section title">
             </div>
             <div class="edit-actions">
                 <button id="edit-save">Save</button>

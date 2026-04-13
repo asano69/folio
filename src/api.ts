@@ -4,7 +4,7 @@
 // responses so callers get consistent error objects without repeating the
 // res.ok check everywhere.
 
-import type { PageEditPayload } from './types';
+import type { PageNotePayload, PageSectionPayload } from './types';
 
 async function request(url: string, options?: RequestInit): Promise<Response> {
   const res = await fetch(url, options);
@@ -41,8 +41,16 @@ export async function saveBookNote(bookId: string, body: string): Promise<void> 
 // (bookID, pageHash) pair. The ID is embedded in the template as data-page-id
 // and remains valid across re-scans and CBZ modifications.
 
-export async function savePageEdit(pageId: number, payload: PageEditPayload): Promise<void> {
-  await request(`/api/pages/${pageId}`, {
+export async function savePageNote(pageId: number, payload: PageNotePayload): Promise<void> {
+  await request(`/api/pages/${pageId}/note`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function savePageSection(pageId: number, payload: PageSectionPayload): Promise<void> {
+  await request(`/api/pages/${pageId}/section`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

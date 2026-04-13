@@ -33,43 +33,29 @@ CREATE TABLE IF NOT EXISTS books (
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- pages.id is stable across re-scans. UpsertPages uses a merge algorithm
--- (hash-first, then position) to preserve IDs even when the CBZ changes.
--- title and attribute are page-level metadata edited by the user.
+-- pages holds scan-derived data only. User-editable data (note title,
+-- note body, section marking) lives in separate tables keyed by pages.id,
+-- which is stable across re-scans thanks to the merge algorithm in UpsertPages.
 CREATE TABLE IF NOT EXISTS pages (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id    TEXT    NOT NULL REFERENCES books(id),
     number     INTEGER NOT NULL,
     filename   TEXT    NOT NULL,
     hash       TEXT    NOT NULL DEFAULT '',
-    title      TEXT    NOT NULL DEFAULT '',
-    attribute  TEXT    NOT NULL DEFAULT '',
     UNIQUE(book_id, number)
-);
-
--- ── Per-book derived structure ─────────────────────────────────
-
--- Sections reference pages by stable pages.id so they survive re-scans.
-CREATE TABLE IF NOT EXISTS sections (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id       TEXT    NOT NULL REFERENCES books(id),
-    start_page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
-    title         TEXT    NOT NULL DEFAULT '',
-    status        TEXT    NOT NULL DEFAULT 'unread'
-                  CHECK(status IN ('unread','reading','read','skip')),
-    UNIQUE(book_id, start_page_id)
 );
 
 -- ── Per-page annotations ───────────────────────────────────────
 
--- One text note per page.
+-- One text note per page. Absence of a row means no note has been written.
 CREATE TABLE IF NOT EXISTS page_notes (
     page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
+    title      TEXT    NOT NULL DEFAULT '',
     body       TEXT    NOT NULL DEFAULT '',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- SVG annotation drawing per page; absence of a row means no drawing.
+-- SVG annotation drawing per page. Absence of a row means no drawing exists.
 CREATE TABLE IF NOT EXISTS page_drawings (
     page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
     svg        TEXT    NOT NULL,
@@ -91,6 +77,17 @@ CREATE TABLE IF NOT EXISTS page_ocr (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Marks a page as the start of a named section.
+-- Absence of a row means the page is not a section start.
+-- The section title is independent from the page note title.
+CREATE TABLE IF NOT EXISTS page_sections (
+    page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
+    title      TEXT    NOT NULL DEFAULT '',
+    status     TEXT    NOT NULL DEFAULT 'unread'
+               CHECK(status IN ('unread','reading','read','skip')),
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ── Per-book annotations ───────────────────────────────────────
 
 -- One memo per book.
@@ -101,11 +98,6 @@ CREATE TABLE IF NOT EXISTS book_notes (
 );
 
 -- ── Collections ────────────────────────────────────────────────
---
--- Collections serve as named, colored groups for organizing entities.
--- Tags and collections were previously separate concepts but are unified
--- here: both are named groups with optional color, differing only in
--- the entity type they group.
 
 -- Named groups of books (used for sidebar navigation and filtering).
 CREATE TABLE IF NOT EXISTS book_collections (
@@ -142,7 +134,7 @@ CREATE TABLE IF NOT EXISTS page_collection_members (
 -- ── Indexes ────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_pages_book                   ON pages(book_id);
-CREATE INDEX IF NOT EXISTS idx_sections_book                ON sections(book_id);
+CREATE INDEX IF NOT EXISTS idx_page_sections_book           ON page_sections(page_id);
 CREATE INDEX IF NOT EXISTS idx_book_collection_members_book ON book_collection_members(book_id);
 CREATE INDEX IF NOT EXISTS idx_page_collection_members_page ON page_collection_members(page_id);
 `

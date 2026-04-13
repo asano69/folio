@@ -12,7 +12,8 @@ import (
 
 // PagesAPIHandler handles:
 //
-//	PUT /api/pages/{pageID}          — save title, attribute, and note body
+//	PUT /api/pages/{pageID}/note     — save note title and body
+//	PUT /api/pages/{pageID}/section  — mark or unmark a page as a section start
 //	PUT /api/pages/{pageID}/drawing  — save or clear SVG drawing
 //	PUT /api/pages/{pageID}/status   — update read status
 //
@@ -55,17 +56,37 @@ func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// PUT /api/pages/{pageID}
-	pageID, err := parsePageID(path)
-	if err != nil {
-		http.Error(w, "invalid page ID", http.StatusBadRequest)
+	// PUT /api/pages/{pageID}/note
+	if strings.HasSuffix(path, "/note") {
+		pageID, err := parsePageID(strings.TrimSuffix(path, "/note"))
+		if err != nil {
+			http.Error(w, "invalid page ID", http.StatusBadRequest)
+			return
+		}
+		if r.Method != http.MethodPut {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		h.savePageNote(w, r, pageID)
 		return
 	}
-	if r.Method != http.MethodPut {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	// PUT /api/pages/{pageID}/section
+	if strings.HasSuffix(path, "/section") {
+		pageID, err := parsePageID(strings.TrimSuffix(path, "/section"))
+		if err != nil {
+			http.Error(w, "invalid page ID", http.StatusBadRequest)
+			return
+		}
+		if r.Method != http.MethodPut {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		h.savePageSection(w, r, pageID)
 		return
 	}
-	h.savePageEdit(w, r, pageID)
+
+	http.Error(w, "not found", http.StatusNotFound)
 }
 
 // parsePageID strips surrounding slashes and converts the segment to int.
@@ -73,13 +94,12 @@ func parsePageID(s string) (int, error) {
 	return strconv.Atoi(strings.Trim(s, "/"))
 }
 
-// savePageEdit handles PUT /api/pages/{pageID}.
-// Updates title and attribute on the pages row and upserts the note body.
-func (h *PagesAPIHandler) savePageEdit(w http.ResponseWriter, r *http.Request, pageID int) {
+// savePageNote handles PUT /api/pages/{pageID}/note.
+// Updates the note title and body for a page.
+func (h *PagesAPIHandler) savePageNote(w http.ResponseWriter, r *http.Request, pageID int) {
 	var body struct {
-		Title     string `json:"title"`
-		Attribute string `json:"attribute"`
-		Body      string `json:"body"`
+		Title string `json:"title"`
+		Body  string `json:"body"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -96,9 +116,47 @@ func (h *PagesAPIHandler) savePageEdit(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
-	if err := h.Store.UpsertPageEdit(pageID, strings.TrimSpace(body.Title), body.Attribute, body.Body); err != nil {
+	if err := h.Store.UpsertPageNote(pageID, strings.TrimSpace(body.Title), body.Body); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// savePageSection handles PUT /api/pages/{pageID}/section.
+// When enabled is true, the page is marked as a section start with the given
+// title. When enabled is false, the section marking is removed.
+func (h *PagesAPIHandler) savePageSection(w http.ResponseWriter, r *http.Request, pageID int) {
+	var body struct {
+		Title   string `json:"title"`
+		Enabled bool   `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	page, err := h.Store.GetPage(pageID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if page == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if body.Enabled {
+		if err := h.Store.UpsertPageSection(pageID, strings.TrimSpace(body.Title)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		if err := h.Store.DeletePageSection(pageID); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)
