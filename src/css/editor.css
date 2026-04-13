@@ -7,30 +7,6 @@
   width: 50%;
 }
 
-/* ── Page metadata badges ─────────────────────────────────────── */
-.page-title-badge {
-  font-size: var(--font-size-md);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.page-attr-badge {
-  display: inline-block;
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  text-transform: capitalize;
-  background: var(--color-border);
-  color: var(--color-text-tertiary);
-}
-
-.attr-cover   { background: #ffd6d6; color: #900; }
-.attr-toc     { background: #d6e4ff; color: #004; }
-.attr-section { background: #d6ffd6; color: #040; }
-.attr-index   { background: #ffefd6; color: #640; }
-.attr-other   { background: #ede0ff; color: #408; }
-
 /* ── Pane body ────────────────────────────────────────────────── */
 .edit-pane-body {
   padding: var(--spacing-2xl) var(--spacing-3xl);
@@ -53,8 +29,7 @@
   color: var(--color-text-tertiary);
 }
 
-.edit-field input,
-.edit-field select,
+.edit-field input[type="text"],
 .edit-field textarea {
   padding: var(--spacing-md) var(--spacing-lg);
   border: 1px solid var(--color-border-medium);
@@ -64,8 +39,7 @@
   background: var(--color-surface-bg);
 }
 
-.edit-field input:focus,
-.edit-field select:focus,
+.edit-field input[type="text"]:focus,
 .edit-field textarea:focus {
   outline: none;
   border-color: var(--color-primary);
@@ -75,6 +49,24 @@
   resize: vertical;
   flex: 1;
   min-height: 8rem;
+}
+
+/* Section toggle row: checkbox + label on one line */
+.edit-field--section-toggle label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  cursor: pointer;
+  font-size: var(--font-size-md);
+  font-weight: normal;
+  color: var(--color-text-secondary);
+}
+
+.edit-field--section-toggle input[type="checkbox"] {
+  accent-color: var(--color-primary);
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
 }
 
 /* ── Actions ──────────────────────────────────────────────────── */

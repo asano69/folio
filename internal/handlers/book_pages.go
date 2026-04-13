@@ -26,7 +26,7 @@ type overviewItem struct {
 	Number    int
 	HasThumb  bool
 	NoteTitle string
-	Attribute string
+	IsSection bool
 	Status    string // always one of: unread, reading, read, skip
 }
 
@@ -84,8 +84,19 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Title and attribute come directly from the pages table; no separate
-	// notes query is needed for the overview grid.
+	// Note titles and section markers are fetched in bulk to avoid per-page queries.
+	noteTitles, err := h.Store.ListPageNoteTitlesByBook(bookID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	sectionPageIDs, err := h.Store.ListPageSectionPageIDsByBook(bookID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	items := make([]overviewItem, 0, len(pages))
 	for _, p := range pages {
 		status := statuses[p.ID]
@@ -96,8 +107,8 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 			ID:        p.ID,
 			Number:    p.Number,
 			HasThumb:  thumbSet[p.ID],
-			NoteTitle: p.Title,
-			Attribute: p.Attribute,
+			NoteTitle: noteTitles[p.ID],
+			IsSection: sectionPageIDs[p.ID],
 			Status:    status,
 		})
 	}
@@ -181,20 +192,32 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		currentPage = &pages[pageNum-1]
 	}
 
-	// Fetch the note body and SVG drawing independently; they are stored in
-	// separate tables to allow either to be updated without touching the other.
-	var noteBody string
-	var svgDrawing string
+	// Fetch note, drawing, and section info for the current page.
+	var noteTitle, noteBody, svgDrawing, sectionTitle string
+	var isSection bool
 	if currentPage != nil {
-		noteBody, err = h.Store.GetPageNote(currentPage.ID)
+		note, err := h.Store.GetPageNote(currentPage.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		noteTitle = note.Title
+		noteBody = note.Body
+
 		svgDrawing, err = h.Store.GetPageDrawing(currentPage.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+
+		section, err := h.Store.GetPageSection(currentPage.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if section != nil {
+			isSection = true
+			sectionTitle = section.Title
 		}
 	}
 
@@ -221,9 +244,11 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		TotalPages   int
 		HasPrev      bool
 		HasNext      bool
+		NoteTitle    string
 		NoteBody     string
 		SvgDrawing   string
-		Attributes   []store.AttributeOption
+		IsSection    bool
+		SectionTitle string
 		TOC          []store.TocEntry
 		ActiveTocIdx int
 	}{
@@ -234,9 +259,11 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		TotalPages:   totalPages,
 		HasPrev:      pageNum > 1,
 		HasNext:      pageNum < totalPages,
+		NoteTitle:    noteTitle,
 		NoteBody:     noteBody,
 		SvgDrawing:   svgDrawing,
-		Attributes:   store.AllAttributeOptions,
+		IsSection:    isSection,
+		SectionTitle: sectionTitle,
 		TOC:          toc,
 		ActiveTocIdx: activeTocIdx,
 	}

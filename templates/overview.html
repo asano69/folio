@@ -26,7 +26,7 @@
                 </div>
                 <div class="page-card-info">
                     <span class="page-number">p.{{.Number}}</span>
-                    {{if .Attribute}}<span class="page-attr-badge attr-{{.Attribute}}">{{.Attribute}}</span>{{end}}
+                    {{if .IsSection}}<span class="page-section-badge">Section</span>{{end}}
                     {{if .NoteTitle}}<span class="page-note-title">{{.NoteTitle}}</span>{{end}}
                 </div>
             </a>

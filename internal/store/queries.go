@@ -7,33 +7,6 @@ import (
 	"folio/internal/storage"
 )
 
-// Page attribute constants. Stored as plain strings with no DB CHECK constraint
-// so the list can evolve without a schema migration.
-const (
-	AttrCover   = "cover"
-	AttrTOC     = "toc"
-	AttrSection = "section"
-	AttrPage    = "page"
-	AttrIndex   = "index"
-	AttrOther   = "other"
-)
-
-// AttributeOption pairs a stored value with a human-readable label for the UI.
-type AttributeOption struct {
-	Value string
-	Label string
-}
-
-// AllAttributeOptions lists every valid attribute in display order.
-var AllAttributeOptions = []AttributeOption{
-	{AttrCover, "Cover"},
-	{AttrTOC, "Table of Contents"},
-	{AttrSection, "Section"},
-	{AttrPage, "Page"},
-	{AttrIndex, "Index"},
-	{AttrOther, "Other"},
-}
-
 // Book is the DB representation of a book.
 // MissingSince is non-nil when the CBZ file was not found during the last scan.
 type Book struct {
@@ -46,20 +19,34 @@ type Book struct {
 }
 
 // Page is the DB representation of a single scanned image inside a CBZ.
-// ID is stable across re-scans: UpsertPages merges by hash then by position
-// rather than deleting and reinserting, so foreign keys from page_notes,
-// page_status, page_drawings, etc. remain valid after a scan.
+// It holds only scan-derived data; user-editable data lives in page_notes,
+// page_sections, page_status, and page_drawings, all keyed by pages.id.
+//
+// ID is stable across re-scans: UpsertPages uses a merge algorithm
+// (hash-first, then position) to preserve IDs even when the CBZ changes.
 type Page struct {
-	ID        int
-	BookID    string
-	Number    int
-	Filename  string
-	Hash      string
-	Title     string
-	Attribute string
+	ID       int
+	BookID   string
+	Number   int
+	Filename string
+	Hash     string
 }
 
-// TocEntry is a single entry in the table of contents.
+// PageNote holds the user-editable text annotation for a single page.
+// Title is the note's own heading; Body is the markdown content.
+type PageNote struct {
+	Title string
+	Body  string
+}
+
+// PageSection marks a page as the start of a named section.
+type PageSection struct {
+	PageID int
+	Title  string
+	Status string
+}
+
+// TocEntry is a single entry in the table of contents derived from page_sections.
 type TocEntry struct {
 	PageNum int
 	Title   string
@@ -187,10 +174,7 @@ func (s *Store) CountAllBooks() (int, error) {
 //
 // Pages with no match are inserted as new rows.
 // Existing pages with no match are deleted; ON DELETE CASCADE propagates to
-// page_notes, page_status, page_drawings, page_tags, and page_ocr.
-//
-// Because sections reference pages by the stable pages.id FK, no section
-// rebuild is required after this operation.
+// page_notes, page_status, page_drawings, page_sections, and page_ocr.
 func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -296,9 +280,10 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 }
 
 // ListPages returns all pages for a book ordered by number.
+// Only scan-derived fields are returned; user annotations are in separate tables.
 func (s *Store) ListPages(bookID string) ([]Page, error) {
 	rows, err := s.db.Query(`
-		SELECT id, book_id, number, filename, hash, title, attribute
+		SELECT id, book_id, number, filename, hash
 		FROM pages WHERE book_id = ? ORDER BY number
 	`, bookID)
 	if err != nil {
@@ -309,7 +294,7 @@ func (s *Store) ListPages(bookID string) ([]Page, error) {
 	var pages []Page
 	for rows.Next() {
 		var p Page
-		if err := rows.Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash, &p.Title, &p.Attribute); err != nil {
+		if err := rows.Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash); err != nil {
 			return nil, err
 		}
 		pages = append(pages, p)
@@ -321,9 +306,9 @@ func (s *Store) ListPages(bookID string) ([]Page, error) {
 func (s *Store) GetPage(pageID int) (*Page, error) {
 	var p Page
 	err := s.db.QueryRow(`
-		SELECT id, book_id, number, filename, hash, title, attribute
+		SELECT id, book_id, number, filename, hash
 		FROM pages WHERE id = ?
-	`, pageID).Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash, &p.Title, &p.Attribute)
+	`, pageID).Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -334,9 +319,9 @@ func (s *Store) GetPage(pageID int) (*Page, error) {
 func (s *Store) GetCoverPage(bookID string) (*Page, error) {
 	var p Page
 	err := s.db.QueryRow(`
-		SELECT id, book_id, number, filename, hash, title, attribute
+		SELECT id, book_id, number, filename, hash
 		FROM pages WHERE book_id = ? ORDER BY number LIMIT 1
-	`, bookID).Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash, &p.Title, &p.Attribute)
+	`, bookID).Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -357,56 +342,58 @@ func (s *Store) CountPages(bookID string) (int, error) {
 	return n, err
 }
 
-// ── Page annotations (title, attribute) and notes (body) ──────
+// ── Page notes ─────────────────────────────────────────────────
 
-// UpsertPageEdit updates a page's title and attribute (stored on the pages row)
-// and upserts the note body (stored in page_notes) in a single transaction.
-// It also keeps the sections table in sync when the attribute changes to or
-// from 'section'.
-func (s *Store) UpsertPageEdit(pageID int, title, attribute, body string) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
+// GetPageNote returns the note for a page, or a zero-value PageNote if none exists.
+func (s *Store) GetPageNote(pageID int) (PageNote, error) {
+	var note PageNote
+	err := s.db.QueryRow(
+		`SELECT title, body FROM page_notes WHERE page_id = ?`, pageID,
+	).Scan(&note.Title, &note.Body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return PageNote{}, nil
 	}
-	defer tx.Rollback()
-
-	// Resolve book_id for the section sync call.
-	var bookID string
-	if err := tx.QueryRow(`SELECT book_id FROM pages WHERE id = ?`, pageID).Scan(&bookID); err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(
-		`UPDATE pages SET title = ?, attribute = ? WHERE id = ?`, title, attribute, pageID,
-	); err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(`
-		INSERT INTO page_notes (page_id, body, updated_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(page_id) DO UPDATE SET
-			body       = excluded.body,
-			updated_at = CURRENT_TIMESTAMP
-	`, pageID, body); err != nil {
-		return err
-	}
-
-	if err := syncSection(tx, pageID, bookID, attribute, title); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return note, err
 }
 
-// GetPageNote returns the note body for a page, or an empty string if none exists.
-func (s *Store) GetPageNote(pageID int) (string, error) {
-	var body string
-	err := s.db.QueryRow(`SELECT body FROM page_notes WHERE page_id = ?`, pageID).Scan(&body)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
+// UpsertPageNote inserts or updates the note (title and body) for a page.
+func (s *Store) UpsertPageNote(pageID int, title, body string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO page_notes (page_id, title, body, updated_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(page_id) DO UPDATE SET
+			title      = excluded.title,
+			body       = excluded.body,
+			updated_at = CURRENT_TIMESTAMP
+	`, pageID, title, body)
+	return err
+}
+
+// ListPageNoteTitlesByBook returns a map of pageID → note title for all pages
+// in a book that have a non-empty note title. Used to populate overview grids
+// without a per-page query.
+func (s *Store) ListPageNoteTitlesByBook(bookID string) (map[int]string, error) {
+	rows, err := s.db.Query(`
+		SELECT pn.page_id, pn.title
+		FROM page_notes pn
+		JOIN pages p ON p.id = pn.page_id
+		WHERE p.book_id = ? AND pn.title != ''
+	`, bookID)
+	if err != nil {
+		return nil, err
 	}
-	return body, err
+	defer rows.Close()
+
+	m := make(map[int]string)
+	for rows.Next() {
+		var pageID int
+		var title string
+		if err := rows.Scan(&pageID, &title); err != nil {
+			return nil, err
+		}
+		m[pageID] = title
+	}
+	return m, rows.Err()
 }
 
 // ── Page drawings ──────────────────────────────────────────────
@@ -441,9 +428,8 @@ func (s *Store) UpsertPageDrawing(pageID int, svg *string) error {
 
 // ── Page status ────────────────────────────────────────────────
 
-// ListPageStatuses returns a map of pageID -> status for all pages in a book
-// that have an explicit status record. Pages with no record are absent from
-// the map and should be treated as 'unread'.
+// ListPageStatuses returns a map of pageID → status for all pages in a book
+// that have an explicit status record. Pages absent from the map are 'unread'.
 func (s *Store) ListPageStatuses(bookID string) (map[int]string, error) {
 	rows, err := s.db.Query(`
 		SELECT ps.page_id, ps.status
@@ -480,16 +466,73 @@ func (s *Store) UpsertPageStatus(pageID int, status string) error {
 	return err
 }
 
-// ── Sections ───────────────────────────────────────────────────
+// ── Page sections ──────────────────────────────────────────────
+
+// GetPageSection returns the section record for a page, or nil if the page
+// is not marked as a section start.
+func (s *Store) GetPageSection(pageID int) (*PageSection, error) {
+	var ps PageSection
+	err := s.db.QueryRow(
+		`SELECT page_id, title, status FROM page_sections WHERE page_id = ?`, pageID,
+	).Scan(&ps.PageID, &ps.Title, &ps.Status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return &ps, err
+}
+
+// UpsertPageSection marks a page as a section start with the given title.
+// If the page is already a section start, its title is updated.
+func (s *Store) UpsertPageSection(pageID int, title string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO page_sections (page_id, title, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(page_id) DO UPDATE SET
+			title      = excluded.title,
+			updated_at = CURRENT_TIMESTAMP
+	`, pageID, title)
+	return err
+}
+
+// DeletePageSection removes the section marking from a page.
+// It is a no-op if the page is not a section start.
+func (s *Store) DeletePageSection(pageID int) error {
+	_, err := s.db.Exec(`DELETE FROM page_sections WHERE page_id = ?`, pageID)
+	return err
+}
+
+// ListPageSectionPageIDsByBook returns the set of page IDs that are section
+// starts for a book. Used to populate overview grids without a per-page query.
+func (s *Store) ListPageSectionPageIDsByBook(bookID string) (map[int]bool, error) {
+	rows, err := s.db.Query(`
+		SELECT ps.page_id
+		FROM page_sections ps
+		JOIN pages p ON p.id = ps.page_id
+		WHERE p.book_id = ?
+	`, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	m := make(map[int]bool)
+	for rows.Next() {
+		var pageID int
+		if err := rows.Scan(&pageID); err != nil {
+			return nil, err
+		}
+		m[pageID] = true
+	}
+	return m, rows.Err()
+}
 
 // GetTOC returns all section entries for a book ordered by page number.
-// Each section references the page it starts on via the stable start_page_id FK.
 func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	rows, err := s.db.Query(`
-		SELECT p.number, s.title
-		FROM sections s
-		JOIN pages p ON p.id = s.start_page_id
-		WHERE s.book_id = ?
+		SELECT p.number, ps.title
+		FROM page_sections ps
+		JOIN pages p ON p.id = ps.page_id
+		WHERE p.book_id = ?
 		ORDER BY p.number
 	`, bookID)
 	if err != nil {
@@ -506,21 +549,6 @@ func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 		entries = append(entries, e)
 	}
 	return entries, rows.Err()
-}
-
-// syncSection keeps the sections table in sync whenever a page's attribute is
-// saved. Must be called inside an open transaction.
-func syncSection(tx *sql.Tx, pageID int, bookID, attribute, title string) error {
-	if attribute == AttrSection {
-		_, err := tx.Exec(`
-			INSERT INTO sections (book_id, start_page_id, title)
-			VALUES (?, ?, ?)
-			ON CONFLICT(book_id, start_page_id) DO UPDATE SET title = excluded.title
-		`, bookID, pageID, title)
-		return err
-	}
-	_, err := tx.Exec(`DELETE FROM sections WHERE start_page_id = ?`, pageID)
-	return err
 }
 
 // ── Book notes ─────────────────────────────────────────────────
