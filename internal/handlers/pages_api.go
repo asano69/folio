@@ -126,11 +126,12 @@ func (h *PagesAPIHandler) savePageNote(w http.ResponseWriter, r *http.Request, p
 
 // savePageSection handles PUT /api/pages/{pageID}/section.
 // When enabled is true, the page is marked as a section start with the given
-// title. When enabled is false, the section marking is removed.
+// title and description. When enabled is false, the section marking is removed.
 func (h *PagesAPIHandler) savePageSection(w http.ResponseWriter, r *http.Request, pageID int) {
 	var body struct {
-		Title   string `json:"title"`
-		Enabled bool   `json:"enabled"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Enabled     bool   `json:"enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -148,7 +149,7 @@ func (h *PagesAPIHandler) savePageSection(w http.ResponseWriter, r *http.Request
 	}
 
 	if body.Enabled {
-		if err := h.Store.UpsertPageSection(pageID, strings.TrimSpace(body.Title)); err != nil {
+		if err := h.Store.UpsertPageSection(pageID, strings.TrimSpace(body.Title), body.Description); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

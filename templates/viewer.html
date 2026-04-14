@@ -49,9 +49,15 @@
                     Section start
                 </label>
             </div>
-            <div class="edit-field" id="edit-section-title-field" {{if not .IsSection}}hidden{{end}}>
-                <label for="edit-section-title">Section Title</label>
-                <input type="text" id="edit-section-title" value="{{.SectionTitle}}" placeholder="Section title">
+            <div id="edit-section-title-field" {{if not .IsSection}}hidden{{end}}>
+                <div class="edit-field">
+                    <label for="edit-section-title">Section Title</label>
+                    <input type="text" id="edit-section-title" value="{{.SectionTitle}}" placeholder="Section title">
+                </div>
+                <div class="edit-field">
+                    <label for="edit-section-description">Section Description</label>
+                    <textarea id="edit-section-description" rows="3" placeholder="Optional description of this section...">{{.SectionDescription}}</textarea>
+                </div>
             </div>
             <div class="edit-actions">
                 <button id="edit-save">Save</button>

@@ -40,16 +40,22 @@ type PageNote struct {
 }
 
 // PageSection marks a page as the start of a named section.
+// Description holds optional free-form text about the section.
 type PageSection struct {
-	PageID int
-	Title  string
-	Status string
+	PageID      int
+	Title       string
+	Description string
+	Status      string
 }
 
-// TocEntry is a single entry in the table of contents derived from page_sections.
+// TocEntry is a single entry in the table of contents derived from
+// section_ranges. EndPage is the last page of the section, derived from the
+// start page of the following section (or the last page of the book).
 type TocEntry struct {
-	PageNum int
-	Title   string
+	PageNum     int
+	Title       string
+	Description string
+	EndPage     int
 }
 
 // BookCollection is the DB representation of a named group of books.
@@ -473,24 +479,25 @@ func (s *Store) UpsertPageStatus(pageID int, status string) error {
 func (s *Store) GetPageSection(pageID int) (*PageSection, error) {
 	var ps PageSection
 	err := s.db.QueryRow(
-		`SELECT page_id, title, status FROM page_sections WHERE page_id = ?`, pageID,
-	).Scan(&ps.PageID, &ps.Title, &ps.Status)
+		`SELECT page_id, title, description, status FROM page_sections WHERE page_id = ?`, pageID,
+	).Scan(&ps.PageID, &ps.Title, &ps.Description, &ps.Status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return &ps, err
 }
 
-// UpsertPageSection marks a page as a section start with the given title.
-// If the page is already a section start, its title is updated.
-func (s *Store) UpsertPageSection(pageID int, title string) error {
+// UpsertPageSection marks a page as a section start with the given title and
+// description. If the page is already a section start, both fields are updated.
+func (s *Store) UpsertPageSection(pageID int, title, description string) error {
 	_, err := s.db.Exec(`
-		INSERT INTO page_sections (page_id, title, updated_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO page_sections (page_id, title, description, updated_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(page_id) DO UPDATE SET
-			title      = excluded.title,
-			updated_at = CURRENT_TIMESTAMP
-	`, pageID, title)
+			title       = excluded.title,
+			description = excluded.description,
+			updated_at  = CURRENT_TIMESTAMP
+	`, pageID, title, description)
 	return err
 }
 
@@ -526,14 +533,16 @@ func (s *Store) ListPageSectionPageIDsByBook(bookID string) (map[int]bool, error
 	return m, rows.Err()
 }
 
-// GetTOC returns all section entries for a book ordered by page number.
+// GetTOC returns all section range entries for a book ordered by start page.
+// end_page is derived from the section_ranges view: it equals the start page of
+// the following section minus one, or the last page of the book for the final
+// section.
 func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	rows, err := s.db.Query(`
-		SELECT p.number, ps.title
-		FROM page_sections ps
-		JOIN pages p ON p.id = ps.page_id
-		WHERE p.book_id = ?
-		ORDER BY p.number
+		SELECT start_page, title, description, end_page
+		FROM section_ranges
+		WHERE book_id = ?
+		ORDER BY start_page
 	`, bookID)
 	if err != nil {
 		return nil, err
@@ -543,7 +552,7 @@ func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	var entries []TocEntry
 	for rows.Next() {
 		var e TocEntry
-		if err := rows.Scan(&e.PageNum, &e.Title); err != nil {
+		if err := rows.Scan(&e.PageNum, &e.Title, &e.Description, &e.EndPage); err != nil {
 			return nil, err
 		}
 		entries = append(entries, e)
