@@ -1,14 +1,11 @@
-import { savePageNote, savePageSection } from '../api';
-import type { PageNotePayload, PageSectionPayload } from '../types';
+import { savePageNote } from '../api';
+import type { PageNotePayload } from '../types';
 import { PANE_EVENT_EDIT_OPEN, PANE_EVENT_DRAW_OPEN } from './pane-events';
 
-// EditorSnapshot captures all editable field values at a point in time,
-// used to restore the pane to its original state when the user cancels.
+// EditorSnapshot captures the editable field values at the moment the pane
+// was opened, used to restore state when the user cancels.
 interface EditorSnapshot {
-  noteBody:           string;
-  isSection:          boolean;
-  sectionTitle:       string;
-  sectionDescription: string;
+  noteBody: string;
 }
 
 export function initEditor(): void {
@@ -25,20 +22,10 @@ export function initEditor(): void {
   const pageId = parseInt(pageIdStr, 10);
   if (isNaN(pageId)) return;
 
-  const bodyTextarea            = document.getElementById('edit-body')                as HTMLTextAreaElement | null;
-  const sectionToggle           = document.getElementById('edit-section-toggle')      as HTMLInputElement    | null;
-  const sectionTitleInput       = document.getElementById('edit-section-title')       as HTMLInputElement    | null;
-  const sectionDescriptionInput = document.getElementById('edit-section-description') as HTMLTextAreaElement | null;
-  const sectionTitleField       = document.getElementById('edit-section-title-field') as HTMLElement        | null;
-  const saveBtn                 = document.getElementById('edit-save')                as HTMLButtonElement   | null;
-  const cancelBtn               = document.getElementById('edit-cancel')              as HTMLButtonElement   | null;
+  const bodyTextarea = document.getElementById('edit-body')   as HTMLTextAreaElement | null;
+  const saveBtn      = document.getElementById('edit-save')   as HTMLButtonElement   | null;
+  const cancelBtn    = document.getElementById('edit-cancel') as HTMLButtonElement   | null;
 
-  // Show or hide the section fields based on the toggle state.
-  sectionToggle?.addEventListener('change', () => {
-    if (sectionTitleField) sectionTitleField.hidden = !sectionToggle.checked;
-  });
-
-  // Snapshot of field values at the moment the pane was opened.
   let snapshot = captureValues();
 
   const open = (): void => {
@@ -70,28 +57,17 @@ export function initEditor(): void {
   closeBtn?.addEventListener('click', () => { restoreSnapshot(); close(); });
   backdrop?.addEventListener('click', () => { restoreSnapshot(); close(); });
 
-  saveBtn?.addEventListener('click', () => { save(); });
-
-  cancelBtn?.addEventListener('click', () => {
-    restoreSnapshot();
-    close();
-  });
+  saveBtn?.addEventListener('click',   () => { save(); });
+  cancelBtn?.addEventListener('click', () => { restoreSnapshot(); close(); });
 
   function captureValues(): EditorSnapshot {
     return {
-      noteBody:           bodyTextarea?.value            ?? '',
-      isSection:          sectionToggle?.checked         ?? false,
-      sectionTitle:       sectionTitleInput?.value       ?? '',
-      sectionDescription: sectionDescriptionInput?.value ?? '',
+      noteBody: bodyTextarea?.value ?? '',
     };
   }
 
   function restoreSnapshot(): void {
-    if (bodyTextarea)            bodyTextarea.value            = snapshot.noteBody;
-    if (sectionToggle)           sectionToggle.checked         = snapshot.isSection;
-    if (sectionTitleInput)       sectionTitleInput.value       = snapshot.sectionTitle;
-    if (sectionDescriptionInput) sectionDescriptionInput.value = snapshot.sectionDescription;
-    if (sectionTitleField)       sectionTitleField.hidden      = !snapshot.isSection;
+    if (bodyTextarea) bodyTextarea.value = snapshot.noteBody;
   }
 
   async function save(): Promise<void> {
@@ -99,19 +75,8 @@ export function initEditor(): void {
     saveBtn.disabled = true;
     try {
       const current = captureValues();
-
-      const notePayload: PageNotePayload = {
-        body: current.noteBody,
-      };
-      const sectionPayload: PageSectionPayload = {
-        title:       current.sectionTitle,
-        description: current.sectionDescription,
-        enabled:     current.isSection,
-      };
-
-      await savePageNote(pageId, notePayload);
-      await savePageSection(pageId, sectionPayload);
-
+      const payload: PageNotePayload = { body: current.noteBody };
+      await savePageNote(pageId, payload);
       snapshot = current;
       updateNoteDisplay(current.noteBody);
       close();
@@ -123,8 +88,8 @@ export function initEditor(): void {
   }
 
   function updateNoteDisplay(body: string): void {
-    const noteEl   = document.getElementById('page-note')  as HTMLElement | null;
-    const noteBody = document.getElementById('note-body')  as HTMLElement | null;
+    const noteEl   = document.getElementById('page-note') as HTMLElement | null;
+    const noteBody = document.getElementById('note-body') as HTMLElement | null;
     if (noteEl && noteBody) {
       noteBody.textContent = body;
       noteEl.hidden = !body;

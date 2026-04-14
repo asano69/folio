@@ -4,7 +4,7 @@
 // responses so callers get consistent error objects without repeating the
 // res.ok check everywhere.
 
-import type { PageNotePayload, PageSectionPayload } from './types';
+import type { PageNotePayload } from './types';
 
 async function request(url: string, options?: RequestInit): Promise<Response> {
   const res = await fetch(url, options);
@@ -38,19 +38,11 @@ export async function saveBookNote(bookId: string, body: string): Promise<void> 
 // ── Pages ─────────────────────────────────────────────────────
 //
 // Page endpoints use the stable integer page ID (pages.id) rather than a
-// (bookID, pageHash) pair. The ID is embedded in the template as data-page-id
-// and remains valid across re-scans and CBZ modifications.
+// composite key. The ID is embedded in the template as data-page-id and
+// remains valid across re-scans and CBZ modifications.
 
 export async function savePageNote(pageId: number, payload: PageNotePayload): Promise<void> {
   await request(`/api/pages/${pageId}/note`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function savePageSection(pageId: number, payload: PageSectionPayload): Promise<void> {
-  await request(`/api/pages/${pageId}/section`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -74,14 +66,53 @@ export async function updatePageStatus(pageId: number, status: string): Promise<
   });
 }
 
-// savePageLabels replaces all book-page-number labels for a page.
-// An empty array removes all labels.
-export async function savePageLabels(pageId: number, labels: string[]): Promise<void> {
-  await request(`/api/pages/${pageId}/labels`, {
+// savePageNumber sets or clears the real book page number for a page.
+// Pass null to clear an existing value.
+export async function savePageNumber(pageId: number, pageNumber: string | null): Promise<void> {
+  await request(`/api/pages/${pageId}/page-number`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ labels }),
+    body: JSON.stringify({ page_number: pageNumber }),
   });
+}
+
+// ── Sections ──────────────────────────────────────────────────
+
+export interface CreateSectionPayload {
+  book_id: string;
+  start_page_id: number;
+  end_page_id?: number;
+  title: string;
+  description: string;
+}
+
+export interface UpdateSectionPayload {
+  start_page_id: number;
+  end_page_id?: number;
+  title: string;
+  description: string;
+  status: string;
+}
+
+export async function createSection(payload: CreateSectionPayload): Promise<{ id: number }> {
+  const res = await request('/api/sections/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
+export async function updateSection(id: number, payload: UpdateSectionPayload): Promise<void> {
+  await request(`/api/sections/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteSection(id: number): Promise<void> {
+  await request(`/api/sections/${id}`, { method: 'DELETE' });
 }
 
 // ── Collections ───────────────────────────────────────────────

@@ -19,44 +19,52 @@ type Book struct {
 }
 
 // Page is the DB representation of a single scanned image inside a CBZ.
-// It holds only scan-derived data; user-editable data lives in page_notes,
-// page_sections, page_status, and page_drawings, all keyed by pages.id.
 //
 // ID is stable across re-scans: UpsertPages uses a merge algorithm
 // (hash-first, then position) to preserve IDs even when the CBZ changes.
 //
 // Seq is the 1-based position of the image within the CBZ (filename sort
-// order). It is NOT the real book page number; see page_labels for that.
+// order). It is NOT the real book page number.
+//
+// PageNumber is the real book page number as printed (e.g. "42", "iv").
+// It is TEXT to support roman numerals. NULL when not assigned by the user.
 type Page struct {
-	ID       int
-	BookID   string
-	Seq      int
-	Filename string
-	Hash     string
+	ID         int
+	BookID     string
+	Seq        int
+	Filename   string
+	Hash       string
+	PageNumber *string
 }
 
-// PageNote holds the user-editable text annotation for a single page.
-type PageNote struct {
-	Body string
-}
-
-// PageSection marks a page as the start of a named section.
-// Description holds optional free-form text about the section.
-type PageSection struct {
-	PageID      int
+// Section is the DB representation of a named page range within a book.
+// Sections may overlap and nest freely; no uniqueness is enforced.
+// EndPageID is nil when the user has not set an explicit end boundary.
+type Section struct {
+	ID          int
+	BookID      string
+	StartPageID int
+	EndPageID   *int
 	Title       string
 	Description string
 	Status      string
 }
 
-// TocEntry is a single entry in the table of contents derived from
-// page_sections. EndPage is the last seq of the section, derived in Go
-// from the seq of the following section (or the last page of the book).
+// TocEntry is a single entry in the table of contents derived from sections.
+// StartSeq is the seq of the section-start page. EndSeq is the seq of the
+// end page, or nil when end_page_id is NULL.
 type TocEntry struct {
-	PageNum     int // seq of the section-start page
+	SectionID   int
+	StartSeq    int
+	EndSeq      *int
 	Title       string
 	Description string
-	EndPage     int // seq of the last page in this section
+	Status      string
+}
+
+// PageNote holds the user-editable text annotation for a single page.
+type PageNote struct {
+	Body string
 }
 
 // BookCollection is the DB representation of a named group of books.
@@ -181,7 +189,10 @@ func (s *Store) CountAllBooks() (int, error) {
 //
 // Pages with no match are inserted as new rows.
 // Existing pages with no match are deleted; ON DELETE CASCADE propagates to
-// page_notes, page_status, page_drawings, page_sections, and page_ocr.
+// page_notes, page_status, page_drawings, page_ocr, and sections.
+//
+// page_number is never touched by this function; user-assigned values survive
+// re-scans as long as the page ID is preserved by the merge.
 func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -250,6 +261,7 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 	}
 
 	// Update matched pages: seq, filename, or hash may have changed.
+	// page_number is intentionally excluded; it is user-managed.
 	for exID, newIdx := range matches {
 		entry := entries[newIdx]
 		if _, err := tx.Exec(
@@ -287,10 +299,9 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 }
 
 // ListPages returns all pages for a book ordered by seq.
-// Only scan-derived fields are returned; user annotations are in separate tables.
 func (s *Store) ListPages(bookID string) ([]Page, error) {
 	rows, err := s.db.Query(`
-		SELECT id, book_id, seq, filename, hash
+		SELECT id, book_id, seq, filename, hash, page_number
 		FROM pages WHERE book_id = ? ORDER BY seq
 	`, bookID)
 	if err != nil {
@@ -301,7 +312,7 @@ func (s *Store) ListPages(bookID string) ([]Page, error) {
 	var pages []Page
 	for rows.Next() {
 		var p Page
-		if err := rows.Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash); err != nil {
+		if err := rows.Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash, &p.PageNumber); err != nil {
 			return nil, err
 		}
 		pages = append(pages, p)
@@ -313,9 +324,9 @@ func (s *Store) ListPages(bookID string) ([]Page, error) {
 func (s *Store) GetPage(pageID int) (*Page, error) {
 	var p Page
 	err := s.db.QueryRow(`
-		SELECT id, book_id, seq, filename, hash
+		SELECT id, book_id, seq, filename, hash, page_number
 		FROM pages WHERE id = ?
-	`, pageID).Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash)
+	`, pageID).Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash, &p.PageNumber)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -326,13 +337,35 @@ func (s *Store) GetPage(pageID int) (*Page, error) {
 func (s *Store) GetCoverPage(bookID string) (*Page, error) {
 	var p Page
 	err := s.db.QueryRow(`
-		SELECT id, book_id, seq, filename, hash
+		SELECT id, book_id, seq, filename, hash, page_number
 		FROM pages WHERE book_id = ? ORDER BY seq LIMIT 1
-	`, bookID).Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash)
+	`, bookID).Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash, &p.PageNumber)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return &p, err
+}
+
+// GetPageByNumber returns the page with the lowest seq whose page_number matches
+// within the given book. Returns nil if no page carries that number.
+func (s *Store) GetPageByNumber(bookID, pageNumber string) (*Page, error) {
+	var p Page
+	err := s.db.QueryRow(`
+		SELECT id, book_id, seq, filename, hash, page_number
+		FROM pages WHERE book_id = ? AND page_number = ?
+		ORDER BY seq LIMIT 1
+	`, bookID, pageNumber).Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash, &p.PageNumber)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return &p, err
+}
+
+// UpdatePageNumber sets or clears the real book page number for a page.
+// Pass nil to clear an existing value.
+func (s *Store) UpdatePageNumber(pageID int, pageNumber *string) error {
+	_, err := s.db.Exec(`UPDATE pages SET page_number = ? WHERE id = ?`, pageNumber, pageID)
+	return err
 }
 
 // HasPages reports whether any pages are registered for the given book.
@@ -445,50 +478,69 @@ func (s *Store) UpsertPageStatus(pageID int, status string) error {
 	return err
 }
 
-// ── Page sections ──────────────────────────────────────────────
+// ── Sections ───────────────────────────────────────────────────
 
-// GetPageSection returns the section record for a page, or nil if the page
-// is not marked as a section start.
-func (s *Store) GetPageSection(pageID int) (*PageSection, error) {
-	var ps PageSection
-	err := s.db.QueryRow(
-		`SELECT page_id, title, description, status FROM page_sections WHERE page_id = ?`, pageID,
-	).Scan(&ps.PageID, &ps.Title, &ps.Description, &ps.Status)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	return &ps, err
-}
-
-// UpsertPageSection marks a page as a section start with the given title and
-// description. If the page is already a section start, both fields are updated.
-func (s *Store) UpsertPageSection(pageID int, title, description string) error {
-	_, err := s.db.Exec(`
-		INSERT INTO page_sections (page_id, title, description, updated_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(page_id) DO UPDATE SET
-			title       = excluded.title,
-			description = excluded.description,
-			updated_at  = CURRENT_TIMESTAMP
-	`, pageID, title, description)
-	return err
-}
-
-// DeletePageSection removes the section marking from a page.
-// It is a no-op if the page is not a section start.
-func (s *Store) DeletePageSection(pageID int) error {
-	_, err := s.db.Exec(`DELETE FROM page_sections WHERE page_id = ?`, pageID)
-	return err
-}
-
-// ListPageSectionPageIDsByBook returns the set of page IDs that are section
-// starts for a book. Used to populate overview grids without a per-page query.
-func (s *Store) ListPageSectionPageIDsByBook(bookID string) (map[int]bool, error) {
+// ListSections returns all sections for a book in insertion order.
+func (s *Store) ListSections(bookID string) ([]Section, error) {
 	rows, err := s.db.Query(`
-		SELECT ps.page_id
-		FROM page_sections ps
-		JOIN pages p ON p.id = ps.page_id
-		WHERE p.book_id = ?
+		SELECT id, book_id, start_page_id, end_page_id, title, description, status
+		FROM sections WHERE book_id = ? ORDER BY rowid
+	`, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sections []Section
+	for rows.Next() {
+		var sec Section
+		if err := rows.Scan(
+			&sec.ID, &sec.BookID, &sec.StartPageID, &sec.EndPageID,
+			&sec.Title, &sec.Description, &sec.Status,
+		); err != nil {
+			return nil, err
+		}
+		sections = append(sections, sec)
+	}
+	return sections, rows.Err()
+}
+
+// GetTOC returns all sections for a book joined with their start/end page seq
+// values, ordered by start page seq. This is the primary data source for the
+// table of contents in the viewer and bibliography pages.
+func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
+	rows, err := s.db.Query(`
+		SELECT s.id, p_start.seq, p_end.seq, s.title, s.description, s.status
+		FROM sections s
+		JOIN pages p_start ON p_start.id = s.start_page_id
+		LEFT JOIN pages p_end ON p_end.id = s.end_page_id
+		WHERE s.book_id = ?
+		ORDER BY p_start.seq
+	`, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []TocEntry
+	for rows.Next() {
+		var e TocEntry
+		if err := rows.Scan(
+			&e.SectionID, &e.StartSeq, &e.EndSeq,
+			&e.Title, &e.Description, &e.Status,
+		); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+// ListSectionStartPageIDs returns the set of page IDs that are the start of
+// at least one section for the given book. Used to mark pages in overview grids.
+func (s *Store) ListSectionStartPageIDs(bookID string) (map[int]bool, error) {
+	rows, err := s.db.Query(`
+		SELECT DISTINCT start_page_id FROM sections WHERE book_id = ?
 	`, bookID)
 	if err != nil {
 		return nil, err
@@ -506,123 +558,32 @@ func (s *Store) ListPageSectionPageIDsByBook(bookID string) (map[int]bool, error
 	return m, rows.Err()
 }
 
-// GetTOC returns all section entries for a book ordered by seq, with EndPage
-// derived in Go: each section ends one seq before the next section starts,
-// and the final section extends to the last page of the book.
-func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
-	rows, err := s.db.Query(`
-		SELECT p.seq, ps.title, ps.description
-		FROM page_sections ps
-		JOIN pages p ON p.id = ps.page_id
-		WHERE p.book_id = ?
-		ORDER BY p.seq
-	`, bookID)
+// CreateSection inserts a new section and returns its ID.
+func (s *Store) CreateSection(bookID string, startPageID int, endPageID *int, title, description string) (int64, error) {
+	res, err := s.db.Exec(`
+		INSERT INTO sections (book_id, start_page_id, end_page_id, title, description)
+		VALUES (?, ?, ?, ?, ?)
+	`, bookID, startPageID, endPageID, title, description)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	defer rows.Close()
-
-	var entries []TocEntry
-	for rows.Next() {
-		var e TocEntry
-		if err := rows.Scan(&e.PageNum, &e.Title, &e.Description); err != nil {
-			return nil, err
-		}
-		entries = append(entries, e)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	if len(entries) == 0 {
-		return nil, nil
-	}
-
-	// Derive end_page: last seq of each section.
-	var lastSeq int
-	if err := s.db.QueryRow(
-		`SELECT COALESCE(MAX(seq), 0) FROM pages WHERE book_id = ?`, bookID,
-	).Scan(&lastSeq); err != nil {
-		return nil, err
-	}
-
-	for i := range entries {
-		if i+1 < len(entries) {
-			entries[i].EndPage = entries[i+1].PageNum - 1
-		} else {
-			entries[i].EndPage = lastSeq
-		}
-	}
-
-	return entries, nil
+	return res.LastInsertId()
 }
 
-// ── Page labels ────────────────────────────────────────────────
-
-// UpsertPageLabels replaces all labels for a page in a single transaction.
-// An empty labels slice removes all labels for the page.
-func (s *Store) UpsertPageLabels(pageID int, labels []string) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.Exec(`DELETE FROM page_labels WHERE page_id = ?`, pageID); err != nil {
-		return err
-	}
-
-	for _, label := range labels {
-		if label == "" {
-			continue
-		}
-		if _, err := tx.Exec(
-			`INSERT INTO page_labels (page_id, label) VALUES (?, ?)`, pageID, label,
-		); err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
+// UpdateSection replaces all mutable fields of an existing section.
+func (s *Store) UpdateSection(id int, startPageID int, endPageID *int, title, description, status string) error {
+	_, err := s.db.Exec(`
+		UPDATE sections
+		SET start_page_id = ?, end_page_id = ?, title = ?, description = ?, status = ?
+		WHERE id = ?
+	`, startPageID, endPageID, title, description, status, id)
+	return err
 }
 
-// GetPageByLabel returns the page with the lowest seq whose label matches
-// within the given book. Returns nil if no page carries that label.
-func (s *Store) GetPageByLabel(bookID, label string) (*Page, error) {
-	var p Page
-	err := s.db.QueryRow(`
-		SELECT p.id, p.book_id, p.seq, p.filename, p.hash
-		FROM pages p
-		JOIN page_labels pl ON pl.page_id = p.id
-		WHERE p.book_id = ? AND pl.label = ?
-		ORDER BY p.seq
-		LIMIT 1
-	`, bookID, label).Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	return &p, err
-}
-
-// ListPageLabels returns all labels for a page ordered alphabetically.
-func (s *Store) ListPageLabels(pageID int) ([]string, error) {
-	rows, err := s.db.Query(
-		`SELECT label FROM page_labels WHERE page_id = ? ORDER BY label`, pageID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var labels []string
-	for rows.Next() {
-		var label string
-		if err := rows.Scan(&label); err != nil {
-			return nil, err
-		}
-		labels = append(labels, label)
-	}
-	return labels, rows.Err()
+// DeleteSection removes a section by ID.
+func (s *Store) DeleteSection(id int) error {
+	_, err := s.db.Exec(`DELETE FROM sections WHERE id = ?`, id)
+	return err
 }
 
 // ── Book notes ─────────────────────────────────────────────────

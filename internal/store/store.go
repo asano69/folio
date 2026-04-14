@@ -33,18 +33,18 @@ CREATE TABLE IF NOT EXISTS books (
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- pages holds scan-derived data only. User-editable data lives in separate
--- tables keyed by pages.id, which is stable across re-scans thanks to the
--- merge algorithm in UpsertPages.
---
--- seq is the 1-based position of the image within the CBZ (filename sort
--- order). It is NOT the real book page number; use page_labels for that.
+-- pages holds scan-derived data plus the user-assigned real book page number.
+-- seq is the 1-based position of the image within the CBZ (filename sort order).
+-- page_number is the real book page number as printed (TEXT to support roman
+-- numerals such as "i", "ii", "iii" used in front matter); NULL when not set.
+-- pages.id is stable across re-scans thanks to the merge algorithm in UpsertPages.
 CREATE TABLE IF NOT EXISTS pages (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id    TEXT    NOT NULL REFERENCES books(id),
-    seq        INTEGER NOT NULL,
-    filename   TEXT    NOT NULL,
-    hash       TEXT    NOT NULL DEFAULT '',
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id     TEXT    NOT NULL REFERENCES books(id),
+    seq         INTEGER NOT NULL,
+    filename    TEXT    NOT NULL,
+    hash        TEXT    NOT NULL DEFAULT '',
+    page_number TEXT,
     UNIQUE(book_id, seq)
 );
 
@@ -79,24 +79,23 @@ CREATE TABLE IF NOT EXISTS page_ocr (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Marks a page as the start of a named section.
--- Absence of a row means the page is not a section start.
-CREATE TABLE IF NOT EXISTS page_sections (
-    page_id     INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
-    title       TEXT    NOT NULL DEFAULT '',
-    description TEXT    NOT NULL DEFAULT '',
-    status      TEXT    NOT NULL DEFAULT 'unread'
-                CHECK(status IN ('unread','reading','read','skip')),
-    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+-- ── Sections ───────────────────────────────────────────────────
 
--- Real book page number labels for a scanned image. A single image can carry
--- multiple labels (e.g. a spread covering pages 32 and 33 has two rows).
--- label is TEXT to support roman numerals (i, ii, iii...) used in front matter.
-CREATE TABLE IF NOT EXISTS page_labels (
-    page_id    INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
-    label      TEXT    NOT NULL,
-    PRIMARY KEY(page_id, label)
+-- A section is a named range within a book. start_page_id and end_page_id are
+-- both references to pages.id. end_page_id is nullable (NULL means the user has
+-- not set an explicit end). Sections may overlap or nest; no uniqueness constraint
+-- is enforced. ON DELETE CASCADE for start_page_id removes the section if its
+-- starting page disappears; ON DELETE SET NULL for end_page_id clears the end
+-- boundary rather than removing the whole section.
+CREATE TABLE IF NOT EXISTS sections (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id       TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    start_page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+    end_page_id   INTEGER          REFERENCES pages(id) ON DELETE SET NULL,
+    title         TEXT    NOT NULL DEFAULT '',
+    description   TEXT    NOT NULL DEFAULT '',
+    status        TEXT    NOT NULL DEFAULT 'unread'
+                  CHECK(status IN ('unread','reading','read','skip'))
 );
 
 -- ── Per-book annotations ───────────────────────────────────────
@@ -145,8 +144,7 @@ CREATE TABLE IF NOT EXISTS page_collection_members (
 -- ── Indexes ────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_pages_book                   ON pages(book_id);
-CREATE INDEX IF NOT EXISTS idx_page_sections_page           ON page_sections(page_id);
-CREATE INDEX IF NOT EXISTS idx_page_labels_label            ON page_labels(label);
+CREATE INDEX IF NOT EXISTS idx_sections_book                ON sections(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_collection_members_book ON book_collection_members(book_id);
 CREATE INDEX IF NOT EXISTS idx_page_collection_members_page ON page_collection_members(page_id);
 `

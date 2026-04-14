@@ -25,8 +25,12 @@
                     {{end}}
                 </div>
                 <div class="page-card-info">
-                    <span class="page-number">p.{{.Seq}}</span>
-                    {{if .IsSection}}<span class="page-section-badge">Section</span>{{end}}
+                    {{if .PageNumber}}
+                    <span class="page-number">p.{{.PageNumber}}</span>
+                    {{else}}
+                    <span class="page-number">seq.{{.Seq}}</span>
+                    {{end}}
+                    {{if .IsSection}}<span class="page-section-badge">§</span>{{end}}
                 </div>
             </a>
             {{/* Status buttons appear on hover. Clicking stops propagation so the card link is not followed. */}}
