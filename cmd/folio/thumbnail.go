@@ -40,8 +40,9 @@ func runBookThumbnail(cfg *config.Config, bookID string) error {
 }
 
 // runPageThumbnails generates page-level thumbnails for one book (when bookID
-// is non-empty) or for all non-missing books. Pages that already have a
-// cached thumbnail file are skipped.
+// is non-empty) or for all non-missing books. Pages that already have a cached
+// thumbnail file (keyed by content hash) are skipped. Pages whose hash is empty
+// (folio hash not yet run) are also skipped.
 func runPageThumbnails(cfg *config.Config, bookID string) error {
 	db, err := store.Open(cfg.DataPath)
 	if err != nil {
@@ -87,11 +88,21 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 		if err != nil {
 			return fmt.Errorf("list pages %s: %w", b.ID, err)
 		}
+
+		// Read cached hashes once per book to avoid N stat calls per page.
+		cachedHashes, err := storage.ListPageThumbnailHashes(cfg.CachePath, b.ID)
+		if err != nil {
+			return fmt.Errorf("list page thumbnail hashes %s: %w", b.ID, err)
+		}
+
 		var reqs []storage.ImageThumbnailRequest
 		for _, p := range pages {
-			if !storage.PageThumbnailExists(cfg.CachePath, b.ID, p.ID) {
+			if p.Hash == "" {
+				continue // hash not yet computed; skip until folio hash is run
+			}
+			if !cachedHashes[p.Hash] {
 				reqs = append(reqs, storage.ImageThumbnailRequest{
-					PageID:   p.ID,
+					PageHash: p.Hash,
 					Filename: p.Filename,
 				})
 			}
@@ -127,7 +138,7 @@ func runPageThumbnails(cfg *config.Config, bookID string) error {
 			continue
 		}
 		for _, it := range r.results {
-			if err := storage.WritePageThumbnail(cfg.CachePath, r.bookID, it.PageID, it.Data); err != nil {
+			if err := storage.WritePageThumbnail(cfg.CachePath, r.bookID, it.PageHash, it.Data); err != nil {
 				return fmt.Errorf("write page thumbnail: %w", err)
 			}
 			done++

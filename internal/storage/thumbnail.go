@@ -9,7 +9,6 @@ import (
 	_ "image/png"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"golang.org/x/image/draw"
@@ -46,17 +45,18 @@ func GenerateBookThumbnail(cbzPath string) ([]byte, error) {
 	return nil, fmt.Errorf("image entry %s not found in %s", first, cbzPath)
 }
 
-// ImageThumbnailRequest pairs a page ID with its filename for thumbnail generation.
-// PageID is the stable integer primary key from the pages table.
+// ImageThumbnailRequest pairs a page content hash with its filename for
+// thumbnail generation. PageHash is the SHA-256 hex string of the uncompressed
+// image bytes; it is stable across DB resets as long as the CBZ is unchanged.
 type ImageThumbnailRequest struct {
-	PageID   int
+	PageHash string
 	Filename string
 }
 
 // ImageThumbnailResult holds the generated thumbnail data for one page.
 type ImageThumbnailResult struct {
-	PageID int
-	Data   []byte
+	PageHash string
+	Data     []byte
 }
 
 // GeneratePageThumbnails opens cbzPath once and generates JPEG thumbnails for
@@ -71,14 +71,14 @@ func GeneratePageThumbnails(cbzPath string, reqs []ImageThumbnailRequest) ([]Ima
 	defer r.Close()
 
 	// Index requests by filename for O(1) lookup while iterating the archive.
-	need := make(map[string]int, len(reqs)) // filename -> pageID
+	need := make(map[string]string, len(reqs)) // filename -> pageHash
 	for _, req := range reqs {
-		need[req.Filename] = req.PageID
+		need[req.Filename] = req.PageHash
 	}
 
 	var results []ImageThumbnailResult
 	for _, f := range r.File {
-		pageID, ok := need[f.Name]
+		pageHash, ok := need[f.Name]
 		if !ok {
 			continue
 		}
@@ -86,7 +86,7 @@ func GeneratePageThumbnails(cbzPath string, reqs []ImageThumbnailRequest) ([]Ima
 		if err != nil {
 			return nil, fmt.Errorf("thumbnail %s: %w", f.Name, err)
 		}
-		results = append(results, ImageThumbnailResult{PageID: pageID, Data: data})
+		results = append(results, ImageThumbnailResult{PageHash: pageHash, Data: data})
 	}
 	return results, nil
 }
@@ -130,10 +130,11 @@ func resizeToWidth(src image.Image, w int) image.Image {
 // ── Filesystem cache helpers ───────────────────────────────────
 //
 // Book thumbnails:  {cachePath}/book-thumbnails/{bookID}.jpg
-// Page thumbnails:  {cachePath}/page-thumbnails/{bookID}/{pageID}.jpg
+// Page thumbnails:  {cachePath}/page-thumbnails/{bookID}/{pageHash}.jpg
 //
-// Page thumbnails are keyed by stable integer page ID rather than content hash,
-// so they survive re-scans and in-place image replacements.
+// Page thumbnails are keyed by content hash rather than page ID so that they
+// survive a full DB reset. Both bookID (from folio.json) and pageHash (from
+// image bytes) are recoverable from the CBZ alone, with no DB required.
 
 // BookThumbnailPath returns the filesystem path for a book-level thumbnail.
 func BookThumbnailPath(cachePath, bookID string) string {
@@ -143,8 +144,8 @@ func BookThumbnailPath(cachePath, bookID string) string {
 // PageThumbnailPath returns the filesystem path for a page-level thumbnail.
 // Thumbnails are organised under a per-book subdirectory to keep the
 // page-thumbnails directory manageable.
-func PageThumbnailPath(cachePath, bookID string, pageID int) string {
-	return filepath.Join(cachePath, "page-thumbnails", bookID, strconv.Itoa(pageID)+".jpg")
+func PageThumbnailPath(cachePath, bookID, pageHash string) string {
+	return filepath.Join(cachePath, "page-thumbnails", bookID, pageHash+".jpg")
 }
 
 // WriteBookThumbnail writes book-level thumbnail bytes to the cache directory,
@@ -159,8 +160,8 @@ func WriteBookThumbnail(cachePath, bookID string, data []byte) error {
 
 // WritePageThumbnail writes a page-level thumbnail to the cache directory,
 // creating any missing parent directories.
-func WritePageThumbnail(cachePath, bookID string, pageID int, data []byte) error {
-	path := PageThumbnailPath(cachePath, bookID, pageID)
+func WritePageThumbnail(cachePath, bookID, pageHash string, data []byte) error {
+	path := PageThumbnailPath(cachePath, bookID, pageHash)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("create page-thumbnails dir: %w", err)
 	}
@@ -173,9 +174,10 @@ func BookThumbnailExists(cachePath, bookID string) bool {
 	return err == nil
 }
 
-// PageThumbnailExists reports whether a cached thumbnail file exists for the given page.
-func PageThumbnailExists(cachePath, bookID string, pageID int) bool {
-	_, err := os.Stat(PageThumbnailPath(cachePath, bookID, pageID))
+// PageThumbnailExists reports whether a cached thumbnail file exists for the
+// given book page identified by its content hash.
+func PageThumbnailExists(cachePath, bookID, pageHash string) bool {
+	_, err := os.Stat(PageThumbnailPath(cachePath, bookID, pageHash))
 	return err == nil
 }
 
@@ -201,29 +203,24 @@ func ListBookThumbnailIDs(cachePath string) (map[string]bool, error) {
 	return set, nil
 }
 
-// ListPageThumbnailIDs returns the set of page IDs (integers) that have a
-// cached page-level thumbnail for the given book. Returns an empty map (not
-// an error) when the directory does not yet exist.
-func ListPageThumbnailIDs(cachePath, bookID string) (map[int]bool, error) {
+// ListPageThumbnailHashes returns the set of page content hashes that have a
+// cached page-level thumbnail for the given book. Returns an empty map (not an
+// error) when the directory does not yet exist.
+func ListPageThumbnailHashes(cachePath, bookID string) (map[string]bool, error) {
 	dir := filepath.Join(cachePath, "page-thumbnails", bookID)
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
-		return map[int]bool{}, nil
+		return map[string]bool{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read page-thumbnails dir: %w", err)
 	}
-	set := make(map[int]bool, len(entries))
+	set := make(map[string]bool, len(entries))
 	for _, e := range entries {
 		name := e.Name()
-		if !strings.HasSuffix(name, ".jpg") {
-			continue
+		if strings.HasSuffix(name, ".jpg") {
+			set[strings.TrimSuffix(name, ".jpg")] = true
 		}
-		id, err := strconv.Atoi(strings.TrimSuffix(name, ".jpg"))
-		if err != nil {
-			continue // skip files that are not integer-named
-		}
-		set[id] = true
 	}
 	return set, nil
 }

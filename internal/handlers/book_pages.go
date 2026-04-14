@@ -28,8 +28,9 @@ type BookDispatchHandler struct {
 
 // overviewItem is the template model for a single page card in the overview grid.
 type overviewItem struct {
-	ID         int // stable page ID, used for thumbnail URL
+	ID         int // stable page ID
 	Seq        int
+	Hash       string  // SHA-256 hex; used as the page thumbnail filename
 	PageNumber *string // real book page number as printed; nil when not set
 	HasThumb   bool
 	IsSection  bool   // true when this page is the start of at least one section
@@ -85,8 +86,9 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Page thumbnail existence is keyed by stable page ID.
-	thumbSet, err := storage.ListPageThumbnailIDs(h.CachePath, bookID)
+	// Page thumbnail existence is keyed by content hash.
+	// ListPageThumbnailHashes reads the cache directory once, avoiding N stat calls.
+	cachedHashes, err := storage.ListPageThumbnailHashes(h.CachePath, bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -112,11 +114,14 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 		if status == "" {
 			status = "unread"
 		}
+		// A page with no hash has no thumbnail regardless of the cache state.
+		hasThumb := p.Hash != "" && cachedHashes[p.Hash]
 		items = append(items, overviewItem{
 			ID:         p.ID,
 			Seq:        p.Seq,
+			Hash:       p.Hash,
 			PageNumber: p.PageNumber,
-			HasThumb:   thumbSet[p.ID],
+			HasThumb:   hasThumb,
 			IsSection:  sectionStartPageIDs[p.ID],
 			Status:     status,
 		})
