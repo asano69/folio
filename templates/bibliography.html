@@ -20,13 +20,12 @@
             </dl>
         </section>
 
-        {{/* TODO: sections list with per-section status — see store.GetTOC and store.TocEntry */}}
         <section class="bibliographic-section">
             <h3 class="bibliographic-section-title">Sections</h3>
             {{if .TOC}}
             <nav class="bibliographic-toc">
                 {{range .TOC}}
-                <a href="/books/{{$.Book.ID}}/pages/{{.PageNum}}" class="bibliographic-toc-entry">
+                <a href="/books/{{$.Book.ID}}?seq={{.PageNum}}" class="bibliographic-toc-entry">
                     <span class="bibliographic-toc-page">p.{{.PageNum}}</span>
                     <span class="bibliographic-toc-title">{{.Title}}</span>
                 </a>

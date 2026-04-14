@@ -11,7 +11,7 @@ type Book struct {
 
 // ImageEntry represents a single image entry inside a CBZ.
 type ImageEntry struct {
-	Number   int
+	Seq      int    // 1-based position within the CBZ (filename sort order)
 	Filename string // entry name inside the CBZ
 	Hash     string // SHA-256 of the uncompressed image bytes
 }

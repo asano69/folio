@@ -2,10 +2,9 @@
 
 export type ReadStatus = 'unread' | 'reading' | 'read' | 'skip';
 
-// PageNotePayload carries the user-editable text annotation fields for a page.
+// PageNotePayload carries the user-editable text annotation body for a page.
 export interface PageNotePayload {
-  title: string;
-  body:  string;
+  body: string;
 }
 
 // PageSectionPayload marks or unmarks a page as a section start.

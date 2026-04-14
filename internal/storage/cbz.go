@@ -255,6 +255,7 @@ func writeMeta(path string, r *zip.ReadCloser, meta *folioMeta) error {
 
 // listImages returns image entries from an open zip, sorted by filename.
 // Each entry's Hash is computed as the SHA-256 of its uncompressed bytes.
+// Seq is assigned as the 1-based position in the sorted order.
 func listImages(r *zip.ReadCloser) ([]ImageEntry, error) {
 	var images []ImageEntry
 	for _, f := range r.File {
@@ -279,7 +280,7 @@ func listImages(r *zip.ReadCloser) ([]ImageEntry, error) {
 	})
 
 	for i := range images {
-		images[i].Number = i + 1
+		images[i].Seq = i + 1
 	}
 
 	return images, nil
