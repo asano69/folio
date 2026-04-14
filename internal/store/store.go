@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -80,13 +81,35 @@ CREATE TABLE IF NOT EXISTS page_ocr (
 -- Marks a page as the start of a named section.
 -- Absence of a row means the page is not a section start.
 -- The section title is independent from the page note title.
+-- description holds optional free-form text about the section.
 CREATE TABLE IF NOT EXISTS page_sections (
-    page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
-    title      TEXT    NOT NULL DEFAULT '',
-    status     TEXT    NOT NULL DEFAULT 'unread'
-               CHECK(status IN ('unread','reading','read','skip')),
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    page_id     INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
+    title       TEXT    NOT NULL DEFAULT '',
+    description TEXT    NOT NULL DEFAULT '',
+    status      TEXT    NOT NULL DEFAULT 'unread'
+                CHECK(status IN ('unread','reading','read','skip')),
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- section_ranges derives the end page for each section using the start page of
+-- the next section within the same book. The final section in a book extends to
+-- the last page. end_page is not stored because it is fully determined by the
+-- ordering of start pages; storing it would require keeping adjacent rows in
+-- sync on every insert, update, or delete.
+CREATE VIEW IF NOT EXISTS section_ranges AS
+SELECT
+    ps.page_id,
+    ps.title,
+    ps.description,
+    ps.status,
+    p.book_id,
+    p.number AS start_page,
+    COALESCE(
+        LEAD(p.number) OVER (PARTITION BY p.book_id ORDER BY p.number) - 1,
+        (SELECT MAX(p2.number) FROM pages p2 WHERE p2.book_id = p.book_id)
+    ) AS end_page
+FROM page_sections ps
+JOIN pages p ON p.id = ps.page_id;
 
 -- ── Per-book annotations ───────────────────────────────────────
 
@@ -139,6 +162,20 @@ CREATE INDEX IF NOT EXISTS idx_book_collection_members_book ON book_collection_m
 CREATE INDEX IF NOT EXISTS idx_page_collection_members_page ON page_collection_members(page_id);
 `
 
+// migrations runs once per Open call. Each entry is applied only when the
+// condition query returns no rows (i.e. the change has not yet been applied).
+// This handles databases created before the schema was updated.
+var migrations = []struct {
+	condition string // returns a row if the migration has already been applied
+	statement string
+}{
+	{
+		// Add description column to page_sections if it does not yet exist.
+		condition: `SELECT 1 FROM pragma_table_info('page_sections') WHERE name = 'description'`,
+		statement: `ALTER TABLE page_sections ADD COLUMN description TEXT NOT NULL DEFAULT ''`,
+	},
+}
+
 func Open(dataPath string) (*Store, error) {
 	if err := os.MkdirAll(dataPath, 0755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
@@ -159,7 +196,30 @@ func Open(dataPath string) (*Store, error) {
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
 
+	if err := applyMigrations(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("apply migrations: %w", err)
+	}
+
 	return &Store{db: db}, nil
+}
+
+// applyMigrations runs each pending migration exactly once. A migration is
+// considered pending when its condition query returns no rows.
+func applyMigrations(db *sql.DB) error {
+	for _, m := range migrations {
+		var applied int
+		err := db.QueryRow(m.condition).Scan(&applied)
+		if errors.Is(err, sql.ErrNoRows) {
+			if _, execErr := db.Exec(m.statement); execErr != nil {
+				return fmt.Errorf("migration %q: %w", m.statement, execErr)
+			}
+		} else if err != nil {
+			return fmt.Errorf("migration condition %q: %w", m.condition, err)
+		}
+		// err == nil means the condition row exists; migration already applied.
+	}
+	return nil
 }
 
 func (s *Store) Close() error {

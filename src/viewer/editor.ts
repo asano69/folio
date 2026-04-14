@@ -5,10 +5,11 @@ import { PANE_EVENT_EDIT_OPEN, PANE_EVENT_DRAW_OPEN } from './pane-events';
 // EditorSnapshot captures all editable field values at a point in time,
 // used to restore the pane to its original state when the user cancels.
 interface EditorSnapshot {
-  noteTitle:    string;
-  noteBody:     string;
-  isSection:    boolean;
-  sectionTitle: string;
+  noteTitle:          string;
+  noteBody:           string;
+  isSection:          boolean;
+  sectionTitle:       string;
+  sectionDescription: string;
 }
 
 export function initEditor(): void {
@@ -25,15 +26,16 @@ export function initEditor(): void {
   const pageId = parseInt(pageIdStr, 10);
   if (isNaN(pageId)) return;
 
-  const noteTitleInput    = document.getElementById('edit-note-title')    as HTMLInputElement   | null;
-  const bodyTextarea      = document.getElementById('edit-body')          as HTMLTextAreaElement | null;
-  const sectionToggle     = document.getElementById('edit-section-toggle') as HTMLInputElement  | null;
-  const sectionTitleInput = document.getElementById('edit-section-title') as HTMLInputElement   | null;
-  const sectionTitleField = document.getElementById('edit-section-title-field') as HTMLElement  | null;
-  const saveBtn           = document.getElementById('edit-save')          as HTMLButtonElement  | null;
-  const cancelBtn         = document.getElementById('edit-cancel')        as HTMLButtonElement  | null;
+  const noteTitleInput          = document.getElementById('edit-note-title')          as HTMLInputElement    | null;
+  const bodyTextarea            = document.getElementById('edit-body')                as HTMLTextAreaElement | null;
+  const sectionToggle           = document.getElementById('edit-section-toggle')      as HTMLInputElement    | null;
+  const sectionTitleInput       = document.getElementById('edit-section-title')       as HTMLInputElement    | null;
+  const sectionDescriptionInput = document.getElementById('edit-section-description') as HTMLTextAreaElement | null;
+  const sectionTitleField       = document.getElementById('edit-section-title-field') as HTMLElement        | null;
+  const saveBtn                 = document.getElementById('edit-save')                as HTMLButtonElement   | null;
+  const cancelBtn               = document.getElementById('edit-cancel')              as HTMLButtonElement   | null;
 
-  // Show or hide the section title input based on the toggle state.
+  // Show or hide the section fields based on the toggle state.
   sectionToggle?.addEventListener('change', () => {
     if (sectionTitleField) sectionTitleField.hidden = !sectionToggle.checked;
   });
@@ -79,19 +81,21 @@ export function initEditor(): void {
 
   function captureValues(): EditorSnapshot {
     return {
-      noteTitle:    noteTitleInput?.value    ?? '',
-      noteBody:     bodyTextarea?.value      ?? '',
-      isSection:    sectionToggle?.checked   ?? false,
-      sectionTitle: sectionTitleInput?.value ?? '',
+      noteTitle:          noteTitleInput?.value          ?? '',
+      noteBody:           bodyTextarea?.value            ?? '',
+      isSection:          sectionToggle?.checked         ?? false,
+      sectionTitle:       sectionTitleInput?.value       ?? '',
+      sectionDescription: sectionDescriptionInput?.value ?? '',
     };
   }
 
   function restoreSnapshot(): void {
-    if (noteTitleInput)    noteTitleInput.value    = snapshot.noteTitle;
-    if (bodyTextarea)      bodyTextarea.value      = snapshot.noteBody;
-    if (sectionToggle)     sectionToggle.checked   = snapshot.isSection;
-    if (sectionTitleInput) sectionTitleInput.value = snapshot.sectionTitle;
-    if (sectionTitleField) sectionTitleField.hidden = !snapshot.isSection;
+    if (noteTitleInput)          noteTitleInput.value          = snapshot.noteTitle;
+    if (bodyTextarea)            bodyTextarea.value            = snapshot.noteBody;
+    if (sectionToggle)           sectionToggle.checked         = snapshot.isSection;
+    if (sectionTitleInput)       sectionTitleInput.value       = snapshot.sectionTitle;
+    if (sectionDescriptionInput) sectionDescriptionInput.value = snapshot.sectionDescription;
+    if (sectionTitleField)       sectionTitleField.hidden      = !snapshot.isSection;
   }
 
   async function save(): Promise<void> {
@@ -105,8 +109,9 @@ export function initEditor(): void {
         body:  current.noteBody,
       };
       const sectionPayload: PageSectionPayload = {
-        title:   current.sectionTitle,
-        enabled: current.isSection,
+        title:       current.sectionTitle,
+        description: current.sectionDescription,
+        enabled:     current.isSection,
       };
 
       await savePageNote(pageId, notePayload);

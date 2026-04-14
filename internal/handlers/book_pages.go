@@ -193,7 +193,7 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 	}
 
 	// Fetch note, drawing, and section info for the current page.
-	var noteTitle, noteBody, svgDrawing, sectionTitle string
+	var noteTitle, noteBody, svgDrawing, sectionTitle, sectionDescription string
 	var isSection bool
 	if currentPage != nil {
 		note, err := h.Store.GetPageNote(currentPage.ID)
@@ -218,6 +218,7 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		if section != nil {
 			isSection = true
 			sectionTitle = section.Title
+			sectionDescription = section.Description
 		}
 	}
 
@@ -237,35 +238,37 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 	}
 
 	data := struct {
-		Book         *store.Book
-		CurrentPage  *store.Page
-		Pages        []store.Page
-		PageNum      int
-		TotalPages   int
-		HasPrev      bool
-		HasNext      bool
-		NoteTitle    string
-		NoteBody     string
-		SvgDrawing   string
-		IsSection    bool
-		SectionTitle string
-		TOC          []store.TocEntry
-		ActiveTocIdx int
+		Book               *store.Book
+		CurrentPage        *store.Page
+		Pages              []store.Page
+		PageNum            int
+		TotalPages         int
+		HasPrev            bool
+		HasNext            bool
+		NoteTitle          string
+		NoteBody           string
+		SvgDrawing         string
+		IsSection          bool
+		SectionTitle       string
+		SectionDescription string
+		TOC                []store.TocEntry
+		ActiveTocIdx       int
 	}{
-		Book:         book,
-		CurrentPage:  currentPage,
-		Pages:        pages,
-		PageNum:      pageNum,
-		TotalPages:   totalPages,
-		HasPrev:      pageNum > 1,
-		HasNext:      pageNum < totalPages,
-		NoteTitle:    noteTitle,
-		NoteBody:     noteBody,
-		SvgDrawing:   svgDrawing,
-		IsSection:    isSection,
-		SectionTitle: sectionTitle,
-		TOC:          toc,
-		ActiveTocIdx: activeTocIdx,
+		Book:               book,
+		CurrentPage:        currentPage,
+		Pages:              pages,
+		PageNum:            pageNum,
+		TotalPages:         totalPages,
+		HasPrev:            pageNum > 1,
+		HasNext:            pageNum < totalPages,
+		NoteTitle:          noteTitle,
+		NoteBody:           noteBody,
+		SvgDrawing:         svgDrawing,
+		IsSection:          isSection,
+		SectionTitle:       sectionTitle,
+		SectionDescription: sectionDescription,
+		TOC:                toc,
+		ActiveTocIdx:       activeTocIdx,
 	}
 
 	if err := h.ViewerTemplate.Execute(w, data); err != nil {
