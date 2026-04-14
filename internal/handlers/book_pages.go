@@ -28,11 +28,12 @@ type BookDispatchHandler struct {
 
 // overviewItem is the template model for a single page card in the overview grid.
 type overviewItem struct {
-	ID        int // stable page ID, used for thumbnail URL
-	Seq       int
-	HasThumb  bool
-	IsSection bool   // true when this page is the start of at least one section
-	Status    string // always one of: unread, reading, read, skip
+	ID         int // stable page ID, used for thumbnail URL
+	Seq        int
+	PageNumber *string // real book page number as printed; nil when not set
+	HasThumb   bool
+	IsSection  bool   // true when this page is the start of at least one section
+	Status     string // always one of: unread, reading, read, skip
 }
 
 func (h *BookDispatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -112,11 +113,12 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 			status = "unread"
 		}
 		items = append(items, overviewItem{
-			ID:        p.ID,
-			Seq:       p.Seq,
-			HasThumb:  thumbSet[p.ID],
-			IsSection: sectionStartPageIDs[p.ID],
-			Status:    status,
+			ID:         p.ID,
+			Seq:        p.Seq,
+			PageNumber: p.PageNumber,
+			HasThumb:   thumbSet[p.ID],
+			IsSection:  sectionStartPageIDs[p.ID],
+			Status:     status,
 		})
 	}
 
