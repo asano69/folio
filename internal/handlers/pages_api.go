@@ -12,11 +12,10 @@ import (
 
 // PagesAPIHandler handles:
 //
-//	PUT /api/pages/{pageID}/note     — save note body
-//	PUT /api/pages/{pageID}/section  — mark or unmark a page as a section start
-//	PUT /api/pages/{pageID}/drawing  — save or clear SVG drawing
-//	PUT /api/pages/{pageID}/status   — update read status
-//	PUT /api/pages/{pageID}/labels   — replace all book-page-number labels
+//	PUT /api/pages/{pageID}/note        — save note body
+//	PUT /api/pages/{pageID}/drawing     — save or clear SVG drawing
+//	PUT /api/pages/{pageID}/status      — update read status
+//	PUT /api/pages/{pageID}/page-number — set or clear the real book page number
 //
 // The page ID is the stable integer primary key from the pages table.
 // It remains valid across re-scans and CBZ modifications.
@@ -72,9 +71,9 @@ func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// PUT /api/pages/{pageID}/section
-	if strings.HasSuffix(path, "/section") {
-		pageID, err := parsePageID(strings.TrimSuffix(path, "/section"))
+	// PUT /api/pages/{pageID}/page-number
+	if strings.HasSuffix(path, "/page-number") {
+		pageID, err := parsePageID(strings.TrimSuffix(path, "/page-number"))
 		if err != nil {
 			http.Error(w, "invalid page ID", http.StatusBadRequest)
 			return
@@ -83,22 +82,7 @@ func (h *PagesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		h.savePageSection(w, r, pageID)
-		return
-	}
-
-	// PUT /api/pages/{pageID}/labels
-	if strings.HasSuffix(path, "/labels") {
-		pageID, err := parsePageID(strings.TrimSuffix(path, "/labels"))
-		if err != nil {
-			http.Error(w, "invalid page ID", http.StatusBadRequest)
-			return
-		}
-		if r.Method != http.MethodPut {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		h.saveLabels(w, r, pageID)
+		h.savePageNumber(w, r, pageID)
 		return
 	}
 
@@ -111,7 +95,6 @@ func parsePageID(s string) (int, error) {
 }
 
 // savePageNote handles PUT /api/pages/{pageID}/note.
-// Updates the note body for a page.
 func (h *PagesAPIHandler) savePageNote(w http.ResponseWriter, r *http.Request, pageID int) {
 	var body struct {
 		Body string `json:"body"`
@@ -134,45 +117,6 @@ func (h *PagesAPIHandler) savePageNote(w http.ResponseWriter, r *http.Request, p
 	if err := h.Store.UpsertPageNote(pageID, body.Body); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// savePageSection handles PUT /api/pages/{pageID}/section.
-// When enabled is true, the page is marked as a section start with the given
-// title and description. When enabled is false, the section marking is removed.
-func (h *PagesAPIHandler) savePageSection(w http.ResponseWriter, r *http.Request, pageID int) {
-	var body struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Enabled     bool   `json:"enabled"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	page, err := h.Store.GetPage(pageID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if page == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	if body.Enabled {
-		if err := h.Store.UpsertPageSection(pageID, strings.TrimSpace(body.Title), body.Description); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	} else {
-		if err := h.Store.DeletePageSection(pageID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -249,11 +193,12 @@ func (h *PagesAPIHandler) saveStatus(w http.ResponseWriter, r *http.Request, pag
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// saveLabels handles PUT /api/pages/{pageID}/labels.
-// Replaces all book-page-number labels for a page. An empty array removes all labels.
-func (h *PagesAPIHandler) saveLabels(w http.ResponseWriter, r *http.Request, pageID int) {
+// savePageNumber handles PUT /api/pages/{pageID}/page-number.
+// The page_number field stores the real book page number as printed (e.g. "42",
+// "iv"). Pass null in the JSON body to clear an existing value.
+func (h *PagesAPIHandler) savePageNumber(w http.ResponseWriter, r *http.Request, pageID int) {
 	var body struct {
-		Labels []string `json:"labels"`
+		PageNumber *string `json:"page_number"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -270,7 +215,7 @@ func (h *PagesAPIHandler) saveLabels(w http.ResponseWriter, r *http.Request, pag
 		return
 	}
 
-	if err := h.Store.UpsertPageLabels(pageID, body.Labels); err != nil {
+	if err := h.Store.UpdatePageNumber(pageID, body.PageNumber); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

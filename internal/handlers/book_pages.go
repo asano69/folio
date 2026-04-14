@@ -14,9 +14,9 @@ import (
 // BookDispatchHandler routes:
 //
 //	GET /books/{uuid}/overview      — page grid with status and thumbnails
-//	GET /books/{uuid}/bibliography  — TOC, stats, and book-level memo
+//	GET /books/{uuid}/bibliography  — sections TOC, stats, and book-level memo
 //	GET /books/{uuid}?seq=N         — viewer at image sequence position N
-//	GET /books/{uuid}?p=LABEL       — viewer at the image carrying book page label LABEL
+//	GET /books/{uuid}?p=PAGENUMBER  — viewer at the image carrying that book page number
 //	GET /books/{uuid}               — redirect to /books/{uuid}/overview
 type BookDispatchHandler struct {
 	Store                 *store.Store
@@ -31,7 +31,7 @@ type overviewItem struct {
 	ID        int // stable page ID, used for thumbnail URL
 	Seq       int
 	HasThumb  bool
-	IsSection bool
+	IsSection bool   // true when this page is the start of at least one section
 	Status    string // always one of: unread, reading, read, skip
 }
 
@@ -52,8 +52,8 @@ func (h *BookDispatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			h.serveViewer(w, r, bookID, seq)
 			return
 		}
-		if label := r.URL.Query().Get("p"); label != "" {
-			h.serveViewerByLabel(w, r, bookID, label)
+		if pageNumber := r.URL.Query().Get("p"); pageNumber != "" {
+			h.serveViewerByPageNumber(w, r, bookID, pageNumber)
 			return
 		}
 		// No recognised query parameter: redirect to the overview page.
@@ -98,7 +98,8 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	sectionPageIDs, err := h.Store.ListPageSectionPageIDsByBook(bookID)
+	// Pages that are the start of at least one section, keyed by page ID.
+	sectionStartPageIDs, err := h.Store.ListSectionStartPageIDs(bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -114,7 +115,7 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 			ID:        p.ID,
 			Seq:       p.Seq,
 			HasThumb:  thumbSet[p.ID],
-			IsSection: sectionPageIDs[p.ID],
+			IsSection: sectionStartPageIDs[p.ID],
 			Status:    status,
 		})
 	}
@@ -174,10 +175,10 @@ func (h *BookDispatchHandler) serveBibliographic(w http.ResponseWriter, r *http.
 	}
 }
 
-// serveViewerByLabel looks up the page carrying the given book-page label and
-// delegates to serveViewer. Returns 404 if no page has that label.
-func (h *BookDispatchHandler) serveViewerByLabel(w http.ResponseWriter, r *http.Request, bookID, label string) {
-	page, err := h.Store.GetPageByLabel(bookID, label)
+// serveViewerByPageNumber looks up the page carrying the given book page number
+// and delegates to serveViewer. Returns 404 if no page has that number.
+func (h *BookDispatchHandler) serveViewerByPageNumber(w http.ResponseWriter, r *http.Request, bookID, pageNumber string) {
+	page, err := h.Store.GetPageByNumber(bookID, pageNumber)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -232,32 +233,16 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		nextSeq = pages[currentIdx+1].Seq
 	}
 
-	// Fetch note, drawing, and section info for the current page.
-	var noteBody, svgDrawing, sectionTitle, sectionDescription string
-	var isSection bool
-
 	note, err := h.Store.GetPageNote(currentPage.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	noteBody = note.Body
 
-	svgDrawing, err = h.Store.GetPageDrawing(currentPage.ID)
+	svgDrawing, err := h.Store.GetPageDrawing(currentPage.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-
-	section, err := h.Store.GetPageSection(currentPage.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if section != nil {
-		isSection = true
-		sectionTitle = section.Title
-		sectionDescription = section.Description
 	}
 
 	toc, err := h.Store.GetTOC(bookID)
@@ -266,49 +251,43 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// ActiveTocIdx is the index of the last section whose seq is <= current seq.
+	// ActiveTocIdx is the index of the last section whose StartSeq is <= current seq.
 	// -1 means no section is active.
 	activeTocIdx := -1
 	for i, e := range toc {
-		if e.PageNum <= seq {
+		if e.StartSeq <= seq {
 			activeTocIdx = i
 		}
 	}
 
 	data := struct {
-		Book               *store.Book
-		CurrentPage        *store.Page
-		Pages              []store.Page
-		Seq                int
-		TotalPages         int
-		HasPrev            bool
-		HasNext            bool
-		PrevSeq            int
-		NextSeq            int
-		NoteBody           string
-		SvgDrawing         string
-		IsSection          bool
-		SectionTitle       string
-		SectionDescription string
-		TOC                []store.TocEntry
-		ActiveTocIdx       int
+		Book         *store.Book
+		CurrentPage  *store.Page
+		Pages        []store.Page
+		Seq          int
+		TotalPages   int
+		HasPrev      bool
+		HasNext      bool
+		PrevSeq      int
+		NextSeq      int
+		NoteBody     string
+		SvgDrawing   string
+		TOC          []store.TocEntry
+		ActiveTocIdx int
 	}{
-		Book:               book,
-		CurrentPage:        currentPage,
-		Pages:              pages,
-		Seq:                seq,
-		TotalPages:         len(pages),
-		HasPrev:            hasPrev,
-		HasNext:            hasNext,
-		PrevSeq:            prevSeq,
-		NextSeq:            nextSeq,
-		NoteBody:           noteBody,
-		SvgDrawing:         svgDrawing,
-		IsSection:          isSection,
-		SectionTitle:       sectionTitle,
-		SectionDescription: sectionDescription,
-		TOC:                toc,
-		ActiveTocIdx:       activeTocIdx,
+		Book:         book,
+		CurrentPage:  currentPage,
+		Pages:        pages,
+		Seq:          seq,
+		TotalPages:   len(pages),
+		HasPrev:      hasPrev,
+		HasNext:      hasNext,
+		PrevSeq:      prevSeq,
+		NextSeq:      nextSeq,
+		NoteBody:     note.Body,
+		SvgDrawing:   svgDrawing,
+		TOC:          toc,
+		ActiveTocIdx: activeTocIdx,
 	}
 
 	if err := h.ViewerTemplate.Execute(w, data); err != nil {

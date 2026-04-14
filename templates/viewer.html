@@ -12,14 +12,14 @@
         <nav class="toc-nav pane-body">
             {{if .TOC}}
             {{range $i, $e := .TOC}}
-            <a href="/books/{{$.Book.ID}}?seq={{$e.PageNum}}"
+            <a href="/books/{{$.Book.ID}}?seq={{$e.StartSeq}}"
                class="toc-entry{{if eq $i $.ActiveTocIdx}} toc-entry-active{{end}}">
                 {{$e.Title}}
             </a>
             {{end}}
             {{else}}
             <div class="toc-empty">
-                No sections yet. Use the Edit pane to mark a page as a section start.
+                No sections yet. Use the Sections API to create sections for this book.
             </div>
             {{end}}
         </nav>
@@ -38,22 +38,6 @@
             <div class="edit-field">
                 <label for="edit-body">Comment</label>
                 <textarea id="edit-body" rows="8" placeholder="Notes for this page...">{{.NoteBody}}</textarea>
-            </div>
-            <div class="edit-field edit-field--section-toggle">
-                <label>
-                    <input type="checkbox" id="edit-section-toggle" {{if .IsSection}}checked{{end}}>
-                    Section start
-                </label>
-            </div>
-            <div id="edit-section-title-field" {{if not .IsSection}}hidden{{end}}>
-                <div class="edit-field">
-                    <label for="edit-section-title">Section Title</label>
-                    <input type="text" id="edit-section-title" value="{{.SectionTitle}}" placeholder="Section title">
-                </div>
-                <div class="edit-field">
-                    <label for="edit-section-description">Section Description</label>
-                    <textarea id="edit-section-description" rows="3" placeholder="Optional description of this section...">{{.SectionDescription}}</textarea>
-                </div>
             </div>
             <div class="edit-actions">
                 <button id="edit-save">Save</button>

@@ -25,14 +25,17 @@
             {{if .TOC}}
             <nav class="bibliographic-toc">
                 {{range .TOC}}
-                <a href="/books/{{$.Book.ID}}?seq={{.PageNum}}" class="bibliographic-toc-entry">
-                    <span class="bibliographic-toc-page">p.{{.PageNum}}</span>
+                <a href="/books/{{$.Book.ID}}?seq={{.StartSeq}}" class="bibliographic-toc-entry">
+                    <span class="bibliographic-toc-page">p.{{.StartSeq}}</span>
                     <span class="bibliographic-toc-title">{{.Title}}</span>
+                    {{if .EndSeq}}
+                    <span class="bibliographic-toc-page">–{{.EndSeq}}</span>
+                    {{end}}
                 </a>
                 {{end}}
             </nav>
             {{else}}
-            <p class="bibliographic-empty">No sections yet. Mark pages with the "Section" attribute in the viewer to build a table of contents.</p>
+            <p class="bibliographic-empty">No sections yet. Use the Sections API to create sections for this book.</p>
             {{end}}
         </section>
 

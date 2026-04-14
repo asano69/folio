@@ -7,13 +7,15 @@ export interface PageNotePayload {
   body: string;
 }
 
-// PageSectionPayload marks or unmarks a page as a section start.
-// When enabled is false, the section entry is removed and title/description
-// are ignored.
-export interface PageSectionPayload {
-  title:       string;
+// Section is the frontend representation of a book section.
+export interface Section {
+  id: number;
+  bookId: string;
+  startPageId: number;
+  endPageId: number | null;
+  title: string;
   description: string;
-  enabled:     boolean;
+  status: ReadStatus;
 }
 
 export interface Collection {

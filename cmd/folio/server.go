@@ -72,8 +72,6 @@ func (s *server) setupRoutes() {
 		"inc": func(i int) int { return i + 1 },
 	}
 
-	// sidebar.html is included in both home and collection template sets so
-	// that the {{template "sidebar" .}} call resolves in both.
 	homeTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
 		"templates/layout.html",
 		"templates/sidebar.html",
@@ -128,7 +126,7 @@ func (s *server) setupRoutes() {
 	})
 
 	// Routes /books/{uuid}/overview, /books/{uuid}/bibliography,
-	// and /books/{uuid}/pages/{page_num}.
+	// and /books/{uuid}?seq={N} / ?p={pageNumber}.
 	s.mux.Handle("/books/", &handlers.BookDispatchHandler{
 		Store:                 s.store,
 		CachePath:             s.config.CachePath,
@@ -148,12 +146,15 @@ func (s *server) setupRoutes() {
 		CachePath: s.config.CachePath,
 	})
 
-	// Handles PUT /api/pages/{bookID}/{pageHash},
-	// PUT /api/pages/{bookID}/{pageHash}/drawing, and
-	// PUT /api/pages/{bookID}/{pageHash}/status.
+	// Handles PUT /api/pages/{pageID}/note, /drawing, /status, /page-number.
 	s.mux.Handle("/api/pages/", &handlers.PagesAPIHandler{
 		Store: s.store,
 	})
+
+	// Handles POST /api/sections/, PUT /api/sections/{id}, DELETE /api/sections/{id}.
+	sectionsHandler := &handlers.SectionsAPIHandler{Store: s.store}
+	s.mux.Handle("/api/sections", sectionsHandler)
+	s.mux.Handle("/api/sections/", sectionsHandler)
 
 	cHandler := &handlers.CollectionsAPIHandler{Store: s.store}
 	s.mux.Handle("/api/collections", cHandler)
