@@ -8,14 +8,14 @@ export function initViewer() {
     pageSelect.addEventListener('change', (e) => {
       const target = e.target as HTMLSelectElement;
       const bookId = target.dataset.bookId;
-      const pageNum = target.value;
+      const seq = target.value;
 
-      if (bookId && pageNum) {
-        window.location.href = `/books/${bookId}/pages/${pageNum}`;
+      if (bookId && seq) {
+        window.location.href = `/books/${bookId}?seq=${seq}`;
       }
     });
   }
 
-  // Keyboard navigation is now handled centrally by the keyboard manager
+  // Keyboard navigation is handled centrally by the keyboard manager
   // in src/keyboard/init.ts, so we don't need to duplicate logic here.
 }

@@ -12,7 +12,7 @@
         <nav class="toc-nav pane-body">
             {{if .TOC}}
             {{range $i, $e := .TOC}}
-            <a href="/books/{{$.Book.ID}}/pages/{{$e.PageNum}}"
+            <a href="/books/{{$.Book.ID}}?seq={{$e.PageNum}}"
                class="toc-entry{{if eq $i $.ActiveTocIdx}} toc-entry-active{{end}}">
                 {{$e.Title}}
             </a>
@@ -35,10 +35,6 @@
             <button class="pane-close-btn" id="edit-close">✕</button>
         </div>
         <div class="edit-pane-body pane-body">
-            <div class="edit-field">
-                <label for="edit-note-title">Note Title</label>
-                <input type="text" id="edit-note-title" value="{{.NoteTitle}}" placeholder="Note title">
-            </div>
             <div class="edit-field">
                 <label for="edit-body">Comment</label>
                 <textarea id="edit-body" rows="8" placeholder="Notes for this page...">{{.NoteBody}}</textarea>
@@ -121,12 +117,12 @@
     <div class="viewer-container">
         {{/* Hidden anchors provide hrefs for keyboard navigation without occupying layout space */}}
         {{if .HasPrev}}
-        <a href="/books/{{.Book.ID}}/pages/{{sub .PageNum 1}}" class="prev-btn" hidden></a>
+        <a href="/books/{{.Book.ID}}?seq={{.PrevSeq}}" class="prev-btn" hidden></a>
         {{else}}
         <span class="prev-btn disabled" hidden></span>
         {{end}}
         {{if .HasNext}}
-        <a href="/books/{{.Book.ID}}/pages/{{add .PageNum 1}}" class="next-btn" hidden></a>
+        <a href="/books/{{.Book.ID}}?seq={{.NextSeq}}" class="next-btn" hidden></a>
         {{else}}
         <span class="next-btn disabled" hidden></span>
         {{end}}
@@ -134,7 +130,7 @@
         {{if .CurrentPage}}
         <div class="viewer-image">
             <div class="drawing-canvas">
-                <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.PageNum}}" id="page-image">
+                <img src="/images/{{.Book.ID}}/{{.CurrentPage.Filename}}" alt="Page {{.Seq}}" id="page-image">
                 <svg id="drawing-overlay" class="drawing-overlay"
                      data-page-id="{{.CurrentPage.ID}}"
                      {{if .SvgDrawing}}data-drawing="{{.SvgDrawing}}"{{end}}
@@ -160,8 +156,8 @@
                 <label for="page-select">Jump to page:</label>
                 <select id="page-select" data-book-id="{{.Book.ID}}">
                     {{range .Pages}}
-                    <option value="{{.Number}}" {{if eq .Number $.PageNum}}selected{{end}}>
-                        Page {{.Number}}
+                    <option value="{{.Seq}}" {{if eq .Seq $.Seq}}selected{{end}}>
+                        Page {{.Seq}}
                     </option>
                     {{end}}
                 </select>

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -10,8 +11,13 @@ import (
 	"folio/internal/store"
 )
 
-// BookDispatchHandler routes /books/{uuid}/overview, /books/{uuid}/bibliography,
-// and /books/{uuid}/pages/{page_num}.
+// BookDispatchHandler routes:
+//
+//	GET /books/{uuid}/overview      — page grid with status and thumbnails
+//	GET /books/{uuid}/bibliography  — TOC, stats, and book-level memo
+//	GET /books/{uuid}?seq=N         — viewer at image sequence position N
+//	GET /books/{uuid}?p=LABEL       — viewer at the image carrying book page label LABEL
+//	GET /books/{uuid}               — redirect to /books/{uuid}/overview
 type BookDispatchHandler struct {
 	Store                 *store.Store
 	CachePath             string
@@ -23,9 +29,8 @@ type BookDispatchHandler struct {
 // overviewItem is the template model for a single page card in the overview grid.
 type overviewItem struct {
 	ID        int // stable page ID, used for thumbnail URL
-	Number    int
+	Seq       int
 	HasThumb  bool
-	NoteTitle string
 	IsSection bool
 	Status    string // always one of: unread, reading, read, skip
 }
@@ -33,25 +38,34 @@ type overviewItem struct {
 func (h *BookDispatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/books/")
 	path = strings.Trim(path, "/")
-	parts := strings.SplitN(path, "/", 3)
-	if len(parts) < 2 {
-		http.NotFound(w, r)
+	parts := strings.SplitN(path, "/", 2)
+	bookID := parts[0]
+
+	if len(parts) == 1 {
+		// /books/{uuid} — dispatch on query parameters.
+		if seqStr := r.URL.Query().Get("seq"); seqStr != "" {
+			seq, err := strconv.Atoi(seqStr)
+			if err != nil || seq < 1 {
+				http.NotFound(w, r)
+				return
+			}
+			h.serveViewer(w, r, bookID, seq)
+			return
+		}
+		if label := r.URL.Query().Get("p"); label != "" {
+			h.serveViewerByLabel(w, r, bookID, label)
+			return
+		}
+		// No recognised query parameter: redirect to the overview page.
+		http.Redirect(w, r, "/books/"+bookID+"/overview", http.StatusFound)
 		return
 	}
-	bookID, view := parts[0], parts[1]
-	switch view {
+
+	switch parts[1] {
 	case "overview":
 		h.serveOverview(w, r, bookID)
 	case "bibliography":
 		h.serveBibliographic(w, r, bookID)
-	case "pages":
-		pageNum := 1
-		if len(parts) == 3 && parts[2] != "" {
-			if n, err := strconv.Atoi(parts[2]); err == nil && n > 0 {
-				pageNum = n
-			}
-		}
-		h.serveViewer(w, r, bookID, pageNum)
 	default:
 		http.NotFound(w, r)
 	}
@@ -84,13 +98,6 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Note titles and section markers are fetched in bulk to avoid per-page queries.
-	noteTitles, err := h.Store.ListPageNoteTitlesByBook(bookID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	sectionPageIDs, err := h.Store.ListPageSectionPageIDsByBook(bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -105,9 +112,8 @@ func (h *BookDispatchHandler) serveOverview(w http.ResponseWriter, r *http.Reque
 		}
 		items = append(items, overviewItem{
 			ID:        p.ID,
-			Number:    p.Number,
+			Seq:       p.Seq,
 			HasThumb:  thumbSet[p.ID],
-			NoteTitle: noteTitles[p.ID],
 			IsSection: sectionPageIDs[p.ID],
 			Status:    status,
 		})
@@ -168,7 +174,22 @@ func (h *BookDispatchHandler) serveBibliographic(w http.ResponseWriter, r *http.
 	}
 }
 
-func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request, bookID string, pageNum int) {
+// serveViewerByLabel looks up the page carrying the given book-page label and
+// delegates to serveViewer. Returns 404 if no page has that label.
+func (h *BookDispatchHandler) serveViewerByLabel(w http.ResponseWriter, r *http.Request, bookID, label string) {
+	page, err := h.Store.GetPageByLabel(bookID, label)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if page == nil {
+		http.NotFound(w, r)
+		return
+	}
+	h.serveViewer(w, r, bookID, page.Seq)
+}
+
+func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request, bookID string, seq int) {
 	book, err := h.Store.GetBook(bookID)
 	if err != nil || book == nil {
 		http.NotFound(w, r)
@@ -181,45 +202,62 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	totalPages := len(pages)
-
-	if pageNum > totalPages && totalPages > 0 {
-		pageNum = totalPages
+	// Find the page matching the requested seq.
+	currentIdx := -1
+	for i, p := range pages {
+		if p.Seq == seq {
+			currentIdx = i
+			break
+		}
+	}
+	// If seq not found, redirect to the first page.
+	if currentIdx == -1 {
+		if len(pages) > 0 {
+			http.Redirect(w, r, fmt.Sprintf("/books/%s?seq=%d", bookID, pages[0].Seq), http.StatusFound)
+		} else {
+			http.NotFound(w, r)
+		}
+		return
 	}
 
-	var currentPage *store.Page
-	if totalPages > 0 {
-		currentPage = &pages[pageNum-1]
+	currentPage := &pages[currentIdx]
+
+	hasPrev := currentIdx > 0
+	hasNext := currentIdx < len(pages)-1
+	var prevSeq, nextSeq int
+	if hasPrev {
+		prevSeq = pages[currentIdx-1].Seq
+	}
+	if hasNext {
+		nextSeq = pages[currentIdx+1].Seq
 	}
 
 	// Fetch note, drawing, and section info for the current page.
-	var noteTitle, noteBody, svgDrawing, sectionTitle, sectionDescription string
+	var noteBody, svgDrawing, sectionTitle, sectionDescription string
 	var isSection bool
-	if currentPage != nil {
-		note, err := h.Store.GetPageNote(currentPage.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		noteTitle = note.Title
-		noteBody = note.Body
 
-		svgDrawing, err = h.Store.GetPageDrawing(currentPage.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	note, err := h.Store.GetPageNote(currentPage.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	noteBody = note.Body
 
-		section, err := h.Store.GetPageSection(currentPage.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if section != nil {
-			isSection = true
-			sectionTitle = section.Title
-			sectionDescription = section.Description
-		}
+	svgDrawing, err = h.Store.GetPageDrawing(currentPage.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	section, err := h.Store.GetPageSection(currentPage.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if section != nil {
+		isSection = true
+		sectionTitle = section.Title
+		sectionDescription = section.Description
 	}
 
 	toc, err := h.Store.GetTOC(bookID)
@@ -228,11 +266,11 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// ActiveTocIdx is the index of the last section whose page number is <=
-	// the current page. -1 means no section is active.
+	// ActiveTocIdx is the index of the last section whose seq is <= current seq.
+	// -1 means no section is active.
 	activeTocIdx := -1
 	for i, e := range toc {
-		if e.PageNum <= pageNum {
+		if e.PageNum <= seq {
 			activeTocIdx = i
 		}
 	}
@@ -241,11 +279,12 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		Book               *store.Book
 		CurrentPage        *store.Page
 		Pages              []store.Page
-		PageNum            int
+		Seq                int
 		TotalPages         int
 		HasPrev            bool
 		HasNext            bool
-		NoteTitle          string
+		PrevSeq            int
+		NextSeq            int
 		NoteBody           string
 		SvgDrawing         string
 		IsSection          bool
@@ -257,11 +296,12 @@ func (h *BookDispatchHandler) serveViewer(w http.ResponseWriter, r *http.Request
 		Book:               book,
 		CurrentPage:        currentPage,
 		Pages:              pages,
-		PageNum:            pageNum,
-		TotalPages:         totalPages,
-		HasPrev:            pageNum > 1,
-		HasNext:            pageNum < totalPages,
-		NoteTitle:          noteTitle,
+		Seq:                seq,
+		TotalPages:         len(pages),
+		HasPrev:            hasPrev,
+		HasNext:            hasNext,
+		PrevSeq:            prevSeq,
+		NextSeq:            nextSeq,
 		NoteBody:           noteBody,
 		SvgDrawing:         svgDrawing,
 		IsSection:          isSection,

@@ -16,18 +16,17 @@
     <div class="books-grid pages-grid" data-book-id="{{.Book.ID}}">
         {{range .Items}}
         <div class="book-card page-card page-card--{{.Status}}" data-page-id="{{.ID}}">
-            <a href="/books/{{$.Book.ID}}/pages/{{.Number}}" class="page-card-link">
+            <a href="/books/{{$.Book.ID}}?seq={{.Seq}}" class="page-card-link">
                 <div class="book-thumbnail page-thumbnail">
                     {{if .HasThumb}}
-                    <img src="/page-thumbnails/{{$.Book.ID}}/{{.ID}}.jpg" alt="Page {{.Number}}">
+                    <img src="/page-thumbnails/{{$.Book.ID}}/{{.ID}}.jpg" alt="Page {{.Seq}}">
                     {{else}}
-                    <div class="thumbnail-placeholder">{{.Number}}</div>
+                    <div class="thumbnail-placeholder">{{.Seq}}</div>
                     {{end}}
                 </div>
                 <div class="page-card-info">
-                    <span class="page-number">p.{{.Number}}</span>
+                    <span class="page-number">p.{{.Seq}}</span>
                     {{if .IsSection}}<span class="page-section-badge">Section</span>{{end}}
-                    {{if .NoteTitle}}<span class="page-note-title">{{.NoteTitle}}</span>{{end}}
                 </div>
             </a>
             {{/* Status buttons appear on hover. Clicking stops propagation so the card link is not followed. */}}

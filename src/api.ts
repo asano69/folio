@@ -74,6 +74,16 @@ export async function updatePageStatus(pageId: number, status: string): Promise<
   });
 }
 
+// savePageLabels replaces all book-page-number labels for a page.
+// An empty array removes all labels.
+export async function savePageLabels(pageId: number, labels: string[]): Promise<void> {
+  await request(`/api/pages/${pageId}/labels`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ labels }),
+  });
+}
+
 // ── Collections ───────────────────────────────────────────────
 
 export interface AddToCollectionResult {

@@ -24,19 +24,20 @@ type Book struct {
 //
 // ID is stable across re-scans: UpsertPages uses a merge algorithm
 // (hash-first, then position) to preserve IDs even when the CBZ changes.
+//
+// Seq is the 1-based position of the image within the CBZ (filename sort
+// order). It is NOT the real book page number; see page_labels for that.
 type Page struct {
 	ID       int
 	BookID   string
-	Number   int
+	Seq      int
 	Filename string
 	Hash     string
 }
 
 // PageNote holds the user-editable text annotation for a single page.
-// Title is the note's own heading; Body is the markdown content.
 type PageNote struct {
-	Title string
-	Body  string
+	Body string
 }
 
 // PageSection marks a page as the start of a named section.
@@ -49,13 +50,13 @@ type PageSection struct {
 }
 
 // TocEntry is a single entry in the table of contents derived from
-// section_ranges. EndPage is the last page of the section, derived from the
-// start page of the following section (or the last page of the book).
+// page_sections. EndPage is the last seq of the section, derived in Go
+// from the seq of the following section (or the last page of the book).
 type TocEntry struct {
-	PageNum     int
+	PageNum     int // seq of the section-start page
 	Title       string
 	Description string
-	EndPage     int
+	EndPage     int // seq of the last page in this section
 }
 
 // BookCollection is the DB representation of a named group of books.
@@ -175,7 +176,7 @@ func (s *Store) CountAllBooks() (int, error) {
 //
 //  1. Match by hash (content identity): a page that moved to a different
 //     position keeps its ID because its image content is unchanged.
-//  2. Match remaining entries by position: a page whose content was replaced
+//  2. Match remaining entries by seq: a page whose content was replaced
 //     in-place keeps its ID; only its hash (and filename) is updated.
 //
 // Pages with no match are inserted as new rows.
@@ -190,19 +191,19 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 
 	// Load existing pages for this book.
 	rows, err := tx.Query(
-		`SELECT id, number, hash FROM pages WHERE book_id = ? ORDER BY number`, bookID,
+		`SELECT id, seq, hash FROM pages WHERE book_id = ? ORDER BY seq`, bookID,
 	)
 	if err != nil {
 		return err
 	}
 	type existingPage struct {
-		id, number int
-		hash       string
+		id, seq int
+		hash    string
 	}
 	var existing []existingPage
 	for rows.Next() {
 		var p existingPage
-		if err := rows.Scan(&p.id, &p.number, &p.hash); err != nil {
+		if err := rows.Scan(&p.id, &p.seq, &p.hash); err != nil {
 			rows.Close()
 			return err
 		}
@@ -233,13 +234,13 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 		}
 	}
 
-	// Pass 2: match remaining entries by position (content replaced in-place).
+	// Pass 2: match remaining entries by seq (content replaced in-place).
 	for newIdx, entry := range entries {
 		if usedNew[newIdx] {
 			continue
 		}
 		for exIdx, ex := range existing {
-			if !usedExisting[exIdx] && ex.number == entry.Number {
+			if !usedExisting[exIdx] && ex.seq == entry.Seq {
 				matches[ex.id] = newIdx
 				usedExisting[exIdx] = true
 				usedNew[newIdx] = true
@@ -248,25 +249,25 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 		}
 	}
 
-	// Update matched pages: number, filename, or hash may have changed.
+	// Update matched pages: seq, filename, or hash may have changed.
 	for exID, newIdx := range matches {
 		entry := entries[newIdx]
 		if _, err := tx.Exec(
-			`UPDATE pages SET number = ?, filename = ?, hash = ? WHERE id = ?`,
-			entry.Number, entry.Filename, entry.Hash, exID,
+			`UPDATE pages SET seq = ?, filename = ?, hash = ? WHERE id = ?`,
+			entry.Seq, entry.Filename, entry.Hash, exID,
 		); err != nil {
 			return err
 		}
 	}
 
-	// Insert truly new pages (no existing page matched by hash or position).
+	// Insert truly new pages (no existing page matched by hash or seq).
 	for newIdx, entry := range entries {
 		if usedNew[newIdx] {
 			continue
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO pages (book_id, number, filename, hash) VALUES (?, ?, ?, ?)`,
-			bookID, entry.Number, entry.Filename, entry.Hash,
+			`INSERT INTO pages (book_id, seq, filename, hash) VALUES (?, ?, ?, ?)`,
+			bookID, entry.Seq, entry.Filename, entry.Hash,
 		); err != nil {
 			return err
 		}
@@ -285,12 +286,12 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 	return tx.Commit()
 }
 
-// ListPages returns all pages for a book ordered by number.
+// ListPages returns all pages for a book ordered by seq.
 // Only scan-derived fields are returned; user annotations are in separate tables.
 func (s *Store) ListPages(bookID string) ([]Page, error) {
 	rows, err := s.db.Query(`
-		SELECT id, book_id, number, filename, hash
-		FROM pages WHERE book_id = ? ORDER BY number
+		SELECT id, book_id, seq, filename, hash
+		FROM pages WHERE book_id = ? ORDER BY seq
 	`, bookID)
 	if err != nil {
 		return nil, err
@@ -300,7 +301,7 @@ func (s *Store) ListPages(bookID string) ([]Page, error) {
 	var pages []Page
 	for rows.Next() {
 		var p Page
-		if err := rows.Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash); err != nil {
+		if err := rows.Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash); err != nil {
 			return nil, err
 		}
 		pages = append(pages, p)
@@ -312,22 +313,22 @@ func (s *Store) ListPages(bookID string) ([]Page, error) {
 func (s *Store) GetPage(pageID int) (*Page, error) {
 	var p Page
 	err := s.db.QueryRow(`
-		SELECT id, book_id, number, filename, hash
+		SELECT id, book_id, seq, filename, hash
 		FROM pages WHERE id = ?
-	`, pageID).Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash)
+	`, pageID).Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return &p, err
 }
 
-// GetCoverPage returns the first page of a book, or nil if none exists.
+// GetCoverPage returns the first page (lowest seq) of a book, or nil if none exists.
 func (s *Store) GetCoverPage(bookID string) (*Page, error) {
 	var p Page
 	err := s.db.QueryRow(`
-		SELECT id, book_id, number, filename, hash
-		FROM pages WHERE book_id = ? ORDER BY number LIMIT 1
-	`, bookID).Scan(&p.ID, &p.BookID, &p.Number, &p.Filename, &p.Hash)
+		SELECT id, book_id, seq, filename, hash
+		FROM pages WHERE book_id = ? ORDER BY seq LIMIT 1
+	`, bookID).Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -354,52 +355,24 @@ func (s *Store) CountPages(bookID string) (int, error) {
 func (s *Store) GetPageNote(pageID int) (PageNote, error) {
 	var note PageNote
 	err := s.db.QueryRow(
-		`SELECT title, body FROM page_notes WHERE page_id = ?`, pageID,
-	).Scan(&note.Title, &note.Body)
+		`SELECT body FROM page_notes WHERE page_id = ?`, pageID,
+	).Scan(&note.Body)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PageNote{}, nil
 	}
 	return note, err
 }
 
-// UpsertPageNote inserts or updates the note (title and body) for a page.
-func (s *Store) UpsertPageNote(pageID int, title, body string) error {
+// UpsertPageNote inserts or updates the note body for a page.
+func (s *Store) UpsertPageNote(pageID int, body string) error {
 	_, err := s.db.Exec(`
-		INSERT INTO page_notes (page_id, title, body, updated_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO page_notes (page_id, body, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(page_id) DO UPDATE SET
-			title      = excluded.title,
 			body       = excluded.body,
 			updated_at = CURRENT_TIMESTAMP
-	`, pageID, title, body)
+	`, pageID, body)
 	return err
-}
-
-// ListPageNoteTitlesByBook returns a map of pageID → note title for all pages
-// in a book that have a non-empty note title. Used to populate overview grids
-// without a per-page query.
-func (s *Store) ListPageNoteTitlesByBook(bookID string) (map[int]string, error) {
-	rows, err := s.db.Query(`
-		SELECT pn.page_id, pn.title
-		FROM page_notes pn
-		JOIN pages p ON p.id = pn.page_id
-		WHERE p.book_id = ? AND pn.title != ''
-	`, bookID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	m := make(map[int]string)
-	for rows.Next() {
-		var pageID int
-		var title string
-		if err := rows.Scan(&pageID, &title); err != nil {
-			return nil, err
-		}
-		m[pageID] = title
-	}
-	return m, rows.Err()
 }
 
 // ── Page drawings ──────────────────────────────────────────────
@@ -533,16 +506,16 @@ func (s *Store) ListPageSectionPageIDsByBook(bookID string) (map[int]bool, error
 	return m, rows.Err()
 }
 
-// GetTOC returns all section range entries for a book ordered by start page.
-// end_page is derived from the section_ranges view: it equals the start page of
-// the following section minus one, or the last page of the book for the final
-// section.
+// GetTOC returns all section entries for a book ordered by seq, with EndPage
+// derived in Go: each section ends one seq before the next section starts,
+// and the final section extends to the last page of the book.
 func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	rows, err := s.db.Query(`
-		SELECT start_page, title, description, end_page
-		FROM section_ranges
-		WHERE book_id = ?
-		ORDER BY start_page
+		SELECT p.seq, ps.title, ps.description
+		FROM page_sections ps
+		JOIN pages p ON p.id = ps.page_id
+		WHERE p.book_id = ?
+		ORDER BY p.seq
 	`, bookID)
 	if err != nil {
 		return nil, err
@@ -552,12 +525,104 @@ func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	var entries []TocEntry
 	for rows.Next() {
 		var e TocEntry
-		if err := rows.Scan(&e.PageNum, &e.Title, &e.Description, &e.EndPage); err != nil {
+		if err := rows.Scan(&e.PageNum, &e.Title, &e.Description); err != nil {
 			return nil, err
 		}
 		entries = append(entries, e)
 	}
-	return entries, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(entries) == 0 {
+		return nil, nil
+	}
+
+	// Derive end_page: last seq of each section.
+	var lastSeq int
+	if err := s.db.QueryRow(
+		`SELECT COALESCE(MAX(seq), 0) FROM pages WHERE book_id = ?`, bookID,
+	).Scan(&lastSeq); err != nil {
+		return nil, err
+	}
+
+	for i := range entries {
+		if i+1 < len(entries) {
+			entries[i].EndPage = entries[i+1].PageNum - 1
+		} else {
+			entries[i].EndPage = lastSeq
+		}
+	}
+
+	return entries, nil
+}
+
+// ── Page labels ────────────────────────────────────────────────
+
+// UpsertPageLabels replaces all labels for a page in a single transaction.
+// An empty labels slice removes all labels for the page.
+func (s *Store) UpsertPageLabels(pageID int, labels []string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM page_labels WHERE page_id = ?`, pageID); err != nil {
+		return err
+	}
+
+	for _, label := range labels {
+		if label == "" {
+			continue
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO page_labels (page_id, label) VALUES (?, ?)`, pageID, label,
+		); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetPageByLabel returns the page with the lowest seq whose label matches
+// within the given book. Returns nil if no page carries that label.
+func (s *Store) GetPageByLabel(bookID, label string) (*Page, error) {
+	var p Page
+	err := s.db.QueryRow(`
+		SELECT p.id, p.book_id, p.seq, p.filename, p.hash
+		FROM pages p
+		JOIN page_labels pl ON pl.page_id = p.id
+		WHERE p.book_id = ? AND pl.label = ?
+		ORDER BY p.seq
+		LIMIT 1
+	`, bookID, label).Scan(&p.ID, &p.BookID, &p.Seq, &p.Filename, &p.Hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return &p, err
+}
+
+// ListPageLabels returns all labels for a page ordered alphabetically.
+func (s *Store) ListPageLabels(pageID int) ([]string, error) {
+	rows, err := s.db.Query(
+		`SELECT label FROM page_labels WHERE page_id = ? ORDER BY label`, pageID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var labels []string
+	for rows.Next() {
+		var label string
+		if err := rows.Scan(&label); err != nil {
+			return nil, err
+		}
+		labels = append(labels, label)
+	}
+	return labels, rows.Err()
 }
 
 // ── Book notes ─────────────────────────────────────────────────

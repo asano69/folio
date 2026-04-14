@@ -5,7 +5,6 @@ import { PANE_EVENT_EDIT_OPEN, PANE_EVENT_DRAW_OPEN } from './pane-events';
 // EditorSnapshot captures all editable field values at a point in time,
 // used to restore the pane to its original state when the user cancels.
 interface EditorSnapshot {
-  noteTitle:          string;
   noteBody:           string;
   isSection:          boolean;
   sectionTitle:       string;
@@ -26,7 +25,6 @@ export function initEditor(): void {
   const pageId = parseInt(pageIdStr, 10);
   if (isNaN(pageId)) return;
 
-  const noteTitleInput          = document.getElementById('edit-note-title')          as HTMLInputElement    | null;
   const bodyTextarea            = document.getElementById('edit-body')                as HTMLTextAreaElement | null;
   const sectionToggle           = document.getElementById('edit-section-toggle')      as HTMLInputElement    | null;
   const sectionTitleInput       = document.getElementById('edit-section-title')       as HTMLInputElement    | null;
@@ -50,7 +48,7 @@ export function initEditor(): void {
     pane.classList.add('open');
     backdrop?.classList.add('visible');
     toggleBtn.classList.add('active');
-    noteTitleInput?.focus();
+    bodyTextarea?.focus();
   };
 
   const close = (): void => {
@@ -81,7 +79,6 @@ export function initEditor(): void {
 
   function captureValues(): EditorSnapshot {
     return {
-      noteTitle:          noteTitleInput?.value          ?? '',
       noteBody:           bodyTextarea?.value            ?? '',
       isSection:          sectionToggle?.checked         ?? false,
       sectionTitle:       sectionTitleInput?.value       ?? '',
@@ -90,7 +87,6 @@ export function initEditor(): void {
   }
 
   function restoreSnapshot(): void {
-    if (noteTitleInput)          noteTitleInput.value          = snapshot.noteTitle;
     if (bodyTextarea)            bodyTextarea.value            = snapshot.noteBody;
     if (sectionToggle)           sectionToggle.checked         = snapshot.isSection;
     if (sectionTitleInput)       sectionTitleInput.value       = snapshot.sectionTitle;
@@ -105,8 +101,7 @@ export function initEditor(): void {
       const current = captureValues();
 
       const notePayload: PageNotePayload = {
-        title: current.noteTitle,
-        body:  current.noteBody,
+        body: current.noteBody,
       };
       const sectionPayload: PageSectionPayload = {
         title:       current.sectionTitle,
