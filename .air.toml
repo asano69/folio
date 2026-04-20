@@ -1,7 +1,7 @@
 [build]
   cmd = "make static/app.js static/style.css && go build -o ./tmp/folio ./cmd/folio/"
   bin = "./tmp/folio"
-  full_bin = "env $(cat folio.env | xargs) ./tmp/folio server"
+  full_bin = "env $(cat folio.env | xargs) ./tmp/folio serve"
   include_ext = ["go", "ts", "css", "html"]
   include_dir = ["cmd", "internal", "src", "templates"]
   exclude_dir = ["tmp", ".js"]

@@ -19,7 +19,7 @@ CSS_OUT   := static/style.css
 # ─────────────────────────────────────────
 .PHONY: all
 all: $(JS_OUT) $(CSS_OUT)
-	go run ./cmd/folio/ server
+	go run ./cmd/folio/ serve
 
 # ─────────────────────────────────────────
 # Build

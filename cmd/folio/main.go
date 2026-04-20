@@ -16,7 +16,7 @@ func main() {
 	cfg := config.Load()
 
 	switch os.Args[1] {
-	case "server":
+	case "serve":
 		runServer(cfg)
 	case "scan":
 		scanPath := cfg.LibraryPath
@@ -78,7 +78,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, `Usage: folio <subcommand> [arguments]
 
 Subcommands:
-  server                     Start the HTTP server
+  serve                      Start the HTTP server
   scan [path]                Scan CBZ files and sync the database
                              (default path: FOLIO_LIBRARY_PATH)
   thumbnail <uuid>           Regenerate the book-level thumbnail for one book
