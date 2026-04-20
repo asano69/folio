@@ -141,7 +141,8 @@ const bookSelectSQL = `
     id, title, source, status, file_mtime, missing_since,
     type, abstract, language, author, translator, origtitle,
     edition, volume, series, series_number, publisher, year,
-    note, keywords, isbn, links`
+    note, keywords, isbn, links
+`
 
 // scanBookRow scans a database row into a Book, decoding JSON array columns.
 // The row must have been selected with bookSelectSQL column order.

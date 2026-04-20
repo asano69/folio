@@ -46,7 +46,8 @@ function readScriptJSON<T>(elementId: string, fallback: T): T {
   const el = document.getElementById(elementId);
   if (!el) return fallback;
   try {
-    return JSON.parse(el.textContent ?? '') as T;
+    const parsed = JSON.parse(el.textContent ?? '') as T | null;
+    return parsed ?? fallback;
   } catch {
     return fallback;
   }
