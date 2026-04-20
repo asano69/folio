@@ -12,15 +12,93 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
 
-const metaFile = "folio.json"
+const (
+	metaFile    = "folio.json"
+	metaVersion = "2026-04-20"
+)
 
+// folioMeta is the in-memory representation of folio.json stored inside a CBZ.
+// Fields map directly to the JSON keys in the file.
+// Required fields: version, id, title.
+// All other fields are optional (omitempty).
 type folioMeta struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
+	Version      string       `json:"version"`
+	ID           string       `json:"id"`
+	Type         string       `json:"type,omitempty"`
+	Abstract     string       `json:"abstract,omitempty"`
+	Language     string       `json:"language,omitempty"`
+	Author       []PersonName `json:"author,omitempty"`
+	Translator   []PersonName `json:"translator,omitempty"`
+	Title        string       `json:"title"`
+	OrigTitle    string       `json:"origtitle,omitempty"`
+	Edition      string       `json:"edition,omitempty"`
+	Volume       string       `json:"volume,omitempty"`
+	Series       string       `json:"series,omitempty"`
+	SeriesNumber string       `json:"series_number,omitempty"`
+	Publisher    string       `json:"publisher,omitempty"`
+	Year         string       `json:"year,omitempty"`
+	Note         string       `json:"note,omitempty"`
+	Keywords     []string     `json:"keywords,omitempty"`
+	ISBN         string       `json:"isbn,omitempty"`
+	Links        []string     `json:"links,omitempty"`
+	CreatedAt    string       `json:"created_at,omitempty"`
+	UpdatedAt    string       `json:"updated_at,omitempty"`
+}
+
+// metaToBook converts a folioMeta into a Book, setting source and mtime from the caller.
+func metaToBook(meta *folioMeta, source string, mtime int64) Book {
+	return Book{
+		ID:           meta.ID,
+		Title:        meta.Title,
+		Source:       source,
+		FileMtime:    mtime,
+		Type:         meta.Type,
+		Abstract:     meta.Abstract,
+		Language:     meta.Language,
+		Author:       meta.Author,
+		Translator:   meta.Translator,
+		OrigTitle:    meta.OrigTitle,
+		Edition:      meta.Edition,
+		Volume:       meta.Volume,
+		Series:       meta.Series,
+		SeriesNumber: meta.SeriesNumber,
+		Publisher:    meta.Publisher,
+		Year:         meta.Year,
+		Note:         meta.Note,
+		Keywords:     meta.Keywords,
+		ISBN:         meta.ISBN,
+		Links:        meta.Links,
+	}
+}
+
+// bookToMeta converts a Book's metadata fields into a folioMeta.
+// Timestamps (created_at, updated_at) and version must be set by the caller.
+func bookToMeta(b Book) *folioMeta {
+	return &folioMeta{
+		ID:           b.ID,
+		Type:         b.Type,
+		Abstract:     b.Abstract,
+		Language:     b.Language,
+		Author:       b.Author,
+		Translator:   b.Translator,
+		Title:        b.Title,
+		OrigTitle:    b.OrigTitle,
+		Edition:      b.Edition,
+		Volume:       b.Volume,
+		Series:       b.Series,
+		SeriesNumber: b.SeriesNumber,
+		Publisher:    b.Publisher,
+		Year:         b.Year,
+		Note:         b.Note,
+		Keywords:     b.Keywords,
+		ISBN:         b.ISBN,
+		Links:        b.Links,
+	}
 }
 
 // openCBZMeta reads only folio.json from a CBZ and returns book identity and
@@ -51,12 +129,7 @@ func openCBZMeta(path string) (Book, error) {
 		return Book{Source: path, FileMtime: info.ModTime().Unix()}, nil
 	}
 
-	return Book{
-		ID:        meta.ID,
-		Title:     meta.Title,
-		Source:    path,
-		FileMtime: info.ModTime().Unix(),
-	}, nil
+	return metaToBook(meta, path, info.ModTime().Unix()), nil
 }
 
 func openCBZ(path string) (Book, error) {
@@ -80,9 +153,13 @@ func openCBZ(path string) (Book, error) {
 			r.Close()
 			return Book{}, fmt.Errorf("generate uuid: %w", err)
 		}
+		now := time.Now().Format(time.RFC3339)
 		m := &folioMeta{
-			ID:    id.String(),
-			Title: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
+			Version:   metaVersion,
+			ID:        id.String(),
+			Title:     strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
+			CreatedAt: now,
+			UpdatedAt: now,
 		}
 		// writeMeta closes r as a side effect.
 		if err := writeMeta(path, r, m); err != nil {
@@ -110,13 +187,9 @@ func openCBZ(path string) (Book, error) {
 		return Book{}, fmt.Errorf("stat %s: %w", path, err)
 	}
 
-	return Book{
-		ID:        meta.ID,
-		Title:     meta.Title,
-		Source:    path,
-		FileMtime: info.ModTime().Unix(),
-		Pages:     images,
-	}, nil
+	book := metaToBook(meta, path, info.ModTime().Unix())
+	book.Pages = images
+	return book, nil
 }
 
 // OpenBook opens a single CBZ file and returns its book data including images
@@ -149,7 +222,9 @@ func OpenPage(cbzPath, filename string) (io.ReadCloser, error) {
 	return nil, fmt.Errorf("page %s not found in %s", filename, cbzPath)
 }
 
-// UpdateTitle rewrites the title field in folio.json inside the CBZ archive.
+// UpdateTitle rewrites only the title field in folio.json inside the CBZ archive.
+// This is used by the inline rename on the library page.
+// For full metadata updates, use UpdateFolioMeta instead.
 func UpdateTitle(cbzPath, newTitle string) error {
 	r, err := zip.OpenReader(cbzPath)
 	if err != nil {
@@ -167,6 +242,38 @@ func UpdateTitle(cbzPath, newTitle string) error {
 	}
 
 	meta.Title = newTitle
+	meta.Version = metaVersion
+	meta.UpdatedAt = time.Now().Format(time.RFC3339)
+	// writeMeta closes r before overwriting the file.
+	return writeMeta(cbzPath, r, meta)
+}
+
+// UpdateFolioMeta rewrites folio.json inside the CBZ with the given book metadata.
+// The existing created_at timestamp is preserved; updated_at is set to the current time.
+// This is used by the bibliography page metadata editor.
+func UpdateFolioMeta(cbzPath string, b Book) error {
+	r, err := zip.OpenReader(cbzPath)
+	if err != nil {
+		return fmt.Errorf("open cbz %s: %w", cbzPath, err)
+	}
+
+	existing, err := readMeta(r)
+	if err != nil {
+		r.Close()
+		return err
+	}
+
+	meta := bookToMeta(b)
+	meta.Version = metaVersion
+	meta.UpdatedAt = time.Now().Format(time.RFC3339)
+
+	if existing != nil && existing.CreatedAt != "" {
+		meta.CreatedAt = existing.CreatedAt
+	} else {
+		// Preserve created_at as the current time if no prior value exists.
+		meta.CreatedAt = meta.UpdatedAt
+	}
+
 	// writeMeta closes r before overwriting the file.
 	return writeMeta(cbzPath, r, meta)
 }
@@ -203,8 +310,9 @@ func readMeta(r *zip.ReadCloser) (*folioMeta, error) {
 	return nil, nil
 }
 
-// writeMeta rewrites the CBZ with folio.json added.
+// writeMeta rewrites the CBZ with folio.json added or replaced.
 // Existing entries are copied as raw compressed bytes to preserve their CRC32 values.
+// writeMeta closes r before overwriting the file.
 func writeMeta(path string, r *zip.ReadCloser, meta *folioMeta) error {
 	data, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {

@@ -13,8 +13,8 @@ import (
 //
 // Routes:
 //
-//	PUT  /api/books/{id}           — rename a book
-//	PUT  /api/books/{id}/note      — save book-level memo
+//	PUT  /api/books/{id}           — rename a book (updates folio.json + DB title)
+//	PUT  /api/books/{id}/meta      — save all book metadata (updates folio.json + DB)
 //	POST /api/books/{id}/thumbnail — regenerate book-level thumbnail
 type BooksAPIHandler struct {
 	Store     *store.Store
@@ -39,9 +39,9 @@ func (h *BooksAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// PUT /api/books/{id}/note
-	if strings.HasSuffix(path, "/note") {
-		bookID := strings.TrimSuffix(path, "/note")
+	// PUT /api/books/{id}/meta
+	if strings.HasSuffix(path, "/meta") {
+		bookID := strings.TrimSuffix(path, "/meta")
 		if bookID == "" || strings.Contains(bookID, "/") {
 			http.Error(w, "invalid book ID", http.StatusBadRequest)
 			return
@@ -50,7 +50,7 @@ func (h *BooksAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		h.saveBookNote(w, r, bookID)
+		h.saveBookMeta(w, r, bookID)
 		return
 	}
 
@@ -108,12 +108,40 @@ func (h *BooksAPIHandler) renameBook(w http.ResponseWriter, r *http.Request, boo
 	}{ID: bookID, Title: title})
 }
 
-func (h *BooksAPIHandler) saveBookNote(w http.ResponseWriter, r *http.Request, bookID string) {
-	var body struct {
-		Body string `json:"body"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+// bookMetaRequest is the request body for PUT /api/books/{id}/meta.
+// All fields except title are optional.
+type bookMetaRequest struct {
+	Title        string               `json:"title"`
+	Type         string               `json:"type"`
+	Abstract     string               `json:"abstract"`
+	Language     string               `json:"language"`
+	Author       []storage.PersonName `json:"author"`
+	Translator   []storage.PersonName `json:"translator"`
+	OrigTitle    string               `json:"origtitle"`
+	Edition      string               `json:"edition"`
+	Volume       string               `json:"volume"`
+	Series       string               `json:"series"`
+	SeriesNumber string               `json:"series_number"`
+	Publisher    string               `json:"publisher"`
+	Year         string               `json:"year"`
+	Note         string               `json:"note"`
+	Keywords     []string             `json:"keywords"`
+	ISBN         string               `json:"isbn"`
+	Links        []string             `json:"links"`
+}
+
+// saveBookMeta handles PUT /api/books/{id}/meta.
+// It writes all metadata fields to both folio.json inside the CBZ and the DB.
+func (h *BooksAPIHandler) saveBookMeta(w http.ResponseWriter, r *http.Request, bookID string) {
+	var req bookMetaRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		http.Error(w, "title cannot be empty", http.StatusBadRequest)
 		return
 	}
 
@@ -123,7 +151,34 @@ func (h *BooksAPIHandler) saveBookNote(w http.ResponseWriter, r *http.Request, b
 		return
 	}
 
-	if err := h.Store.UpsertBookNote(bookID, body.Body); err != nil {
+	meta := storage.Book{
+		ID:           bookID,
+		Title:        title,
+		Type:         req.Type,
+		Abstract:     req.Abstract,
+		Language:     req.Language,
+		Author:       req.Author,
+		Translator:   req.Translator,
+		OrigTitle:    req.OrigTitle,
+		Edition:      req.Edition,
+		Volume:       req.Volume,
+		Series:       req.Series,
+		SeriesNumber: req.SeriesNumber,
+		Publisher:    req.Publisher,
+		Year:         req.Year,
+		Note:         req.Note,
+		Keywords:     req.Keywords,
+		ISBN:         req.ISBN,
+		Links:        req.Links,
+	}
+
+	// Update folio.json inside the CBZ first; if this fails the DB is not touched.
+	if err := storage.UpdateFolioMeta(book.Source, meta); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.Store.UpdateBookMeta(bookID, meta); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

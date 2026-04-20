@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -14,7 +15,7 @@ import (
 // BookDispatchHandler routes:
 //
 //	GET /books/{uuid}/overview      — page grid with status and thumbnails
-//	GET /books/{uuid}/bibliography  — sections TOC, stats, and book-level memo
+//	GET /books/{uuid}/bibliography  — sections TOC, stats, and book metadata editor
 //	GET /books/{uuid}?seq=N         — viewer at image sequence position N
 //	GET /books/{uuid}?p=PAGENUMBER  — viewer at the image carrying that book page number
 //	GET /books/{uuid}               — redirect to /books/{uuid}/overview
@@ -153,28 +154,35 @@ func (h *BookDispatchHandler) serveBibliographic(w http.ResponseWriter, r *http.
 		return
 	}
 
-	noteBody, err := h.Store.GetBookNote(bookID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	toc, err := h.Store.GetTOC(bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// Serialize array fields to JSON for use in <script type="application/json"> tags.
+	// template.JS prevents HTML escaping so the JSON remains valid when read by JavaScript.
+	authorJSON, _ := json.Marshal(book.Author)
+	translatorJSON, _ := json.Marshal(book.Translator)
+	keywordsJSON, _ := json.Marshal(book.Keywords)
+	linksJSON, _ := json.Marshal(book.Links)
+
 	data := struct {
-		Book      *store.Book
-		PageCount int
-		NoteBody  string
-		TOC       []store.TocEntry
+		Book           *store.Book
+		PageCount      int
+		TOC            []store.TocEntry
+		AuthorJSON     template.JS
+		TranslatorJSON template.JS
+		KeywordsJSON   template.JS
+		LinksJSON      template.JS
 	}{
-		Book:      book,
-		PageCount: pageCount,
-		NoteBody:  noteBody,
-		TOC:       toc,
+		Book:           book,
+		PageCount:      pageCount,
+		TOC:            toc,
+		AuthorJSON:     template.JS(authorJSON),
+		TranslatorJSON: template.JS(translatorJSON),
+		KeywordsJSON:   template.JS(keywordsJSON),
+		LinksJSON:      template.JS(linksJSON),
 	}
 
 	if err := h.BibliographicTemplate.Execute(w, data); err != nil {

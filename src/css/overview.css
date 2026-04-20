@@ -166,31 +166,77 @@
   line-height: var(--line-height-relaxed);
 }
 
-/* ── Note form ────────────────────────────────────────────────── */
-.bibliographic-note-form {
+/* ── Metadata editor form ─────────────────────────────────────── */
+.bibliographic-meta-form {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-xl);
 }
 
-.bibliographic-note-textarea {
-  width: 100%;
-  min-height: 12rem;
-  padding: var(--spacing-lg);
+/* A row that places two fields side by side */
+.bibliographic-meta-row {
+  display: flex;
+  gap: var(--spacing-xl);
+  align-items: flex-end;
+}
+
+.bibliographic-meta-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  flex: 1;
+}
+
+/* Short fields (year, edition, volume, etc.) do not grow to fill available space */
+.bibliographic-meta-field--short {
+  flex: 0 0 auto;
+  min-width: 6rem;
+  max-width: 10rem;
+}
+
+.bibliographic-meta-field label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-md);
+}
+
+.bibliographic-meta-hint {
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  color: var(--color-text-faint);
+}
+
+.bibliographic-meta-field input[type="text"],
+.bibliographic-meta-field textarea {
+  padding: var(--spacing-md) var(--spacing-lg);
   border: 1px solid var(--color-border-medium);
   border-radius: var(--radius);
   font-family: inherit;
   font-size: var(--font-size-md);
-  resize: vertical;
   background: var(--color-surface-bg);
-  line-height: var(--line-height-relaxed);
+  line-height: var(--line-height-base);
 }
 
-.bibliographic-note-textarea:focus {
+.bibliographic-meta-field input[type="text"]:focus,
+.bibliographic-meta-field textarea:focus {
   outline: none;
   border-color: var(--color-primary);
 }
 
+.bibliographic-meta-field textarea {
+  resize: vertical;
+}
+
+.bibliographic-meta-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xl);
+}
+
+/* Reuse the existing save button style */
 .bibliographic-note-save {
   align-self: flex-start;
   padding: var(--spacing-md) var(--spacing-2xl);
@@ -212,4 +258,17 @@
 .bibliographic-note-save:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Inline status message shown after save attempt */
+.bibliographic-meta-status {
+  font-size: var(--font-size-sm);
+}
+
+.bibliographic-meta-status--success {
+  color: var(--color-primary-dark);
+}
+
+.bibliographic-meta-status--error {
+  color: var(--color-danger);
 }

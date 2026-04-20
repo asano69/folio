@@ -22,15 +22,34 @@ PRAGMA journal_mode = WAL;
 
 -- ── Core entities ──────────────────────────────────────────────
 
+-- Extended metadata columns mirror the fields in folio.json.
+-- Array-valued fields (author, translator, keywords, links) are stored as JSON text.
 CREATE TABLE IF NOT EXISTS books (
-    id            TEXT PRIMARY KEY,
+    id            TEXT PRIMARY KEY,            -- UUID from folio.json
     title         TEXT NOT NULL,
-    source        TEXT NOT NULL,
+    source        TEXT NOT NULL,               -- absolute path to CBZ
     status        TEXT NOT NULL DEFAULT 'unread'
                   CHECK(status IN ('unread','reading','read','skip')),
-    file_mtime    INTEGER NOT NULL DEFAULT 0,
-    missing_since DATETIME,
-    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+    file_mtime    INTEGER NOT NULL DEFAULT 0,  -- Unix timestamp; detects CBZ changes
+    missing_since DATETIME,                    -- set when CBZ not found on last scan
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    -- Optional metadata fields mirrored from folio.json
+    type          TEXT NOT NULL DEFAULT '',
+    abstract      TEXT NOT NULL DEFAULT '',
+    language      TEXT NOT NULL DEFAULT '',
+    author        TEXT NOT NULL DEFAULT '[]',  -- JSON: [{family,given}]
+    translator    TEXT NOT NULL DEFAULT '[]',  -- JSON: [{family,given}]
+    origtitle     TEXT NOT NULL DEFAULT '',
+    edition       TEXT NOT NULL DEFAULT '',
+    volume        TEXT NOT NULL DEFAULT '',
+    series        TEXT NOT NULL DEFAULT '',
+    series_number TEXT NOT NULL DEFAULT '',
+    publisher     TEXT NOT NULL DEFAULT '',
+    year          TEXT NOT NULL DEFAULT '',
+    note          TEXT NOT NULL DEFAULT '',
+    keywords      TEXT NOT NULL DEFAULT '[]',  -- JSON: [string]
+    isbn          TEXT NOT NULL DEFAULT '',
+    links         TEXT NOT NULL DEFAULT '[]'   -- JSON: [string]
 );
 
 -- pages holds scan-derived data plus the user-assigned real book page number.
@@ -96,15 +115,6 @@ CREATE TABLE IF NOT EXISTS sections (
     description   TEXT    NOT NULL DEFAULT '',
     status        TEXT    NOT NULL DEFAULT 'unread'
                   CHECK(status IN ('unread','reading','read','skip'))
-);
-
--- ── Per-book annotations ───────────────────────────────────────
-
--- One memo per book.
-CREATE TABLE IF NOT EXISTS book_notes (
-    book_id    TEXT PRIMARY KEY REFERENCES books(id),
-    body       TEXT NOT NULL DEFAULT '',
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ── Collections ────────────────────────────────────────────────

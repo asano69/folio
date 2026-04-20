@@ -12,6 +12,8 @@
     </nav>
 
     <div class="bibliographic-layout">
+
+        {{/* ── Stats (read-only) ──────────────────────────────────────── */}}
         <section class="bibliographic-section">
             <h3 class="bibliographic-section-title">Stats</h3>
             <dl class="bibliographic-stats">
@@ -20,6 +22,129 @@
             </dl>
         </section>
 
+        {{/* ── Metadata editor ────────────────────────────────────────── */}}
+        {{/*
+            Array fields (author, translator, keywords, links) are passed as
+            JSON via <script type="application/json"> tags so that JavaScript
+            can initialize the dynamic form fields without HTML-encoding issues.
+        */}}
+        <script type="application/json" id="book-author-data">{{.AuthorJSON}}</script>
+        <script type="application/json" id="book-translator-data">{{.TranslatorJSON}}</script>
+        <script type="application/json" id="book-keywords-data">{{.KeywordsJSON}}</script>
+        <script type="application/json" id="book-links-data">{{.LinksJSON}}</script>
+
+        <section class="bibliographic-section">
+            <h3 class="bibliographic-section-title">Metadata</h3>
+            <div class="bibliographic-meta-form" id="book-meta-form" data-book-id="{{.Book.ID}}">
+
+                <div class="bibliographic-meta-row">
+                    <div class="bibliographic-meta-field">
+                        <label for="meta-title">Title</label>
+                        <input type="text" id="meta-title" value="{{.Book.Title}}">
+                    </div>
+                    <div class="bibliographic-meta-field bibliographic-meta-field--short">
+                        <label for="meta-type">Type</label>
+                        <input type="text" id="meta-type" value="{{.Book.Type}}" placeholder="book">
+                    </div>
+                </div>
+
+                <div class="bibliographic-meta-field">
+                    <label for="meta-origtitle">Original title</label>
+                    <input type="text" id="meta-origtitle" value="{{.Book.OrigTitle}}">
+                </div>
+
+                <div class="bibliographic-meta-field">
+                    <label>
+                        Author
+                        <span class="bibliographic-meta-hint">one per line: Family, Given</span>
+                    </label>
+                    <textarea id="meta-author" rows="3" placeholder="Yamada, Taro&#10;Suzuki, Hanako"></textarea>
+                </div>
+
+                <div class="bibliographic-meta-field">
+                    <label>
+                        Translator
+                        <span class="bibliographic-meta-hint">one per line: Family, Given</span>
+                    </label>
+                    <textarea id="meta-translator" rows="2" placeholder="Smith, John"></textarea>
+                </div>
+
+                <div class="bibliographic-meta-row">
+                    <div class="bibliographic-meta-field">
+                        <label for="meta-publisher">Publisher</label>
+                        <input type="text" id="meta-publisher" value="{{.Book.Publisher}}">
+                    </div>
+                    <div class="bibliographic-meta-field bibliographic-meta-field--short">
+                        <label for="meta-year">Year</label>
+                        <input type="text" id="meta-year" value="{{.Book.Year}}" placeholder="2024">
+                    </div>
+                </div>
+
+                <div class="bibliographic-meta-row">
+                    <div class="bibliographic-meta-field bibliographic-meta-field--short">
+                        <label for="meta-edition">Edition</label>
+                        <input type="text" id="meta-edition" value="{{.Book.Edition}}" placeholder="2">
+                    </div>
+                    <div class="bibliographic-meta-field bibliographic-meta-field--short">
+                        <label for="meta-volume">Volume</label>
+                        <input type="text" id="meta-volume" value="{{.Book.Volume}}" placeholder="1">
+                    </div>
+                    <div class="bibliographic-meta-field bibliographic-meta-field--short">
+                        <label for="meta-language">Language</label>
+                        <input type="text" id="meta-language" value="{{.Book.Language}}" placeholder="ja">
+                    </div>
+                </div>
+
+                <div class="bibliographic-meta-row">
+                    <div class="bibliographic-meta-field">
+                        <label for="meta-series">Series</label>
+                        <input type="text" id="meta-series" value="{{.Book.Series}}">
+                    </div>
+                    <div class="bibliographic-meta-field bibliographic-meta-field--short">
+                        <label for="meta-series-number">Series no.</label>
+                        <input type="text" id="meta-series-number" value="{{.Book.SeriesNumber}}" placeholder="12">
+                    </div>
+                </div>
+
+                <div class="bibliographic-meta-field">
+                    <label for="meta-isbn">ISBN</label>
+                    <input type="text" id="meta-isbn" value="{{.Book.ISBN}}" placeholder="978-…">
+                </div>
+
+                <div class="bibliographic-meta-field">
+                    <label>
+                        Keywords
+                        <span class="bibliographic-meta-hint">one per line</span>
+                    </label>
+                    <textarea id="meta-keywords" rows="3"></textarea>
+                </div>
+
+                <div class="bibliographic-meta-field">
+                    <label>
+                        Links
+                        <span class="bibliographic-meta-hint">one per line</span>
+                    </label>
+                    <textarea id="meta-links" rows="2" placeholder="https://…"></textarea>
+                </div>
+
+                <div class="bibliographic-meta-field">
+                    <label for="meta-abstract">Abstract</label>
+                    <textarea id="meta-abstract" rows="4">{{.Book.Abstract}}</textarea>
+                </div>
+
+                <div class="bibliographic-meta-field">
+                    <label for="meta-note">Note</label>
+                    <textarea id="meta-note" rows="3">{{.Book.Note}}</textarea>
+                </div>
+
+                <div class="bibliographic-meta-actions">
+                    <button id="book-meta-save" class="bibliographic-note-save">Save</button>
+                    <span id="book-meta-status" class="bibliographic-meta-status" hidden></span>
+                </div>
+            </div>
+        </section>
+
+        {{/* ── Sections / TOC ──────────────────────────────────────────── */}}
         <section class="bibliographic-section">
             <h3 class="bibliographic-section-title">Sections</h3>
             {{if .TOC}}
@@ -39,17 +164,6 @@
             {{end}}
         </section>
 
-        <section class="bibliographic-section">
-            <h3 class="bibliographic-section-title">Notes</h3>
-            <div class="bibliographic-note-form">
-                <textarea
-                    id="book-note-body"
-                    class="bibliographic-note-textarea"
-                    data-book-id="{{.Book.ID}}"
-                    placeholder="Add notes about this book…">{{.NoteBody}}</textarea>
-                <button id="book-note-save" class="bibliographic-note-save">Save</button>
-            </div>
-        </section>
     </div>
 </div>
 {{end}}

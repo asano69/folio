@@ -27,11 +27,39 @@ export async function renameBook(bookId: string, title: string): Promise<void> {
   });
 }
 
-export async function saveBookNote(bookId: string, body: string): Promise<void> {
-  await request(`/api/books/${bookId}/note`, {
+// PersonName follows the CSL convention used in folio.json.
+export interface PersonName {
+  family: string;
+  given: string;
+}
+
+// BookMetaPayload carries all editable metadata fields for a book.
+// All fields except title are optional.
+export interface BookMetaPayload {
+  title: string;
+  type?: string;
+  abstract?: string;
+  language?: string;
+  author?: PersonName[];
+  translator?: PersonName[];
+  origtitle?: string;
+  edition?: string;
+  volume?: string;
+  series?: string;
+  series_number?: string;
+  publisher?: string;
+  year?: string;
+  note?: string;
+  keywords?: string[];
+  isbn?: string;
+  links?: string[];
+}
+
+export async function saveBookMeta(bookId: string, payload: BookMetaPayload): Promise<void> {
+  await request(`/api/books/${bookId}/meta`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body }),
+    body: JSON.stringify(payload),
   });
 }
 

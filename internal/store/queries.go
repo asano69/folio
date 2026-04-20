@@ -2,13 +2,15 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	"folio/internal/storage"
 )
 
-// Book is the DB representation of a book.
-// MissingSince is non-nil when the CBZ file was not found during the last scan.
+// Book is the DB representation of a book, including extended metadata fields
+// that mirror folio.json. Array fields (Author, Translator, Keywords, Links)
+// are stored as JSON text in SQLite and decoded on read.
 type Book struct {
 	ID           string
 	Title        string
@@ -16,6 +18,23 @@ type Book struct {
 	Status       string
 	FileMtime    int64
 	MissingSince *string
+	// Extended metadata mirrored from folio.json
+	Type         string
+	Abstract     string
+	Language     string
+	Author       []storage.PersonName
+	Translator   []storage.PersonName
+	OrigTitle    string
+	Edition      string
+	Volume       string
+	Series       string
+	SeriesNumber string
+	Publisher    string
+	Year         string
+	Note         string
+	Keywords     []string
+	ISBN         string
+	Links        []string
 }
 
 // Page is the DB representation of a single scanned image inside a CBZ.
@@ -77,21 +96,170 @@ type BookCollection struct {
 	BookCount   int
 }
 
+// ── JSON helpers for array columns ────────────────────────────
+
+// marshalPersonNames serializes a PersonName slice to a JSON string for DB storage.
+func marshalPersonNames(names []storage.PersonName) string {
+	if len(names) == 0 {
+		return "[]"
+	}
+	b, _ := json.Marshal(names)
+	return string(b)
+}
+
+// unmarshalPersonNames deserializes a JSON string from the DB into a PersonName slice.
+func unmarshalPersonNames(s string) []storage.PersonName {
+	if s == "" || s == "[]" {
+		return nil
+	}
+	var names []storage.PersonName
+	_ = json.Unmarshal([]byte(s), &names)
+	return names
+}
+
+// marshalStrings serializes a string slice to a JSON string for DB storage.
+func marshalStrings(strs []string) string {
+	if len(strs) == 0 {
+		return "[]"
+	}
+	b, _ := json.Marshal(strs)
+	return string(b)
+}
+
+// unmarshalStrings deserializes a JSON string from the DB into a string slice.
+func unmarshalStrings(s string) []string {
+	if s == "" || s == "[]" {
+		return nil
+	}
+	var strs []string
+	_ = json.Unmarshal([]byte(s), &strs)
+	return strs
+}
+
+// bookSelectSQL is the SELECT column list used by all book-returning queries.
+const bookSelectSQL = `
+    id, title, source, status, file_mtime, missing_since,
+    type, abstract, language, author, translator, origtitle,
+    edition, volume, series, series_number, publisher, year,
+    note, keywords, isbn, links`
+
+// scanBookRow scans a database row into a Book, decoding JSON array columns.
+// The row must have been selected with bookSelectSQL column order.
+func scanBookRow(
+	id, title, source, status *string,
+	fileMtime *int64,
+	missingSince **string,
+	typ, abstract, language *string,
+	authorJSON, translatorJSON *string,
+	origTitle, edition, volume, series, seriesNumber *string,
+	publisher, year, note *string,
+	keywordsJSON, isbn, linksJSON *string,
+) Book {
+	b := Book{
+		ID:           *id,
+		Title:        *title,
+		Source:       *source,
+		Status:       *status,
+		FileMtime:    *fileMtime,
+		MissingSince: *missingSince,
+		Type:         *typ,
+		Abstract:     *abstract,
+		Language:     *language,
+		Author:       unmarshalPersonNames(*authorJSON),
+		Translator:   unmarshalPersonNames(*translatorJSON),
+		OrigTitle:    *origTitle,
+		Edition:      *edition,
+		Volume:       *volume,
+		Series:       *series,
+		SeriesNumber: *seriesNumber,
+		Publisher:    *publisher,
+		Year:         *year,
+		Note:         *note,
+		Keywords:     unmarshalStrings(*keywordsJSON),
+		ISBN:         *isbn,
+		Links:        unmarshalStrings(*linksJSON),
+	}
+	return b
+}
+
 // ── Books ──────────────────────────────────────────────────────
 
-// UpsertBook inserts a new book or updates its title, source, file_mtime, and
-// clears missing_since. Status is excluded from the UPDATE so user-set values
-// are preserved across re-scans.
+// UpsertBook inserts a new book or updates its title, source, file_mtime, metadata
+// columns, and clears missing_since. Status is excluded from the UPDATE so
+// user-set values are preserved across re-scans.
 func (s *Store) UpsertBook(b storage.Book) error {
 	_, err := s.db.Exec(`
-		INSERT INTO books (id, title, source, file_mtime)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO books (
+			id, title, source, file_mtime,
+			type, abstract, language, author, translator, origtitle,
+			edition, volume, series, series_number, publisher, year,
+			note, keywords, isbn, links
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			title         = excluded.title,
 			source        = excluded.source,
 			file_mtime    = excluded.file_mtime,
+			type          = excluded.type,
+			abstract      = excluded.abstract,
+			language      = excluded.language,
+			author        = excluded.author,
+			translator    = excluded.translator,
+			origtitle     = excluded.origtitle,
+			edition       = excluded.edition,
+			volume        = excluded.volume,
+			series        = excluded.series,
+			series_number = excluded.series_number,
+			publisher     = excluded.publisher,
+			year          = excluded.year,
+			note          = excluded.note,
+			keywords      = excluded.keywords,
+			isbn          = excluded.isbn,
+			links         = excluded.links,
 			missing_since = NULL
-	`, b.ID, b.Title, b.Source, b.FileMtime)
+	`,
+		b.ID, b.Title, b.Source, b.FileMtime,
+		b.Type, b.Abstract, b.Language,
+		marshalPersonNames(b.Author), marshalPersonNames(b.Translator),
+		b.OrigTitle, b.Edition, b.Volume, b.Series, b.SeriesNumber,
+		b.Publisher, b.Year, b.Note,
+		marshalStrings(b.Keywords), b.ISBN, marshalStrings(b.Links),
+	)
+	return err
+}
+
+// UpdateBookMeta updates all editable metadata columns for a book.
+// Called after the bibliography page saves metadata. Source and file_mtime
+// are not touched; those are scan-managed. Status is not touched either.
+func (s *Store) UpdateBookMeta(id string, b storage.Book) error {
+	_, err := s.db.Exec(`
+		UPDATE books SET
+			title         = ?,
+			type          = ?,
+			abstract      = ?,
+			language      = ?,
+			author        = ?,
+			translator    = ?,
+			origtitle     = ?,
+			edition       = ?,
+			volume        = ?,
+			series        = ?,
+			series_number = ?,
+			publisher     = ?,
+			year          = ?,
+			note          = ?,
+			keywords      = ?,
+			isbn          = ?,
+			links         = ?
+		WHERE id = ?
+	`,
+		b.Title, b.Type, b.Abstract, b.Language,
+		marshalPersonNames(b.Author), marshalPersonNames(b.Translator),
+		b.OrigTitle, b.Edition, b.Volume, b.Series, b.SeriesNumber,
+		b.Publisher, b.Year, b.Note,
+		marshalStrings(b.Keywords), b.ISBN, marshalStrings(b.Links),
+		id,
+	)
 	return err
 }
 
@@ -114,32 +282,20 @@ func (s *Store) UpdateBookTitle(id, title string) error {
 
 // ListBooks returns all books ordered by title, including missing ones.
 func (s *Store) ListBooks() ([]Book, error) {
-	rows, err := s.db.Query(`
-		SELECT id, title, source, status, file_mtime, missing_since
-		FROM books ORDER BY title
-	`)
+	rows, err := s.db.Query(`SELECT` + bookSelectSQL + `FROM books ORDER BY title`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var books []Book
-	for rows.Next() {
-		var b Book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince); err != nil {
-			return nil, err
-		}
-		books = append(books, b)
-	}
-	return books, rows.Err()
+	return scanBookRows(rows)
 }
 
 // ListBooksUnderPath returns books whose source path is under the given
 // directory. Used by partial scans to restrict missing-book detection.
 func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
 	rows, err := s.db.Query(
-		`SELECT id, title, source, status, file_mtime, missing_since
-		 FROM books WHERE source LIKE ? || '/%'`,
+		`SELECT`+bookSelectSQL+`FROM books WHERE source LIKE ? || '/%'`,
 		dirPath,
 	)
 	if err != nil {
@@ -147,27 +303,27 @@ func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
 	}
 	defer rows.Close()
 
-	var books []Book
-	for rows.Next() {
-		var b Book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince); err != nil {
-			return nil, err
-		}
-		books = append(books, b)
-	}
-	return books, rows.Err()
+	return scanBookRows(rows)
 }
 
 // GetBook returns a single book by ID, or nil if not found.
 func (s *Store) GetBook(id string) (*Book, error) {
-	var b Book
-	err := s.db.QueryRow(
-		`SELECT id, title, source, status, file_mtime, missing_since FROM books WHERE id = ?`, id,
-	).Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince)
-	if errors.Is(err, sql.ErrNoRows) {
+	rows, err := s.db.Query(
+		`SELECT`+bookSelectSQL+`FROM books WHERE id = ?`, id,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	books, err := scanBookRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(books) == 0 {
 		return nil, nil
 	}
-	return &b, err
+	return &books[0], nil
 }
 
 // CountAllBooks returns the number of non-missing books in the library.
@@ -175,6 +331,58 @@ func (s *Store) CountAllBooks() (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM books WHERE missing_since IS NULL`).Scan(&n)
 	return n, err
+}
+
+// scanBookRows scans all rows from a books query into a Book slice.
+func scanBookRows(rows *sql.Rows) ([]Book, error) {
+	var books []Book
+	for rows.Next() {
+		var (
+			id, title, source, status string
+			fileMtime                 int64
+			missingSince              *string
+			typ, abstract, language   string
+			authorJSON, transJSON     string
+			origTitle, edition        string
+			volume, series, seriesNum string
+			publisher, year, note     string
+			keywordsJSON, isbn        string
+			linksJSON                 string
+		)
+		if err := rows.Scan(
+			&id, &title, &source, &status, &fileMtime, &missingSince,
+			&typ, &abstract, &language, &authorJSON, &transJSON,
+			&origTitle, &edition, &volume, &series, &seriesNum,
+			&publisher, &year, &note, &keywordsJSON, &isbn, &linksJSON,
+		); err != nil {
+			return nil, err
+		}
+		books = append(books, Book{
+			ID:           id,
+			Title:        title,
+			Source:       source,
+			Status:       status,
+			FileMtime:    fileMtime,
+			MissingSince: missingSince,
+			Type:         typ,
+			Abstract:     abstract,
+			Language:     language,
+			Author:       unmarshalPersonNames(authorJSON),
+			Translator:   unmarshalPersonNames(transJSON),
+			OrigTitle:    origTitle,
+			Edition:      edition,
+			Volume:       volume,
+			Series:       series,
+			SeriesNumber: seriesNum,
+			Publisher:    publisher,
+			Year:         year,
+			Note:         note,
+			Keywords:     unmarshalStrings(keywordsJSON),
+			ISBN:         isbn,
+			Links:        unmarshalStrings(linksJSON),
+		})
+	}
+	return books, rows.Err()
 }
 
 // ── Pages ──────────────────────────────────────────────────────
@@ -586,30 +794,6 @@ func (s *Store) DeleteSection(id int) error {
 	return err
 }
 
-// ── Book notes ─────────────────────────────────────────────────
-
-// GetBookNote returns the memo body for a book, or an empty string if none exists.
-func (s *Store) GetBookNote(bookID string) (string, error) {
-	var body string
-	err := s.db.QueryRow(`SELECT body FROM book_notes WHERE book_id = ?`, bookID).Scan(&body)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	return body, err
-}
-
-// UpsertBookNote inserts or updates the memo for a book.
-func (s *Store) UpsertBookNote(bookID, body string) error {
-	_, err := s.db.Exec(`
-		INSERT INTO book_notes (book_id, body, updated_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(book_id) DO UPDATE SET
-			body       = excluded.body,
-			updated_at = CURRENT_TIMESTAMP
-	`, bookID, body)
-	return err
-}
-
 // ── Book collections ───────────────────────────────────────────
 
 // ListBookCollections returns all book collections ordered by name, with
@@ -684,55 +868,38 @@ func (s *Store) RemoveBookFromBookCollection(collectionID int, bookID string) er
 // ListBooksInBookCollection returns books belonging to a book collection,
 // ordered by title.
 func (s *Store) ListBooksInBookCollection(collectionID int) ([]Book, error) {
-	rows, err := s.db.Query(`
-		SELECT b.id, b.title, b.source, b.status, b.file_mtime, b.missing_since
-		FROM books b
-		JOIN book_collection_members m ON m.book_id = b.id
-		WHERE m.collection_id = ?
-		ORDER BY b.title
-	`, collectionID)
+	rows, err := s.db.Query(
+		`SELECT`+bookSelectSQL+`FROM books b
+		 JOIN book_collection_members m ON m.book_id = b.id
+		 WHERE m.collection_id = ?
+		 ORDER BY b.title`,
+		collectionID,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var books []Book
-	for rows.Next() {
-		var b Book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince); err != nil {
-			return nil, err
-		}
-		books = append(books, b)
-	}
-	return books, rows.Err()
+	return scanBookRows(rows)
 }
 
 // ListUncategorizedBooks returns non-missing books that do not belong to any
 // book collection, ordered by title.
 func (s *Store) ListUncategorizedBooks() ([]Book, error) {
-	rows, err := s.db.Query(`
-		SELECT id, title, source, status, file_mtime, missing_since
-		FROM books
-		WHERE missing_since IS NULL
-		  AND NOT EXISTS (
-		      SELECT 1 FROM book_collection_members m WHERE m.book_id = books.id
-		  )
-		ORDER BY title
-	`)
+	rows, err := s.db.Query(
+		`SELECT` + bookSelectSQL + `FROM books
+		 WHERE missing_since IS NULL
+		   AND NOT EXISTS (
+		       SELECT 1 FROM book_collection_members m WHERE m.book_id = books.id
+		   )
+		 ORDER BY title`,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var books []Book
-	for rows.Next() {
-		var b Book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Source, &b.Status, &b.FileMtime, &b.MissingSince); err != nil {
-			return nil, err
-		}
-		books = append(books, b)
-	}
-	return books, rows.Err()
+	return scanBookRows(rows)
 }
 
 // CountUncategorizedBooks returns the number of non-missing books that do not
