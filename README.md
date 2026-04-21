@@ -47,7 +47,8 @@
 - **手描き注釈**: SVGペンで図解・強調などの描画
 - **ステータスタグ**: ページごとの「既読/途中/未読」などのステータス管理
 
-### LibraryとCollection
+### Library / Collection / Book モデル
+
 - LibraryとCollcetionは、本を整理するための単位であり、Libraryは複数のCollectionをグループ化し、Collectionは複数のBookをグループ化する。
 - LibraryとCollectionの子要素は複数のグループに所属することができる。例えばあるBookは複数のCollectionに所属できるし、あるCollectionは複数のLibraryに所属できる。
 - ただし、あるBookを直接Libraryに所属させることはできず、かならずCollectionを介してLibraryに所属させる必要がある。
