@@ -4,7 +4,7 @@ import {
   renameLibrary,
   deleteLibrary,
   moveCollectionToLibrary,
-} from '../api';
+} from './api';  // was '../api' — incorrect for a file at the src/ root level
 
 export function initLibrary(): void {
   const layout = document.querySelector<HTMLElement>('.library-admin-layout');
@@ -160,7 +160,7 @@ function setupCollectionMoveSelects(): void {
       if (isNaN(collectionID) || isNaN(targetLibraryID)) return;
       try {
         await moveCollectionToLibrary(collectionID, targetLibraryID);
-        // Reload to show the tile has moved; navigate to the target library.
+        // Navigate to the target library after moving.
         window.location.href = `/library?lib=${targetLibraryID}`;
       } catch (err) {
         console.error('Failed to move collection:', err);

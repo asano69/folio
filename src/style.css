@@ -23,3 +23,6 @@
 /* Page-specific components */
 @import "./css/book.css";
 @import "./css/overview.css";
+
+/* Page-specific: library admin */
+@import "./css/library.css";

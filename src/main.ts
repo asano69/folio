@@ -9,6 +9,7 @@ import { initCollections } from './ui/collections';
 import { initDrawing } from './viewer/drawing';
 import { initPageStatus } from './ui/page-status';
 import { initBookMeta } from './ui/book-meta';
+import { initLibrary } from './library';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize keyboard bindings first, so all other modules can assume it's ready.
@@ -24,4 +25,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initDrawing();
     initPageStatus();
     initBookMeta();
+    initLibrary();
 });

@@ -1,0 +1,283 @@
+/* ── Library admin page layout ────────────────────────────────── */
+main:has(.library-admin-layout) {
+  padding: 0;
+}
+
+.library-admin-layout {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+/* ── Left sidebar: library list ───────────────────────────────── */
+.library-admin-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--color-surface-bg);
+  border-right: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.library-admin-toolbar {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border-light);
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.library-edit-btn {
+  background: none;
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-family: inherit;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.library-edit-btn:hover {
+  background: var(--color-hover-bg);
+  color: var(--color-text-tertiary);
+}
+
+.library-edit-btn.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.library-admin-nav {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-md) 0;
+}
+
+/* ── Library list items ───────────────────────────────────────── */
+.library-item {
+  display: flex;
+  align-items: stretch;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+  transition: background var(--transition-fast);
+}
+
+.library-item:hover {
+  background: var(--color-hover-bg);
+}
+
+.library-item--active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.library-link {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) var(--spacing-lg);
+  cursor: pointer;
+}
+
+.library-item-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.library-item-count {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+}
+
+.library-item--active .library-item-count {
+  color: var(--color-text-muted);
+}
+
+/* ── Delete button (shown only in edit mode) ──────────────────── */
+.library-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-disabled);
+  padding: var(--spacing-lg) var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+  flex-shrink: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+  transition: color var(--transition-fast);
+}
+
+.library-delete-btn:hover {
+  color: var(--color-danger);
+}
+
+/* ── Inline rename input ──────────────────────────────────────── */
+.library-rename-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-bottom: 1px solid var(--color-primary);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  outline: none;
+  padding: 0;
+  color: inherit;
+}
+
+/* ── Add library item ─────────────────────────────────────────── */
+.library-add-item {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border-light);
+  margin-top: var(--spacing-md);
+}
+
+.library-add-item:hover {
+  background: var(--color-hover-bg);
+  color: var(--color-primary);
+}
+
+.library-add-label {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-lg) var(--spacing-lg);
+  font-size: var(--font-size-md);
+}
+
+.library-new-input {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-lg) var(--spacing-lg);
+  border: none;
+  border-top: 2px solid var(--color-primary);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  outline: none;
+  background: #f8f9ff;
+  flex-shrink: 0;
+}
+
+/* ── Right panel: collection tiles ───────────────────────────── */
+.library-admin-main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--spacing-4xl);
+}
+
+.library-admin-header {
+  margin-bottom: var(--spacing-3xl);
+}
+
+.library-admin-header h2 {
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-primary);
+}
+
+.library-admin-empty {
+  color: var(--color-text-light);
+  font-size: var(--font-size-lg);
+  text-align: center;
+  padding: var(--spacing-5xl);
+}
+
+/* ── Collection tiles grid ────────────────────────────────────── */
+.collection-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-xl);
+}
+
+.collection-tile {
+  background: var(--color-surface-bg);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.collection-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.collection-tile-link {
+  display: block;
+  padding: var(--spacing-2xl);
+  text-decoration: none;
+  color: inherit;
+}
+
+.collection-tile-name {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.collection-tile-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* ── Move-to-library controls (shown in edit mode) ────────────── */
+.collection-tile-move {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--color-border-light);
+  background: var(--color-surface-subtle);
+}
+
+.collection-library-select {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  background: var(--color-surface-bg);
+  cursor: pointer;
+}
+
+.collection-library-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 680px) {
+  .library-admin-layout {
+    flex-direction: column;
+  }
+
+  .library-admin-sidebar {
+    width: 100%;
+    position: static;
+    height: auto;
+  }
+
+  .library-admin-nav {
+    max-height: 40vh;
+  }
+
+  .library-admin-main {
+    padding: var(--spacing-xl);
+  }
+}
