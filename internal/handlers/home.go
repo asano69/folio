@@ -3,6 +3,7 @@ package handlers
 import (
 	"html/template"
 	"net/http"
+	"strconv"
 
 	"folio/internal/storage"
 	"folio/internal/store"
@@ -18,6 +19,8 @@ type bookView struct {
 }
 
 // HomeHandler serves GET / — the all-books library page.
+// It accepts a ?lib= query parameter to filter collections and books by library.
+// Defaults to Central Library when the parameter is absent or invalid.
 type HomeHandler struct {
 	Store     *store.Store
 	CachePath string
@@ -30,13 +33,41 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	collections, err := h.Store.ListBookCollections()
+	// Determine active library from ?lib= query parameter.
+	activeLibraryID := store.CentralLibraryID
+	if libStr := r.URL.Query().Get("lib"); libStr != "" {
+		if id, err := strconv.Atoi(libStr); err == nil && id > 0 {
+			activeLibraryID = id
+		}
+	}
+
+	libraries, err := h.Store.ListLibraries()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	dbBooks, err := h.Store.ListBooks()
+	// Verify the requested library exists; fall back to Central Library if not.
+	validLibrary := false
+	for _, lib := range libraries {
+		if lib.ID == activeLibraryID {
+			validLibrary = true
+			break
+		}
+	}
+	if !validLibrary {
+		activeLibraryID = store.CentralLibraryID
+	}
+
+	// Load collections filtered to the active library for the sidebar.
+	collections, err := h.Store.ListBookCollectionsInLibrary(activeLibraryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Load books for the active library.
+	dbBooks, err := h.Store.ListAllBooksInLibrary(activeLibraryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -80,6 +111,8 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Books               []bookView
 		MissingBooks        []bookView
 		Collections         []store.BookCollection
+		Libraries           []store.Library
+		ActiveLibraryID     int
 		ActiveCollectionID  int
 		TotalBookCount      int
 		UncategorizedCount  int
@@ -88,6 +121,8 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Books:               present,
 		MissingBooks:        missing,
 		Collections:         collections,
+		Libraries:           libraries,
+		ActiveLibraryID:     activeLibraryID,
 		ActiveCollectionID:  0,
 		TotalBookCount:      totalCount,
 		UncategorizedCount:  uncategorizedCount,

@@ -34,23 +34,29 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	collections, err := h.Store.ListBookCollections()
+	// Load the specific collection to determine its library.
+	activeCollection, err := h.Store.GetBookCollection(collectionID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if activeCollection == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	activeLibraryID := activeCollection.LibraryID
+
+	libraries, err := h.Store.ListLibraries()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Locate the active collection within the already-fetched list to avoid a
-	// second DB query. 404 if the ID does not exist.
-	var activeCollection *store.BookCollection
-	for i := range collections {
-		if collections[i].ID == collectionID {
-			activeCollection = &collections[i]
-			break
-		}
-	}
-	if activeCollection == nil {
-		http.NotFound(w, r)
+	// Load collections for this library to populate the sidebar.
+	collections, err := h.Store.ListBookCollectionsInLibrary(activeLibraryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -98,7 +104,9 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Books               []bookView
 		MissingBooks        []bookView
 		Collections         []store.BookCollection
+		Libraries           []store.Library
 		ActiveCollectionID  int
+		ActiveLibraryID     int
 		Collection          *store.BookCollection
 		TotalBookCount      int
 		UncategorizedCount  int
@@ -107,7 +115,9 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Books:               present,
 		MissingBooks:        missing,
 		Collections:         collections,
+		Libraries:           libraries,
 		ActiveCollectionID:  collectionID,
+		ActiveLibraryID:     activeLibraryID,
 		Collection:          activeCollection,
 		TotalBookCount:      totalCount,
 		UncategorizedCount:  uncategorizedCount,

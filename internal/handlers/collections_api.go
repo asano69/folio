@@ -16,6 +16,7 @@ import (
 //	POST   /api/collections/                        — create a collection
 //	PUT    /api/collections/{id}                    — rename
 //	DELETE /api/collections/{id}                    — delete (removes memberships too)
+//	PUT    /api/collections/{id}/library            — move to a different library
 //	POST   /api/collections/{id}/books/{bookID}     — add a book
 //	DELETE /api/collections/{id}/books/{bookID}     — remove a book
 type CollectionsAPIHandler struct {
@@ -56,6 +57,16 @@ func (h *CollectionsAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// /api/collections/{id}/library — move to different library
+	if len(parts) == 2 && parts[1] == "library" {
+		if r.Method != http.MethodPut {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		h.moveCollectionToLibrary(w, r, collectionID)
+		return
+	}
+
 	// /api/collections/{id}/books/{bookID} — add or remove book
 	if len(parts) == 3 && parts[1] == "books" {
 		bookID := parts[2]
@@ -75,7 +86,8 @@ func (h *CollectionsAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 func (h *CollectionsAPIHandler) createCollection(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name string `json:"name"`
+		Name      string `json:"name"`
+		LibraryID int    `json:"library_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -87,7 +99,13 @@ func (h *CollectionsAPIHandler) createCollection(w http.ResponseWriter, r *http.
 		return
 	}
 
-	id, err := h.Store.CreateBookCollection(name)
+	// Default to Central Library when no library_id is provided.
+	libraryID := body.LibraryID
+	if libraryID == 0 {
+		libraryID = store.CentralLibraryID
+	}
+
+	id, err := h.Store.CreateBookCollection(name, libraryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -96,9 +114,10 @@ func (h *CollectionsAPIHandler) createCollection(w http.ResponseWriter, r *http.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(struct {
-		ID   int64  `json:"id"`
-		Name string `json:"name"`
-	}{ID: id, Name: name})
+		ID        int64  `json:"id"`
+		Name      string `json:"name"`
+		LibraryID int    `json:"library_id"`
+	}{ID: id, Name: name, LibraryID: libraryID})
 }
 
 func (h *CollectionsAPIHandler) renameCollection(w http.ResponseWriter, r *http.Request, id int) {
@@ -132,6 +151,28 @@ func (h *CollectionsAPIHandler) deleteCollection(w http.ResponseWriter, r *http.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// moveCollectionToLibrary handles PUT /api/collections/{id}/library.
+func (h *CollectionsAPIHandler) moveCollectionToLibrary(w http.ResponseWriter, r *http.Request, collectionID int) {
+	var body struct {
+		LibraryID int `json:"library_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if body.LibraryID == 0 {
+		http.Error(w, "library_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Store.MoveCollectionToLibrary(collectionID, body.LibraryID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 

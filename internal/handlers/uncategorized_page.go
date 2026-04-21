@@ -9,7 +9,8 @@ import (
 )
 
 // UncategorizedPageHandler serves GET /books/uncategorized — books that do not
-// belong to any book collection.
+// belong to any book collection. Uncategorized books are always presented under
+// Central Library context.
 type UncategorizedPageHandler struct {
 	Store     *store.Store
 	CachePath string
@@ -17,7 +18,14 @@ type UncategorizedPageHandler struct {
 }
 
 func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	collections, err := h.Store.ListBookCollections()
+	libraries, err := h.Store.ListLibraries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Uncategorized always lives under Central Library.
+	collections, err := h.Store.ListBookCollectionsInLibrary(store.CentralLibraryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -61,7 +69,9 @@ func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		Books               []bookView
 		MissingBooks        []bookView
 		Collections         []store.BookCollection
+		Libraries           []store.Library
 		ActiveCollectionID  int
+		ActiveLibraryID     int
 		TotalBookCount      int
 		UncategorizedCount  int
 		IsUncategorizedPage bool
@@ -69,7 +79,9 @@ func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		Books:               books,
 		MissingBooks:        nil,
 		Collections:         collections,
+		Libraries:           libraries,
 		ActiveCollectionID:  0,
+		ActiveLibraryID:     store.CentralLibraryID,
 		TotalBookCount:      totalCount,
 		UncategorizedCount:  uncategorizedCount,
 		IsUncategorizedPage: true,

@@ -166,11 +166,12 @@ export async function removeBookFromCollection(
   await request(`/api/collections/${collectionId}/books/${bookId}`, { method: 'DELETE' });
 }
 
-export async function createCollection(name: string): Promise<{ id: number; name: string }> {
+// libraryId defaults to Central Library (1) when not provided.
+export async function createCollection(name: string, libraryId = 1): Promise<{ id: number; name: string }> {
   const res = await request('/api/collections/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, library_id: libraryId }),
   });
   return res.json();
 }
@@ -185,4 +186,36 @@ export async function renameCollection(id: number, name: string): Promise<void> 
 
 export async function deleteCollection(id: number): Promise<void> {
   await request(`/api/collections/${id}`, { method: 'DELETE' });
+}
+
+// moveCollectionToLibrary reassigns a collection to a different library.
+export async function moveCollectionToLibrary(collectionId: number, libraryId: number): Promise<void> {
+  await request(`/api/collections/${collectionId}/library`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ library_id: libraryId }),
+  });
+}
+
+// ── Libraries ─────────────────────────────────────────────────
+
+export async function createLibrary(name: string): Promise<{ id: number; name: string }> {
+  const res = await request('/api/libraries/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  return res.json();
+}
+
+export async function renameLibrary(id: number, name: string): Promise<void> {
+  await request(`/api/libraries/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteLibrary(id: number): Promise<void> {
+  await request(`/api/libraries/${id}`, { method: 'DELETE' });
 }

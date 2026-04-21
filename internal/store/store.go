@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -19,6 +20,16 @@ PRAGMA foreign_keys = ON;
 
 -- WAL mode allows concurrent reads during writes.
 PRAGMA journal_mode = WAL;
+
+-- ── Libraries ──────────────────────────────────────────────────
+
+-- A library is a named group of book collections.
+-- Central Library (id=1) is seeded by runMigrations and always present.
+CREATE TABLE IF NOT EXISTS libraries (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
 -- ── Core entities ──────────────────────────────────────────────
 
@@ -119,7 +130,9 @@ CREATE TABLE IF NOT EXISTS sections (
 
 -- ── Collections ────────────────────────────────────────────────
 
--- Named groups of books (used for sidebar navigation and filtering).
+-- Named groups of books. Each collection belongs to exactly one library.
+-- library_id is added by migration (ALTER TABLE) so existing databases are
+-- upgraded automatically; the column defaults to Central Library (id=1).
 CREATE TABLE IF NOT EXISTS book_collections (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE,
@@ -179,7 +192,32 @@ func Open(dataPath string) (*Store, error) {
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
 
+	if err := runMigrations(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("run migrations: %w", err)
+	}
+
 	return &Store{db: db}, nil
+}
+
+// runMigrations applies incremental schema changes that cannot be expressed
+// as CREATE TABLE IF NOT EXISTS. It is safe to run on every startup.
+func runMigrations(db *sql.DB) error {
+	// Seed Central Library (id=1) as the immutable default library.
+	if _, err := db.Exec(`INSERT OR IGNORE INTO libraries (id, name) VALUES (1, 'Central Library')`); err != nil {
+		return fmt.Errorf("seed central library: %w", err)
+	}
+
+	// Add library_id to book_collections.
+	// SQLite does not support ALTER TABLE ADD COLUMN IF NOT EXISTS, so we
+	// execute the statement and ignore the error when the column already exists.
+	if _, err := db.Exec(`ALTER TABLE book_collections ADD COLUMN library_id INTEGER NOT NULL DEFAULT 1 REFERENCES libraries(id)`); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column name") {
+			return fmt.Errorf("add library_id to book_collections: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *Store) Close() error {

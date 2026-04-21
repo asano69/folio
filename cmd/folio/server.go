@@ -105,6 +105,11 @@ func (s *server) setupRoutes() {
 		"templates/bibliography.html",
 	))
 
+	libraryTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+		"templates/layout.html",
+		"templates/library.html",
+	))
+
 	s.mux.Handle("/", &handlers.HomeHandler{
 		Store:     s.store,
 		CachePath: s.config.CachePath,
@@ -139,6 +144,12 @@ func (s *server) setupRoutes() {
 		Store: s.store,
 	})
 
+	// Library management page.
+	s.mux.Handle("/library", &handlers.LibraryPageHandler{
+		Store:    s.store,
+		Template: libraryTemplate,
+	})
+
 	// Handles PUT /api/books/{id}, PUT /api/books/{id}/note,
 	// and POST /api/books/{id}/thumbnail.
 	s.mux.Handle("/api/books/", &handlers.BooksAPIHandler{
@@ -159,6 +170,11 @@ func (s *server) setupRoutes() {
 	cHandler := &handlers.CollectionsAPIHandler{Store: s.store}
 	s.mux.Handle("/api/collections", cHandler)
 	s.mux.Handle("/api/collections/", cHandler)
+
+	// Handles POST /api/libraries/, PUT /api/libraries/{id}, DELETE /api/libraries/{id}.
+	lHandler := &handlers.LibrariesAPIHandler{Store: s.store}
+	s.mux.Handle("/api/libraries", lHandler)
+	s.mux.Handle("/api/libraries/", lHandler)
 }
 
 func (s *server) Start() error {

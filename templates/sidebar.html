@@ -1,8 +1,18 @@
 {{define "sidebar"}}
-<aside class="collection-sidebar">
+<aside class="collection-sidebar" data-active-library-id="{{.ActiveLibraryID}}">
     <div class="collection-toolbar">
         <button id="collection-edit-btn" class="collection-edit-btn" title="Edit collections">✎ Edit</button>
     </div>
+    {{/* Library switcher — only shown when multiple libraries exist */}}
+    {{if gt (len .Libraries) 1}}
+    <div class="library-switcher-wrap">
+        <select id="library-select" class="library-select">
+            {{range .Libraries}}
+            <option value="{{.ID}}"{{if eq .ID $.ActiveLibraryID}} selected{{end}}>{{.Name}}</option>
+            {{end}}
+        </select>
+    </div>
+    {{end}}
     <div class="collection-search-wrap">
         <input
             type="search"
@@ -13,7 +23,9 @@
             aria-label="Filter collections">
     </div>
     <nav class="collection-nav">
-        <a href="/" class="collection-item{{if and (not .IsUncategorizedPage) (eq .ActiveCollectionID 0)}} collection-item--active{{end}}">
+        {{/* All Books and Uncategorized are virtual entries shown only for Central Library (id=1) */}}
+        {{if eq .ActiveLibraryID 1}}
+        <a href="/?lib=1" class="collection-item{{if and (not .IsUncategorizedPage) (eq .ActiveCollectionID 0)}} collection-item--active{{end}}">
             <span class="collection-count">({{.TotalBookCount}})</span>
             <span class="collection-title">All Books</span>
         </a>
@@ -21,6 +33,12 @@
         <a href="/books/uncategorized" class="collection-item{{if .IsUncategorizedPage}} collection-item--active{{end}}">
             <span class="collection-count">({{.UncategorizedCount}})</span>
             <span class="collection-title">Uncategorized</span>
+        </a>
+        {{end}}
+        {{else}}
+        {{/* For non-Central libraries, show an "All Books" link for that library */}}
+        <a href="/?lib={{.ActiveLibraryID}}" class="collection-item{{if eq .ActiveCollectionID 0}} collection-item--active{{end}}">
+            <span class="collection-title">All Books</span>
         </a>
         {{end}}
         {{range .Collections}}

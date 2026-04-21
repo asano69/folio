@@ -15,11 +15,25 @@ let selectionBadge: HTMLElement | null = null;
 let suppressNextClick = false;
 
 export function initCollections(): void {
+  setupLibrarySwitcher();
   setupCollectionFilter();
   setupMultiSelect();
   setupDragAndDrop();
   setupEditMode();
   setupRemoveFromCollection();
+}
+
+// ── Library switcher ───────────────────────────────────────────
+
+// When the user selects a different library from the listbox, navigate to
+// the home page for that library so the sidebar collections update.
+function setupLibrarySwitcher(): void {
+  const libSelect = document.getElementById('library-select') as HTMLSelectElement | null;
+  if (!libSelect) return;
+
+  libSelect.addEventListener('change', () => {
+    window.location.href = `/?lib=${libSelect.value}`;
+  });
 }
 
 // ── Multi-select ───────────────────────────────────────────────
@@ -320,6 +334,11 @@ async function startCreateCollection(addItem: HTMLElement): Promise<void> {
   const label = addItem.querySelector<HTMLElement>('.collection-add-label');
   if (!label) return;
 
+  // Read the active library from the sidebar's data attribute so new
+  // collections are created in the currently displayed library.
+  const sidebar = document.querySelector<HTMLElement>('.collection-sidebar');
+  const activeLibraryId = parseInt(sidebar?.dataset.activeLibraryId ?? '1', 10);
+
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'collection-new-input';
@@ -335,7 +354,7 @@ async function startCreateCollection(addItem: HTMLElement): Promise<void> {
     const name = input.value.trim();
     if (name) {
       try {
-        await createCollection(name);
+        await createCollection(name, activeLibraryId);
         window.location.reload();
         return;
       } catch (err) {

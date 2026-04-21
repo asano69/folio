@@ -8,6 +8,18 @@ import (
 	"folio/internal/storage"
 )
 
+// CentralLibraryID is the fixed ID of the default library that is always
+// present. It cannot be deleted and serves as the home for uncategorized
+// collections and the "All Books" virtual view.
+const CentralLibraryID = 1
+
+// Library is the DB representation of a named group of book collections.
+type Library struct {
+	ID              int
+	Name            string
+	CollectionCount int
+}
+
 // Book is the DB representation of a book, including extended metadata fields
 // that mirror folio.json. Array fields (Author, Translator, Keywords, Links)
 // are stored as JSON text in SQLite and decoded on read.
@@ -87,12 +99,13 @@ type PageNote struct {
 }
 
 // BookCollection is the DB representation of a named group of books.
-// BookCount is populated by ListBookCollections.
+// BookCount is populated by query functions that include the JOIN.
 type BookCollection struct {
 	ID          int
 	Name        string
 	Color       string
 	Description string
+	LibraryID   int
 	BookCount   int
 }
 
@@ -143,45 +156,6 @@ const bookSelectSQL = `
     edition, volume, series, series_number, publisher, year,
     note, keywords, isbn, links
 `
-
-// scanBookRow scans a database row into a Book, decoding JSON array columns.
-// The row must have been selected with bookSelectSQL column order.
-func scanBookRow(
-	id, title, source, status *string,
-	fileMtime *int64,
-	missingSince **string,
-	typ, abstract, language *string,
-	authorJSON, translatorJSON *string,
-	origTitle, edition, volume, series, seriesNumber *string,
-	publisher, year, note *string,
-	keywordsJSON, isbn, linksJSON *string,
-) Book {
-	b := Book{
-		ID:           *id,
-		Title:        *title,
-		Source:       *source,
-		Status:       *status,
-		FileMtime:    *fileMtime,
-		MissingSince: *missingSince,
-		Type:         *typ,
-		Abstract:     *abstract,
-		Language:     *language,
-		Author:       unmarshalPersonNames(*authorJSON),
-		Translator:   unmarshalPersonNames(*translatorJSON),
-		OrigTitle:    *origTitle,
-		Edition:      *edition,
-		Volume:       *volume,
-		Series:       *series,
-		SeriesNumber: *seriesNumber,
-		Publisher:    *publisher,
-		Year:         *year,
-		Note:         *note,
-		Keywords:     unmarshalStrings(*keywordsJSON),
-		ISBN:         *isbn,
-		Links:        unmarshalStrings(*linksJSON),
-	}
-	return b
-}
 
 // ── Books ──────────────────────────────────────────────────────
 
@@ -298,6 +272,33 @@ func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
 	rows, err := s.db.Query(
 		`SELECT`+bookSelectSQL+`FROM books WHERE source LIKE ? || '/%'`,
 		dirPath,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanBookRows(rows)
+}
+
+// ListAllBooksInLibrary returns all books associated with the given library.
+// For Central Library (id=1), all books are returned. For other libraries,
+// only books that belong to at least one collection in that library are returned.
+// Both present and missing books are included; the caller separates them.
+func (s *Store) ListAllBooksInLibrary(libraryID int) ([]Book, error) {
+	if libraryID == CentralLibraryID {
+		return s.ListBooks()
+	}
+	rows, err := s.db.Query(
+		`SELECT`+bookSelectSQL+`FROM books
+		 WHERE id IN (
+		     SELECT DISTINCT m.book_id
+		     FROM book_collection_members m
+		     JOIN book_collections c ON c.id = m.collection_id
+		     WHERE c.library_id = ?
+		 )
+		 ORDER BY title`,
+		libraryID,
 	)
 	if err != nil {
 		return nil, err
@@ -795,13 +796,92 @@ func (s *Store) DeleteSection(id int) error {
 	return err
 }
 
+// ── Libraries ─────────────────────────────────────────────────
+
+// ListLibraries returns all libraries ordered by name, with their collection counts.
+func (s *Store) ListLibraries() ([]Library, error) {
+	rows, err := s.db.Query(`
+		SELECT l.id, l.name, COUNT(c.id)
+		FROM libraries l
+		LEFT JOIN book_collections c ON c.library_id = l.id
+		GROUP BY l.id
+		ORDER BY l.name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var libs []Library
+	for rows.Next() {
+		var lib Library
+		if err := rows.Scan(&lib.ID, &lib.Name, &lib.CollectionCount); err != nil {
+			return nil, err
+		}
+		libs = append(libs, lib)
+	}
+	return libs, rows.Err()
+}
+
+// GetLibrary returns a single library by ID, or nil if not found.
+func (s *Store) GetLibrary(id int) (*Library, error) {
+	var lib Library
+	err := s.db.QueryRow(`
+		SELECT l.id, l.name, COUNT(c.id)
+		FROM libraries l
+		LEFT JOIN book_collections c ON c.library_id = l.id
+		WHERE l.id = ?
+		GROUP BY l.id
+	`, id).Scan(&lib.ID, &lib.Name, &lib.CollectionCount)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return &lib, err
+}
+
+// CreateLibrary inserts a new library and returns its ID.
+func (s *Store) CreateLibrary(name string) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO libraries (name) VALUES (?)`, name)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// RenameLibrary updates the name of a library.
+// Returns an error if attempting to rename Central Library.
+func (s *Store) RenameLibrary(id int, name string) error {
+	if id == CentralLibraryID {
+		return errors.New("cannot rename Central Library")
+	}
+	_, err := s.db.Exec(`UPDATE libraries SET name = ? WHERE id = ?`, name, id)
+	return err
+}
+
+// DeleteLibrary removes a library. Returns an error if the library still has
+// collections assigned to it, or if it is Central Library.
+func (s *Store) DeleteLibrary(id int) error {
+	if id == CentralLibraryID {
+		return errors.New("cannot delete Central Library")
+	}
+	var count int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM book_collections WHERE library_id = ?`, id).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return errors.New("library still has collections; move or delete them first")
+	}
+	_, err := s.db.Exec(`DELETE FROM libraries WHERE id = ?`, id)
+	return err
+}
+
 // ── Book collections ───────────────────────────────────────────
 
 // ListBookCollections returns all book collections ordered by name, with
-// member counts.
+// member counts and library IDs.
 func (s *Store) ListBookCollections() ([]BookCollection, error) {
 	rows, err := s.db.Query(`
-		SELECT c.id, c.name, c.color, c.description, COUNT(m.book_id)
+		SELECT c.id, c.name, c.color, c.description, c.library_id, COUNT(m.book_id)
 		FROM book_collections c
 		LEFT JOIN book_collection_members m ON m.collection_id = c.id
 		GROUP BY c.id
@@ -812,10 +892,59 @@ func (s *Store) ListBookCollections() ([]BookCollection, error) {
 	}
 	defer rows.Close()
 
+	return scanBookCollectionRows(rows)
+}
+
+// ListBookCollectionsInLibrary returns collections belonging to the given library,
+// ordered by name, with member counts.
+func (s *Store) ListBookCollectionsInLibrary(libraryID int) ([]BookCollection, error) {
+	rows, err := s.db.Query(`
+		SELECT c.id, c.name, c.color, c.description, c.library_id, COUNT(m.book_id)
+		FROM book_collections c
+		LEFT JOIN book_collection_members m ON m.collection_id = c.id
+		WHERE c.library_id = ?
+		GROUP BY c.id
+		ORDER BY c.name
+	`, libraryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanBookCollectionRows(rows)
+}
+
+// GetBookCollection returns a single collection by ID, or nil if not found.
+func (s *Store) GetBookCollection(id int) (*BookCollection, error) {
+	rows, err := s.db.Query(`
+		SELECT c.id, c.name, c.color, c.description, c.library_id, COUNT(m.book_id)
+		FROM book_collections c
+		LEFT JOIN book_collection_members m ON m.collection_id = c.id
+		WHERE c.id = ?
+		GROUP BY c.id
+	`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	cols, err := scanBookCollectionRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(cols) == 0 {
+		return nil, nil
+	}
+	return &cols[0], nil
+}
+
+// scanBookCollectionRows scans rows from a book_collections query.
+// The SELECT must include: id, name, color, description, library_id, count.
+func scanBookCollectionRows(rows *sql.Rows) ([]BookCollection, error) {
 	var cols []BookCollection
 	for rows.Next() {
 		var c BookCollection
-		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Description, &c.BookCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Description, &c.LibraryID, &c.BookCount); err != nil {
 			return nil, err
 		}
 		cols = append(cols, c)
@@ -823,9 +952,10 @@ func (s *Store) ListBookCollections() ([]BookCollection, error) {
 	return cols, rows.Err()
 }
 
-// CreateBookCollection inserts a new book collection and returns its ID.
-func (s *Store) CreateBookCollection(name string) (int64, error) {
-	res, err := s.db.Exec(`INSERT INTO book_collections (name) VALUES (?)`, name)
+// CreateBookCollection inserts a new book collection in the given library
+// and returns its ID.
+func (s *Store) CreateBookCollection(name string, libraryID int) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO book_collections (name, library_id) VALUES (?, ?)`, name, libraryID)
 	if err != nil {
 		return 0, err
 	}
@@ -835,6 +965,12 @@ func (s *Store) CreateBookCollection(name string) (int64, error) {
 // RenameBookCollection updates the name of an existing book collection.
 func (s *Store) RenameBookCollection(id int, name string) error {
 	_, err := s.db.Exec(`UPDATE book_collections SET name = ? WHERE id = ?`, name, id)
+	return err
+}
+
+// MoveCollectionToLibrary reassigns a collection to a different library.
+func (s *Store) MoveCollectionToLibrary(collectionID, libraryID int) error {
+	_, err := s.db.Exec(`UPDATE book_collections SET library_id = ? WHERE id = ?`, libraryID, collectionID)
 	return err
 }
 
