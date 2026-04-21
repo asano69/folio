@@ -1,5 +1,7 @@
 # Folio
-![logo](src/icons/folio.svg)
+
+<img src="src/icons/folio.svg" width="90" align="right" />
+
 - Folioはサーバのローカルストレージに保存されたスキャン資料を管理するためのシステムです。
 - Library/Collection/Bookを単位として自由にスキャン資料を組織できます。
 - デジタル図書資料にはBibTeXと互換性のある書誌情報の他、目次情報を保存することができます。
