@@ -1,6 +1,6 @@
 # Folio
 
-<img src="src/icons/folio.svg" width="90" align="right" />
+<img src="cmd/folio/favicon.svg" width="100" align="right" />
 
 Folioはローカルサーバのストレージに保存されたスキャン資料を有効活用することを目的として設計されたシステムです。 
 
@@ -11,7 +11,7 @@ Folioはローカルサーバのストレージに保存されたスキャン資
 
 ## Contents
 
-- [vision/introduction.md](vision/introduction.md)
+-  [vision/introduction.md](docs/vision/introduction.md)
 
 
 ## Documents
