@@ -1,4 +1,5 @@
 ## Project Structure
+
 ```
 folio/
 ├── cmd/folio/

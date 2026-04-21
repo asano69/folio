@@ -1,5 +1,16 @@
 ## Folio Data Ownership Philosophy
 
+
+---
+
+**Data ownership**:
+- `folio.json` inside the CBZ — immutable, book-intrinsic data (`id`, `title`).
+  Writing here requires rewriting the entire ZIP, so only rarely-changing data
+  belongs here.
+- SQLite DB — mutable, user-subjective data and derived caches.
+
+--- 
+
 Folio divides data into two categories—**book-intrinsic data** and **user-generated data**—and stores them separately.
 
 * **folio.json** — immutable, book-intrinsic data
@@ -35,3 +46,4 @@ Conventional applications centralize data in a database; if the application disa
 Even if the application is discarded, the CBZ files remain and can be opened in other viewers. Only user-created notes depend on Folio.
 
 This is consistent with the README statement that "the digital image materials themselves are not modified; only metadata is managed," and provides the technical foundation for Folio’s goal of **preserving a sense of continuity and safety**.
+
