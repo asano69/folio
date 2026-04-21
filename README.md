@@ -12,7 +12,7 @@ Folioはローカルサーバのストレージに保存されたスキャン資
 
 ## Contents
 
--  [vision/problem.md](problem.md)
+-  [vision/problem.md](docs/vision/problem.md)
 
 
 ## Documents
