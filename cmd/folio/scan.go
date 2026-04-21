@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 
 	"folio/internal/config"
 	"folio/internal/storage"
@@ -56,27 +58,7 @@ func runScan(cfg *config.Config, scanPath string) error {
 		}
 	}
 
-	// Phase 2: full open (with hash computation) only for new/changed books.
-	type openResult struct {
-		book storage.Book
-		path string
-		err  error
-	}
-	rawResults := runWorkerPool(fullOpenPaths, func(path string) openResult {
-		book, err := storage.OpenBook(path)
-		return openResult{book, path, err}
-	})
-
-	var changedBooks []storage.Book
-	for _, r := range rawResults {
-		if r.err != nil {
-			fmt.Fprintf(os.Stderr, "scan: skip %s: %v\n", r.path, r.err)
-			continue
-		}
-		changedBooks = append(changedBooks, r.book)
-	}
-
-	foundIDs := make(map[string]struct{}, len(unchangedBooks)+len(changedBooks))
+	foundIDs := make(map[string]struct{}, len(unchangedBooks)+len(fullOpenPaths))
 
 	// Upsert unchanged books to keep source path current and clear missing_since.
 	for _, b := range unchangedBooks {
@@ -86,18 +68,56 @@ func runScan(cfg *config.Config, scanPath string) error {
 		}
 	}
 
-	// Upsert new/changed books and merge their page records.
-	for _, b := range changedBooks {
-		foundIDs[b.ID] = struct{}{}
-		if err := db.UpsertBook(b); err != nil {
-			return fmt.Errorf("upsert book %s: %w", b.ID, err)
+	// Phase 2: full open (with hash computation) for new/changed books.
+	// Workers run in parallel bounded by GOMAXPROCS; each result is committed
+	// to the DB immediately so books become queryable as soon as they finish.
+	type openResult struct {
+		book storage.Book
+		path string
+		err  error
+	}
+
+	jobCh := make(chan string, len(fullOpenPaths))
+	for _, p := range fullOpenPaths {
+		jobCh <- p
+	}
+	close(jobCh)
+
+	resultCh := make(chan openResult, runtime.GOMAXPROCS(0))
+	var wg sync.WaitGroup
+	for range runtime.GOMAXPROCS(0) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for path := range jobCh {
+				book, err := storage.OpenBook(path)
+				resultCh <- openResult{book, path, err}
+			}
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	// Commit each result to the DB as it arrives.
+	// UpsertPages uses a merge algorithm to preserve stable page IDs:
+	// existing notes, drawings, and status records are not affected.
+	var changedBooks []storage.Book
+	for r := range resultCh {
+		if r.err != nil {
+			fmt.Fprintf(os.Stderr, "scan: skip %s: %v\n", r.path, r.err)
+			continue
 		}
-		// UpsertPages uses a merge algorithm to preserve stable page IDs:
-		// existing notes, drawings, and status records are not affected.
-		if err := db.UpsertPages(b.ID, b.Pages); err != nil {
-			return fmt.Errorf("upsert pages %s: %w", b.ID, err)
+		foundIDs[r.book.ID] = struct{}{}
+		if err := db.UpsertBook(r.book); err != nil {
+			return fmt.Errorf("upsert book %s: %w", r.book.ID, err)
 		}
-		fmt.Printf("  %s (%d pages)\n", b.Title, len(b.Pages))
+		if err := db.UpsertPages(r.book.ID, r.book.Pages); err != nil {
+			return fmt.Errorf("upsert pages %s: %w", r.book.ID, err)
+		}
+		fmt.Printf("  %s (%d pages)\n", r.book.Title, len(r.book.Pages))
+		changedBooks = append(changedBooks, r.book)
 	}
 
 	allFound := make([]storage.Book, 0, len(unchangedBooks)+len(changedBooks))
