@@ -1,8 +1,9 @@
 # Folio
 
-<img src="cmd/folio/favicon.svg" width="100" align="right" />
 
 Folioはローカルサーバのストレージに保存されたスキャン資料を有効活用することを目的として設計されたシステムです。 
+
+<img src="cmd/folio/favicon.svg" width="100" align="right" />
 
 - Library/Collection/Bookを単位としてスキャン資料を自由に整理できます。
 - 書籍やページには永続性のある静的なURLが与えられ、Wikiなどから自由に参照できます。
