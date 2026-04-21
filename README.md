@@ -77,7 +77,6 @@ roadmap/
 - 実装のフェーズ制御（time-based constraint）
 
 
-
 ## Scope
 
 ### Non-goals
