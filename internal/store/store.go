@@ -130,9 +130,8 @@ CREATE TABLE IF NOT EXISTS sections (
 
 -- ── Collections ────────────────────────────────────────────────
 
--- Named groups of books. Each collection belongs to exactly one library.
--- library_id is added by migration (ALTER TABLE) so existing databases are
--- upgraded automatically; the column defaults to Central Library (id=1).
+-- Named groups of books. library_id is kept for schema compatibility but
+-- library membership is now managed via library_collection_members.
 CREATE TABLE IF NOT EXISTS book_collections (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE,
@@ -164,12 +163,24 @@ CREATE TABLE IF NOT EXISTS page_collection_members (
     PRIMARY KEY(collection_id, page_id)
 );
 
+-- ── Library-collection membership (many-to-many) ───────────────
+
+-- A book collection can belong to multiple libraries, mirroring how a book
+-- can belong to multiple book collections. Central Library (id=1) implicitly
+-- contains all collections and does not require explicit rows here.
+CREATE TABLE IF NOT EXISTS library_collection_members (
+    library_id    INTEGER NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+    collection_id INTEGER NOT NULL REFERENCES book_collections(id) ON DELETE CASCADE,
+    PRIMARY KEY(library_id, collection_id)
+);
+
 -- ── Indexes ────────────────────────────────────────────────────
 
-CREATE INDEX IF NOT EXISTS idx_pages_book                   ON pages(book_id);
-CREATE INDEX IF NOT EXISTS idx_sections_book                ON sections(book_id);
-CREATE INDEX IF NOT EXISTS idx_book_collection_members_book ON book_collection_members(book_id);
-CREATE INDEX IF NOT EXISTS idx_page_collection_members_page ON page_collection_members(page_id);
+CREATE INDEX IF NOT EXISTS idx_pages_book                        ON pages(book_id);
+CREATE INDEX IF NOT EXISTS idx_sections_book                     ON sections(book_id);
+CREATE INDEX IF NOT EXISTS idx_book_collection_members_book      ON book_collection_members(book_id);
+CREATE INDEX IF NOT EXISTS idx_page_collection_members_page      ON page_collection_members(page_id);
+CREATE INDEX IF NOT EXISTS idx_library_collection_members_coll   ON library_collection_members(collection_id);
 `
 
 func Open(dataPath string) (*Store, error) {
@@ -208,13 +219,22 @@ func runMigrations(db *sql.DB) error {
 		return fmt.Errorf("seed central library: %w", err)
 	}
 
-	// Add library_id to book_collections.
-	// SQLite does not support ALTER TABLE ADD COLUMN IF NOT EXISTS, so we
-	// execute the statement and ignore the error when the column already exists.
+	// Add library_id to book_collections (legacy column kept for schema compat).
+	// Library membership is now managed via library_collection_members.
 	if _, err := db.Exec(`ALTER TABLE book_collections ADD COLUMN library_id INTEGER NOT NULL DEFAULT 1 REFERENCES libraries(id)`); err != nil {
 		if !strings.Contains(err.Error(), "duplicate column name") {
 			return fmt.Errorf("add library_id to book_collections: %w", err)
 		}
+	}
+
+	// Migrate existing single-library assignments into the junction table.
+	// Rows with library_id = 1 (Central Library) are skipped because Central
+	// Library implicitly contains all collections.
+	if _, err := db.Exec(`
+		INSERT OR IGNORE INTO library_collection_members (library_id, collection_id)
+		SELECT library_id, id FROM book_collections WHERE library_id != 1
+	`); err != nil {
+		return fmt.Errorf("migrate library_collection_members: %w", err)
 	}
 
 	return nil

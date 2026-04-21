@@ -63,7 +63,7 @@ main:has(.library-admin-layout) {
   padding: var(--spacing-md) 0;
 }
 
-/* ── Library list items ───────────────────────────────────────── */
+/* ── Library list items (also drop zones) ─────────────────────── */
 .library-item {
   display: flex;
   align-items: stretch;
@@ -80,6 +80,18 @@ main:has(.library-admin-layout) {
   background: var(--color-primary-light);
   color: var(--color-primary);
   font-weight: 500;
+}
+
+/* Drag-over state mirrors the collection sidebar pattern */
+.library-drop-zone.drag-over {
+  background: #e8f0fe;
+  outline: 2px dashed #4285f4;
+  outline-offset: -2px;
+}
+
+.library-drop-zone.drop-success {
+  background: #e6f7e6;
+  transition: background 0.4s;
 }
 
 .library-link {
@@ -207,16 +219,22 @@ main:has(.library-admin-layout) {
 }
 
 .collection-tile {
+  position: relative;
   background: var(--color-surface-bg);
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-md);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  cursor: grab;
 }
 
 .collection-tile:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+}
+
+.collection-tile.dragging {
+  opacity: 0.45;
 }
 
 .collection-tile-link {
@@ -238,27 +256,31 @@ main:has(.library-admin-layout) {
   color: var(--color-text-muted);
 }
 
-/* ── Move-to-library controls (shown in edit mode) ────────────── */
-.collection-tile-move {
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-top: 1px solid var(--color-border-light);
-  background: var(--color-surface-subtle);
-}
-
-.collection-library-select {
-  width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
+/* ── Remove-from-library button (shown only in edit mode) ─────── */
+.collection-tile-remove-btn {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(2px);
   border: 1px solid var(--color-border-medium);
   border-radius: var(--radius);
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  background: var(--color-surface-bg);
   cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.collection-library-select:focus {
-  outline: none;
-  border-color: var(--color-primary);
+.collection-tile-remove-btn:hover {
+  background: #fff0f0;
+  color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 /* ── Responsive ───────────────────────────────────────────────── */

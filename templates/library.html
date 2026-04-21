@@ -3,14 +3,14 @@
 {{define "content"}}
 <div class="library-admin-layout">
 
-    {{/* Left pane: library list */}}
+    {{/* Left pane: library list — each item is a drop zone for collection tiles */}}
     <aside class="library-admin-sidebar">
         <div class="library-admin-toolbar">
             <button id="library-edit-btn" class="library-edit-btn">✎ Edit</button>
         </div>
         <nav class="library-admin-nav">
             {{range .Libraries}}
-            <div class="library-item{{if eq .ID $.ActiveLibraryID}} library-item--active{{end}}"
+            <div class="library-item{{if eq .ID $.ActiveLibraryID}} library-item--active{{end}} library-drop-zone"
                  data-library-id="{{.ID}}">
                 {{/* Central Library (id=1) cannot be renamed or deleted */}}
                 {{if ne .ID 1}}
@@ -37,24 +37,28 @@
         {{if .Collections}}
         <div class="collection-tiles">
             {{range .Collections}}
-            <div class="collection-tile" data-collection-id="{{.ID}}" data-library-id="{{.LibraryID}}">
+            <div class="collection-tile" draggable="true"
+                 data-collection-id="{{.ID}}">
                 <a href="/collections/{{.ID}}" class="collection-tile-link">
                     <div class="collection-tile-name">{{.Name}}</div>
                     <div class="collection-tile-count">{{.BookCount}} books</div>
                 </a>
-                {{/* Move-to-library controls shown in edit mode */}}
-                <div class="collection-tile-move" hidden>
-                    <select class="collection-library-select" data-collection-id="{{.ID}}">
-                        {{range $.Libraries}}
-                        <option value="{{.ID}}"{{if eq .ID $.ActiveLibraryID}} selected{{end}}>{{.Name}}</option>
-                        {{end}}
-                    </select>
-                </div>
+                {{/* Remove button shown in edit mode for non-Central-Library views */}}
+                {{if ne $.ActiveLibraryID 1}}
+                <button class="collection-tile-remove-btn" title="Remove from library"
+                        data-collection-id="{{.ID}}" data-library-id="{{$.ActiveLibraryID}}" hidden>✕</button>
+                {{end}}
             </div>
             {{end}}
         </div>
         {{else}}
-        <p class="library-admin-empty">No collections in this library yet.</p>
+        <p class="library-admin-empty">
+            {{if eq .ActiveLibraryID 1}}
+            No collections yet. Create one from the All Books page.
+            {{else}}
+            No collections in this library yet. Drag collections here from Central Library.
+            {{end}}
+        </p>
         {{end}}
     </div>
 </div>

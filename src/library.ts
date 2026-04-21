@@ -1,17 +1,22 @@
-// Library admin page interactions: CRUD for libraries and collection assignment.
+// Library admin page interactions: CRUD for libraries and drag-and-drop
+// collection assignment. The collection-to-library relationship mirrors the
+// book-to-collection relationship: drag a collection tile onto a library item
+// to add it; remove it via the edit-mode button.
 import {
   createLibrary,
   renameLibrary,
   deleteLibrary,
-  moveCollectionToLibrary,
-} from './api';  // was '../api' — incorrect for a file at the src/ root level
+  addCollectionToLibrary,
+  removeCollectionFromLibrary,
+} from './api';
 
 export function initLibrary(): void {
   const layout = document.querySelector<HTMLElement>('.library-admin-layout');
   if (!layout) return;
 
   setupLibraryEditMode();
-  setupCollectionMoveSelects();
+  setupCollectionDragAndDrop();
+  setupRemoveCollectionFromLibrary();
 }
 
 // ── Library edit mode ──────────────────────────────────────────
@@ -30,8 +35,8 @@ function setupLibraryEditMode(): void {
     document.querySelectorAll<HTMLElement>('.library-delete-btn').forEach(btn => {
       btn.hidden = !active;
     });
-    document.querySelectorAll<HTMLElement>('.collection-tile-move').forEach(el => {
-      el.hidden = !active;
+    document.querySelectorAll<HTMLElement>('.collection-tile-remove-btn').forEach(btn => {
+      btn.hidden = !active;
     });
     if (addItem) addItem.hidden = !active;
   };
@@ -148,28 +153,99 @@ async function startCreateLibrary(addItem: HTMLElement): Promise<void> {
   });
 }
 
-// ── Collection move selects ────────────────────────────────────
+// ── Drag-and-drop: collection tiles → library items ────────────
+//
+// Collection tiles in the right pane are draggable. Library items in the
+// left pane are drop zones. Dropping a tile onto a library adds that
+// collection to the library — mirroring how book cards are dropped onto
+// collection items in the main library page.
 
-// Each collection tile has a <select> to move it to a different library.
-// Changing the select immediately moves the collection and reloads the page.
-function setupCollectionMoveSelects(): void {
-  document.querySelectorAll<HTMLSelectElement>('.collection-library-select').forEach(sel => {
-    sel.addEventListener('change', async () => {
-      const collectionID = parseInt(sel.dataset.collectionId ?? '0', 10);
-      const targetLibraryID = parseInt(sel.value, 10);
-      if (isNaN(collectionID) || isNaN(targetLibraryID)) return;
+function setupCollectionDragAndDrop(): void {
+  // Make collection tiles draggable.
+  document.querySelectorAll<HTMLElement>('.collection-tile[data-collection-id]').forEach(tile => {
+    tile.addEventListener('dragstart', (e: DragEvent) => {
+      e.dataTransfer!.setData('text/plain', tile.dataset.collectionId!);
+      e.dataTransfer!.effectAllowed = 'copy';
+      tile.classList.add('dragging');
+    });
+    tile.addEventListener('dragend', () => {
+      tile.classList.remove('dragging');
+      document.querySelectorAll<HTMLElement>('.library-drop-zone.drag-over').forEach(z => {
+        z.classList.remove('drag-over');
+      });
+    });
+  });
+
+  // Make library items drop zones.
+  document.querySelectorAll<HTMLElement>('.library-drop-zone').forEach(zone => {
+    zone.addEventListener('dragover', (e: DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = 'copy';
+      zone.classList.add('drag-over');
+    });
+
+    zone.addEventListener('dragleave', (e: DragEvent) => {
+      if (!zone.contains(e.relatedTarget as Node)) zone.classList.remove('drag-over');
+    });
+
+    zone.addEventListener('drop', (e: DragEvent) => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      const collectionId = parseInt(e.dataTransfer!.getData('text/plain'), 10);
+      const libraryId    = parseInt(zone.dataset.libraryId!, 10);
+      if (!isNaN(collectionId) && !isNaN(libraryId)) {
+        handleCollectionDrop(zone, libraryId, collectionId);
+      }
+    });
+  });
+}
+
+async function handleCollectionDrop(
+  zone: HTMLElement,
+  libraryId: number,
+  collectionId: number,
+): Promise<void> {
+  try {
+    const { added } = await addCollectionToLibrary(libraryId, collectionId);
+    if (added) {
+      // Update the count badge on the target library item.
+      const countEl = zone.querySelector<HTMLElement>('.library-item-count');
+      if (countEl) {
+        const n = parseInt(countEl.textContent?.match(/\d+/)?.[0] ?? '0', 10);
+        countEl.textContent = `(${n + 1})`;
+      }
+    }
+    zone.classList.add('drop-success');
+    setTimeout(() => zone.classList.remove('drop-success'), 700);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// ── Remove collection from library ─────────────────────────────
+
+function setupRemoveCollectionFromLibrary(): void {
+  document.querySelectorAll<HTMLButtonElement>('.collection-tile-remove-btn').forEach(btn => {
+    btn.addEventListener('click', async (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const collectionId = parseInt(btn.dataset.collectionId!, 10);
+      const libraryId    = parseInt(btn.dataset.libraryId!, 10);
+      if (isNaN(collectionId) || isNaN(libraryId)) return;
       try {
-        await moveCollectionToLibrary(collectionID, targetLibraryID);
-        // Navigate to the target library after moving.
-        window.location.href = `/library?lib=${targetLibraryID}`;
-      } catch (err) {
-        console.error('Failed to move collection:', err);
-        // Restore original selection on error.
-        const tile = sel.closest<HTMLElement>('.collection-tile');
-        if (tile) {
-          const originalLibraryID = tile.dataset.libraryId ?? '';
-          sel.value = originalLibraryID;
+        await removeCollectionFromLibrary(libraryId, collectionId);
+        btn.closest<HTMLElement>('.collection-tile')?.remove();
+        // Update the count badge on the matching library sidebar item.
+        const zone = document.querySelector<HTMLElement>(
+          `.library-drop-zone[data-library-id="${libraryId}"]`,
+        );
+        const countEl = zone?.querySelector<HTMLElement>('.library-item-count');
+        if (countEl) {
+          const n = parseInt(countEl.textContent?.match(/\d+/)?.[0] ?? '1', 10);
+          countEl.textContent = `(${Math.max(0, n - 1)})`;
         }
+      } catch (err) {
+        console.error(err);
       }
     });
   });

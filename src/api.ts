@@ -188,7 +188,7 @@ export async function deleteCollection(id: number): Promise<void> {
   await request(`/api/collections/${id}`, { method: 'DELETE' });
 }
 
-// moveCollectionToLibrary reassigns a collection to a different library.
+// moveCollectionToLibrary reassigns a collection to a different library (legacy).
 export async function moveCollectionToLibrary(collectionId: number, libraryId: number): Promise<void> {
   await request(`/api/collections/${collectionId}/library`, {
     method: 'PUT',
@@ -218,4 +218,29 @@ export async function renameLibrary(id: number, name: string): Promise<void> {
 
 export async function deleteLibrary(id: number): Promise<void> {
   await request(`/api/libraries/${id}`, { method: 'DELETE' });
+}
+
+export interface AddToLibraryResult {
+  added: boolean; // false = collection was already a member
+}
+
+// addCollectionToLibrary adds a collection to a library's membership.
+export async function addCollectionToLibrary(
+  libraryId: number,
+  collectionId: number,
+): Promise<AddToLibraryResult> {
+  const res = await request(`/api/libraries/${libraryId}/collections/${collectionId}`, {
+    method: 'POST',
+  });
+  return res.json() as Promise<AddToLibraryResult>;
+}
+
+// removeCollectionFromLibrary removes a collection from a library's membership.
+export async function removeCollectionFromLibrary(
+  libraryId: number,
+  collectionId: number,
+): Promise<void> {
+  await request(`/api/libraries/${libraryId}/collections/${collectionId}`, {
+    method: 'DELETE',
+  });
 }

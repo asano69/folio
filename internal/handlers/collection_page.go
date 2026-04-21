@@ -34,7 +34,6 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Load the specific collection to determine its library.
 	activeCollection, err := h.Store.GetBookCollection(collectionID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -45,16 +44,15 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	activeLibraryID := activeCollection.LibraryID
-
 	libraries, err := h.Store.ListLibraries()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Load collections for this library to populate the sidebar.
-	collections, err := h.Store.ListBookCollectionsInLibrary(activeLibraryID)
+	// A collection can belong to multiple libraries. The sidebar always shows
+	// the Central Library context so all collections are visible for navigation.
+	collections, err := h.Store.ListBookCollectionsInLibrary(store.CentralLibraryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -117,7 +115,7 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Collections:         collections,
 		Libraries:           libraries,
 		ActiveCollectionID:  collectionID,
-		ActiveLibraryID:     activeLibraryID,
+		ActiveLibraryID:     store.CentralLibraryID,
 		Collection:          activeCollection,
 		TotalBookCount:      totalCount,
 		UncategorizedCount:  uncategorizedCount,
