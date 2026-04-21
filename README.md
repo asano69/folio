@@ -9,11 +9,30 @@ Folioはローカルサーバのストレージに保存されたスキャン資
 - 各書籍には、BibTeXと互換性のある書誌情報の他、目次情報を保存できます。
 - 各画像ページには、タグ・メモ・マーカーなどの注釈情報を保存できます。
 
+## Contents
+
+- [vision/introduction.md](vision/introduction.md)
+
+
+## Documents
+
+```
+docs/
+  vision/        ← なぜ作るか（思想・方向性）
+  requirements/  ← 何を作るか（要求・ユースケース）
+  architecture/  ← どう構成するか（全体構造）
+  design/        ← モジュール設計・UI設計
+  specs/         ← API・データ・フォーマット仕様
+  decisions/     ← ADR（設計判断ログ）
+  guides/        ← 使い方・開発ガイド
+  reference/     ← 用語・定数・一覧
+  roadmap/       ← 将来計画（任意）
+```
+
 
 
 ### 注意点
 - Folioは探究心のある個人のために作られたセルフホスティングアプリであり一般公開やコラボレーションを想定していない。
-
 
 ## 要件
 物理本との比較によるユーザー体験要件
@@ -43,22 +62,12 @@ Folioはローカルサーバのストレージに保存されたスキャン資
 - **手描き注釈**: SVGペンで図解・強調などの描画
 - **ステータスタグ**: ページごとの「既読/途中/未読」などのステータス管理
 
-### Library / Collection / Book モデル
 
-- LibraryとCollcetionは、本を整理するための単位であり、Libraryは複数のCollectionをグループ化し、Collectionは複数のBookをグループ化する。
-- LibraryとCollectionの子要素は複数のグループに所属することができる。例えばあるBookは複数のCollectionに所属できるし、あるCollectionは複数のLibraryに所属できる。
-- ただし、あるBookを直接Libraryに所属させることはできず、かならずCollectionを介してLibraryに所属させる必要がある。
-- また、すべてのBookは必ず"All Books" Collectionに所属し、他に所属しているCollectionがなければ自動的に"Uncategorized Books" Collectionに追加される。つまり、すべてのBookは2つ以上のCollectionに必ず所属することになる。
-- 同様に、すべてのCollectionは必ず"All Collections" Libraryに所属し、他に所属しているLibraryがなければ自動的に"Uncategorized Collections" Libraryに追加される。つまり、すべてのCollectionは2つ以上のLibraryに必ず所属することになる。
-- "All Books"と"Uncategorized Books" Collectionは、必ず"Central Library"に所属する。
-- "Central Library" は削除不可であり、All Collections / Uncategorized Collections も削除不可。"All Books" / "Uncategorized Books" Collection も同様に削除不可。
 
 
 ### その他
 - **書籍ノート**: 書籍レベルのメモ（全体的な感想など）
 - **進捗率表示**: 書籍全体のどの位置を読んでいるかを可視化
-
-
 
 ## 設計
 ### 技術
@@ -68,9 +77,4 @@ Folioはローカルサーバのストレージに保存されたスキャン資
 - TypeScript: 必要最小限（描画・UI操作のみ）
 - Storage: ローカルファイルベース
 - Database: Sqlite3
-
-### CLI Program
-- そもそも、サーバのローカルストレージに存在する資料を配信するセルフホスティングアプリなので、Shellが使えることが前提のため、わざわざGUIを作らなくても十分な場面も多い。
-- CLIを用意することで、フロントエンドの管理用GUIが完成していない段階からアプリを使い始めることができる。
-- goのflagで、folioコマンドを作り、その中のserverサブコマンドでサーバを起動するようにする。サーバの設定は環境変数を使い変更することができるようにする。
 

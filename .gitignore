@@ -4,6 +4,7 @@ library/
 data/
 backup/
 cache/
+.obsidian/
 
 *.db
 *~
