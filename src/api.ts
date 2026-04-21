@@ -150,7 +150,7 @@ export interface AddToCollectionResult {
 }
 
 export async function addBookToCollection(
-  collectionId: number,
+  collectionId: string,
   bookId: string,
 ): Promise<AddToCollectionResult> {
   const res = await request(`/api/collections/${collectionId}/books/${bookId}`, {
@@ -160,14 +160,14 @@ export async function addBookToCollection(
 }
 
 export async function removeBookFromCollection(
-  collectionId: number,
+  collectionId: string,
   bookId: string,
 ): Promise<void> {
   await request(`/api/collections/${collectionId}/books/${bookId}`, { method: 'DELETE' });
 }
 
-// libraryId defaults to Central Library (1) when not provided.
-export async function createCollection(name: string, libraryId = 1): Promise<{ id: number; name: string }> {
+// libraryId defaults to empty string; the backend defaults to Central Library.
+export async function createCollection(name: string, libraryId = ''): Promise<{ id: string; name: string }> {
   const res = await request('/api/collections/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -176,7 +176,7 @@ export async function createCollection(name: string, libraryId = 1): Promise<{ i
   return res.json();
 }
 
-export async function renameCollection(id: number, name: string): Promise<void> {
+export async function renameCollection(id: string, name: string): Promise<void> {
   await request(`/api/collections/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -184,22 +184,13 @@ export async function renameCollection(id: number, name: string): Promise<void> 
   });
 }
 
-export async function deleteCollection(id: number): Promise<void> {
+export async function deleteCollection(id: string): Promise<void> {
   await request(`/api/collections/${id}`, { method: 'DELETE' });
-}
-
-// moveCollectionToLibrary reassigns a collection to a different library (legacy).
-export async function moveCollectionToLibrary(collectionId: number, libraryId: number): Promise<void> {
-  await request(`/api/collections/${collectionId}/library`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ library_id: libraryId }),
-  });
 }
 
 // ── Libraries ─────────────────────────────────────────────────
 
-export async function createLibrary(name: string): Promise<{ id: number; name: string }> {
+export async function createLibrary(name: string): Promise<{ id: string; name: string }> {
   const res = await request('/api/libraries/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -208,7 +199,7 @@ export async function createLibrary(name: string): Promise<{ id: number; name: s
   return res.json();
 }
 
-export async function renameLibrary(id: number, name: string): Promise<void> {
+export async function renameLibrary(id: string, name: string): Promise<void> {
   await request(`/api/libraries/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -216,7 +207,7 @@ export async function renameLibrary(id: number, name: string): Promise<void> {
   });
 }
 
-export async function deleteLibrary(id: number): Promise<void> {
+export async function deleteLibrary(id: string): Promise<void> {
   await request(`/api/libraries/${id}`, { method: 'DELETE' });
 }
 
@@ -226,8 +217,8 @@ export interface AddToLibraryResult {
 
 // addCollectionToLibrary adds a collection to a library's membership.
 export async function addCollectionToLibrary(
-  libraryId: number,
-  collectionId: number,
+  libraryId: string,
+  collectionId: string,
 ): Promise<AddToLibraryResult> {
   const res = await request(`/api/libraries/${libraryId}/collections/${collectionId}`, {
     method: 'POST',
@@ -237,8 +228,8 @@ export async function addCollectionToLibrary(
 
 // removeCollectionFromLibrary removes a collection from a library's membership.
 export async function removeCollectionFromLibrary(
-  libraryId: number,
-  collectionId: number,
+  libraryId: string,
+  collectionId: string,
 ): Promise<void> {
   await request(`/api/libraries/${libraryId}/collections/${collectionId}`, {
     method: 'DELETE',
