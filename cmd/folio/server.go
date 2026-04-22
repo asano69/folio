@@ -45,10 +45,6 @@ func (s *server) setupRoutes() {
 		w.Write([]byte(faviconSVG))
 	})
 
-	// Browsers automatically request /favicon.ico regardless of the <link> tag.
-	// Without this handler the request falls through to HomeHandler and returns
-	// an HTML 404, which Firefox caches — causing the favicon to disappear until
-	// the cache is cleared. Serving the SVG here resolves the issue.
 	s.mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		w.Write([]byte(faviconSVG))
@@ -57,9 +53,6 @@ func (s *server) setupRoutes() {
 	fs := http.FileServer(http.Dir("./static"))
 	s.mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	// Thumbnails are served directly from the cache directory via http.FileServer.
-	// This gives ETag, Last-Modified, and conditional GET support for free.
-	// URLs: /book-thumbnails/{bookID}.jpg  and  /page-thumbnails/{bookID}/{pageHash}.jpg
 	bookThumbFS := http.FileServer(http.Dir(filepath.Join(s.config.CachePath, "book-thumbnails")))
 	s.mux.Handle("/book-thumbnails/", http.StripPrefix("/book-thumbnails/", bookThumbFS))
 
@@ -72,22 +65,11 @@ func (s *server) setupRoutes() {
 		"inc": func(i int) int { return i + 1 },
 	}
 
-	homeTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
-		"templates/layout.html",
-		"templates/sidebar.html",
-		"templates/home.html",
-	))
-
+	// Shared template for all book-listing pages (all, uncategorized, collections).
 	collectionTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
 		"templates/layout.html",
 		"templates/sidebar.html",
 		"templates/collection.html",
-	))
-
-	uncategorizedTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
-		"templates/layout.html",
-		"templates/sidebar.html",
-		"templates/uncategorized.html",
 	))
 
 	viewerTemplate := template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
@@ -110,28 +92,52 @@ func (s *server) setupRoutes() {
 		"templates/library.html",
 	))
 
-	s.mux.Handle("/", &handlers.HomeHandler{
-		Store:     s.store,
-		CachePath: s.config.CachePath,
-		Template:  homeTemplate,
+	// / → redirect to /collections/all
+	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/collections/all", http.StatusFound)
 	})
 
+	// Backward-compat redirect: /library → /libraries/all
+	s.mux.HandleFunc("/library", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/libraries/all", http.StatusMovedPermanently)
+	})
+
+	// /collections/all — all books (exact match takes priority over /collections/ prefix)
+	s.mux.Handle("/collections/all", &handlers.AllBooksHandler{
+		Store:     s.store,
+		CachePath: s.config.CachePath,
+		Template:  collectionTemplate,
+	})
+
+	// /collections/uncategorized — books with no collection membership
+	s.mux.Handle("/collections/uncategorized", &handlers.UncategorizedPageHandler{
+		Store:     s.store,
+		CachePath: s.config.CachePath,
+		Template:  collectionTemplate,
+	})
+
+	// /collections/{uuid} — specific collection
 	s.mux.Handle("/collections/", &handlers.CollectionPageHandler{
 		Store:     s.store,
 		CachePath: s.config.CachePath,
 		Template:  collectionTemplate,
 	})
 
-	// /books/uncategorized is registered as an exact (fixed) pattern so it
-	// takes priority over the /books/ subtree pattern below.
-	s.mux.Handle("/books/uncategorized", &handlers.UncategorizedPageHandler{
-		Store:     s.store,
-		CachePath: s.config.CachePath,
-		Template:  uncategorizedTemplate,
-	})
+	// /libraries/all — Central Library admin (exact match)
+	libraryHandler := &handlers.LibraryPageHandler{
+		Store:    s.store,
+		Template: libraryTemplate,
+	}
+	s.mux.Handle("/libraries/all", libraryHandler)
 
-	// Routes /books/{uuid}/overview, /books/{uuid}/bibliography,
-	// and /books/{uuid}?seq={N} / ?p={pageNumber}.
+	// /libraries/{uuid} — specific library admin
+	s.mux.Handle("/libraries/", libraryHandler)
+
+	// /books/{uuid}/... — viewer, overview, bibliography
 	s.mux.Handle("/books/", &handlers.BookDispatchHandler{
 		Store:                 s.store,
 		CachePath:             s.config.CachePath,
@@ -144,25 +150,15 @@ func (s *server) setupRoutes() {
 		Store: s.store,
 	})
 
-	// Library management page.
-	s.mux.Handle("/library", &handlers.LibraryPageHandler{
-		Store:    s.store,
-		Template: libraryTemplate,
-	})
-
-	// Handles PUT /api/books/{id}, PUT /api/books/{id}/note,
-	// and POST /api/books/{id}/thumbnail.
 	s.mux.Handle("/api/books/", &handlers.BooksAPIHandler{
 		Store:     s.store,
 		CachePath: s.config.CachePath,
 	})
 
-	// Handles PUT /api/pages/{pageID}/note, /drawing, /status, /page-number.
 	s.mux.Handle("/api/pages/", &handlers.PagesAPIHandler{
 		Store: s.store,
 	})
 
-	// Handles POST /api/sections/, PUT /api/sections/{id}, DELETE /api/sections/{id}.
 	sectionsHandler := &handlers.SectionsAPIHandler{Store: s.store}
 	s.mux.Handle("/api/sections", sectionsHandler)
 	s.mux.Handle("/api/sections/", sectionsHandler)
@@ -171,7 +167,6 @@ func (s *server) setupRoutes() {
 	s.mux.Handle("/api/collections", cHandler)
 	s.mux.Handle("/api/collections/", cHandler)
 
-	// Handles POST /api/libraries/, PUT /api/libraries/{id}, DELETE /api/libraries/{id}.
 	lHandler := &handlers.LibrariesAPIHandler{Store: s.store}
 	s.mux.Handle("/api/libraries", lHandler)
 	s.mux.Handle("/api/libraries/", lHandler)

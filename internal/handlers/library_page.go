@@ -3,50 +3,66 @@ package handlers
 import (
 	"html/template"
 	"net/http"
-	"strconv"
+	"strings"
 
 	"folio/internal/store"
 )
 
-// LibraryPageHandler serves GET /library — the library management page.
-// It shows a two-column layout: a library list on the left and collection
-// tiles for the selected library on the right.
-//
-// The active library is selected via the ?lib= query parameter.
-// Defaults to Central Library when the parameter is absent or invalid.
+// libraryNavItem is the template model for a library sidebar entry.
+type libraryNavItem struct {
+	ID              string
+	Name            string
+	CollectionCount int
+	IsCentral       bool
+	URL             string
+}
+
+// collectionTileItem is the template model for a collection tile in the library admin.
+type collectionTileItem struct {
+	ID        string
+	Name      string
+	BookCount int
+	URL       string
+}
+
+// LibraryPageHandler serves GET /libraries/all and GET /libraries/{uuid}.
 type LibraryPageHandler struct {
 	Store    *store.Store
 	Template *template.Template
 }
 
 func (h *LibraryPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	seg := strings.TrimPrefix(r.URL.Path, "/libraries/")
+	seg = strings.Trim(seg, "/")
+
+	// Determine the active library.
+	activeLibraryID := store.CentralLibraryID
+	if seg != "" && seg != "all" {
+		activeLibraryID = seg
+	}
+
 	libraries, err := h.Store.ListLibraries()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Determine the active library from the query parameter.
-	activeLibraryID := store.CentralLibraryID
-	if libStr := r.URL.Query().Get("lib"); libStr != "" {
-		if id, err := strconv.Atoi(libStr); err == nil && id > 0 {
-			activeLibraryID = id
+	// Verify the requested library exists (only needed for non-Central).
+	if activeLibraryID != store.CentralLibraryID {
+		found := false
+		for _, lib := range libraries {
+			if lib.ID == activeLibraryID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			http.NotFound(w, r)
+			return
 		}
 	}
 
-	// Verify the requested library exists; fall back to Central Library if not.
-	found := false
-	for _, lib := range libraries {
-		if lib.ID == activeLibraryID {
-			found = true
-			break
-		}
-	}
-	if !found {
-		activeLibraryID = store.CentralLibraryID
-	}
-
-	collections, err := h.Store.ListBookCollectionsInLibrary(activeLibraryID)
+	rawCollections, err := h.Store.ListBookCollectionsInLibrary(activeLibraryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -61,19 +77,44 @@ func (h *LibraryPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Build view types with precomputed URLs.
+	libraryItems := make([]libraryNavItem, 0, len(libraries))
+	for _, lib := range libraries {
+		isCentral := lib.ID == store.CentralLibraryID
+		url := "/libraries/" + lib.ID
+		if isCentral {
+			url = "/libraries/all"
+		}
+		libraryItems = append(libraryItems, libraryNavItem{
+			ID:              lib.ID,
+			Name:            lib.Name,
+			CollectionCount: lib.CollectionCount,
+			IsCentral:       isCentral,
+			URL:             url,
+		})
+	}
+
+	collectionItems := make([]collectionTileItem, 0, len(rawCollections))
+	for _, c := range rawCollections {
+		collectionItems = append(collectionItems, collectionTileItem{
+			ID:        c.ID,
+			Name:      c.Name,
+			BookCount: c.BookCount,
+			URL:       "/collections/" + c.ID,
+		})
+	}
+
 	data := struct {
-		Libraries         []store.Library
-		ActiveLibraryID   int
+		Libraries         []libraryNavItem
+		ActiveLibraryID   string
 		ActiveLibraryName string
-		Collections       []store.BookCollection
-		// IsCentralLibrary is true when the active library is Central Library.
-		// Used to conditionally disable rename/delete controls in the template.
-		IsCentralLibrary bool
+		Collections       []collectionTileItem
+		IsCentralLibrary  bool
 	}{
-		Libraries:         libraries,
+		Libraries:         libraryItems,
 		ActiveLibraryID:   activeLibraryID,
 		ActiveLibraryName: activeLibraryName,
-		Collections:       collections,
+		Collections:       collectionItems,
 		IsCentralLibrary:  activeLibraryID == store.CentralLibraryID,
 	}
 

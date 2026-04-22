@@ -3,15 +3,13 @@ package handlers
 import (
 	"html/template"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"folio/internal/storage"
 	"folio/internal/store"
 )
 
-// CollectionPageHandler serves GET /collections/{id} — a single book
-// collection's book list.
+// CollectionPageHandler serves GET /collections/{uuid} — a single book collection.
 type CollectionPageHandler struct {
 	Store     *store.Store
 	CachePath string
@@ -19,18 +17,11 @@ type CollectionPageHandler struct {
 }
 
 func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/collections/")
-	idStr = strings.Trim(idStr, "/")
+	collectionID := strings.TrimPrefix(r.URL.Path, "/collections/")
+	collectionID = strings.Trim(collectionID, "/")
 
-	// /collections/ with no ID redirects to home.
-	if idStr == "" {
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
-	}
-
-	collectionID, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.NotFound(w, r)
+	if collectionID == "" {
+		http.Redirect(w, r, "/collections/all", http.StatusFound)
 		return
 	}
 
@@ -44,15 +35,7 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	libraries, err := h.Store.ListLibraries()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// A collection can belong to multiple libraries. The sidebar always shows
-	// the Central Library context so all collections are visible for navigation.
-	collections, err := h.Store.ListBookCollectionsInLibrary(store.CentralLibraryID)
+	collections, err := h.Store.ListBookCollections()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -76,7 +59,6 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Read the cache directory once to avoid N individual stat calls.
 	thumbnailSet, err := storage.ListBookThumbnailIDs(h.CachePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -98,28 +80,16 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	data := struct {
-		Books               []bookView
-		MissingBooks        []bookView
-		Collections         []store.BookCollection
-		Libraries           []store.Library
-		ActiveCollectionID  int
-		ActiveLibraryID     int
-		Collection          *store.BookCollection
-		TotalBookCount      int
-		UncategorizedCount  int
-		IsUncategorizedPage bool
-	}{
-		Books:               present,
-		MissingBooks:        missing,
-		Collections:         collections,
-		Libraries:           libraries,
-		ActiveCollectionID:  collectionID,
-		ActiveLibraryID:     store.CentralLibraryID,
-		Collection:          activeCollection,
-		TotalBookCount:      totalCount,
-		UncategorizedCount:  uncategorizedCount,
-		IsUncategorizedPage: false,
+	data := shelfPageData{
+		PageTitle:          activeCollection.Name,
+		Books:              present,
+		MissingBooks:       missing,
+		EmptyMessage:       "No books in this collection yet.",
+		Collections:        collections,
+		ActiveCollectionID: collectionID,
+		CollectionID:       collectionID,
+		TotalBookCount:     totalCount,
+		UncategorizedCount: uncategorizedCount,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {

@@ -11,8 +11,7 @@
         <nav class="library-admin-nav">
             {{range .Libraries}}
             <div class="library-item{{if eq .ID $.ActiveLibraryID}} library-item--active{{end}} library-drop-zone"
-                 data-library-id="{{.ID}}">
-                {{/* Central Library (IsCentral=true) cannot be renamed or deleted */}}
+                 data-library-id="{{.ID}}"{{if .IsCentral}} data-is-central="true"{{end}}>
                 {{if not .IsCentral}}
                 <button class="library-delete-btn" title="Delete library" hidden>✕</button>
                 {{end}}
@@ -37,13 +36,11 @@
         {{if .Collections}}
         <div class="collection-tiles">
             {{range .Collections}}
-            <div class="collection-tile" draggable="true"
-                 data-collection-id="{{.ID}}">
+            <div class="collection-tile" draggable="true" data-collection-id="{{.ID}}">
                 <a href="{{.URL}}" class="collection-tile-link">
                     <div class="collection-tile-name">{{.Name}}</div>
                     <div class="collection-tile-count">{{.BookCount}} books</div>
                 </a>
-                {{/* Remove button shown in edit mode for non-Central-Library views */}}
                 {{if not $.IsCentralLibrary}}
                 <button class="collection-tile-remove-btn" title="Remove from library"
                         data-collection-id="{{.ID}}" data-library-id="{{$.ActiveLibraryID}}" hidden>✕</button>

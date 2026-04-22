@@ -1,1 +1,46 @@
-{{/* superseded by collection.html */}}
+{{define "sidebar"}}
+<aside class="collection-sidebar">
+    <div class="collection-toolbar">
+        <button id="collection-edit-btn" class="collection-edit-btn">✎ Edit</button>
+    </div>
+
+    <div class="collection-search-wrap">
+        <input type="search" id="collection-search" class="collection-search-input"
+               placeholder="Filter collections…" autocomplete="off">
+    </div>
+
+    <nav class="collection-nav">
+        {{/* All Books */}}
+        <a href="/collections/all"
+           class="collection-item{{if eq .ActiveCollectionID "all"}} collection-item--active{{end}}">
+            <span class="collection-title">All Books</span>
+            <span class="collection-count">({{.TotalBookCount}})</span>
+        </a>
+
+        {{/* Named collections */}}
+        {{range .Collections}}
+        <div class="collection-item collection-drop-zone{{if eq .ID $.ActiveCollectionID}} collection-item--active{{end}}"
+             data-collection-id="{{.ID}}">
+            <button class="collection-delete-btn" hidden title="Delete collection">✕</button>
+            <a href="/collections/{{.ID}}" class="collection-link">
+                <span class="collection-title">{{.Name}}</span>
+                <span class="collection-count">({{.BookCount}})</span>
+            </a>
+        </div>
+        {{end}}
+
+        {{/* Uncategorized — shown only when there are uncategorized books */}}
+        {{if gt .UncategorizedCount 0}}
+        <a href="/collections/uncategorized"
+           class="collection-item{{if eq .ActiveCollectionID "uncategorized"}} collection-item--active{{end}}">
+            <span class="collection-title">Uncategorized</span>
+            <span class="collection-count">({{.UncategorizedCount}})</span>
+        </a>
+        {{end}}
+
+        <div id="collection-add-item" class="collection-item collection-add-item" hidden>
+            <span class="collection-add-label">＋ Add Collection</span>
+        </div>
+    </nav>
+</aside>
+{{end}}
