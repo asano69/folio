@@ -4,19 +4,20 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"folio/internal/storage"
+
+	"github.com/google/uuid"
 )
 
-// CentralLibraryID is the fixed ID of the default library that is always
-// present. It cannot be deleted and serves as the home for uncategorized
-// collections and the "All Books" virtual view.
-// Central Library implicitly contains all book collections.
-const CentralLibraryID = 1
+// CentralLibraryID is the fixed UUID of the default library. It cannot be
+// deleted or renamed, and implicitly contains all book collections.
+const CentralLibraryID = "00000000-0000-7000-8000-000000000000"
 
 // Library is the DB representation of a named group of book collections.
 type Library struct {
-	ID              int
+	ID              string
 	Name            string
 	CollectionCount int
 }
@@ -54,12 +55,6 @@ type Book struct {
 //
 // ID is stable across re-scans: UpsertPages uses a merge algorithm
 // (hash-first, then position) to preserve IDs even when the CBZ changes.
-//
-// Seq is the 1-based position of the image within the CBZ (filename sort
-// order). It is NOT the real book page number.
-//
-// PageNumber is the real book page number as printed (e.g. "42", "iv").
-// It is TEXT to support roman numerals. NULL when not assigned by the user.
 type Page struct {
 	ID         int
 	BookID     string
@@ -70,8 +65,6 @@ type Page struct {
 }
 
 // Section is the DB representation of a named page range within a book.
-// Sections may overlap and nest freely; no uniqueness is enforced.
-// EndPageID is nil when the user has not set an explicit end boundary.
 type Section struct {
 	ID          int
 	BookID      string
@@ -83,8 +76,6 @@ type Section struct {
 }
 
 // TocEntry is a single entry in the table of contents derived from sections.
-// StartSeq is the seq of the section-start page. EndSeq is the seq of the
-// end page, or nil when end_page_id is NULL.
 type TocEntry struct {
 	SectionID   int
 	StartSeq    int
@@ -100,19 +91,17 @@ type PageNote struct {
 }
 
 // BookCollection is the DB representation of a named group of books.
-// BookCount is populated by query functions that include the JOIN.
-// A collection can belong to multiple libraries via library_collection_members.
 type BookCollection struct {
-	ID          int
+	ID          string
 	Name        string
 	Color       string
 	Description string
 	BookCount   int
+	LibraryIDs  string // comma-separated IDs from library_collection_members; empty = Central only
 }
 
 // ── JSON helpers for array columns ────────────────────────────
 
-// marshalPersonNames serializes a PersonName slice to a JSON string for DB storage.
 func marshalPersonNames(names []storage.PersonName) string {
 	if len(names) == 0 {
 		return "[]"
@@ -121,7 +110,6 @@ func marshalPersonNames(names []storage.PersonName) string {
 	return string(b)
 }
 
-// unmarshalPersonNames deserializes a JSON string from the DB into a PersonName slice.
 func unmarshalPersonNames(s string) []storage.PersonName {
 	if s == "" || s == "[]" {
 		return nil
@@ -131,7 +119,6 @@ func unmarshalPersonNames(s string) []storage.PersonName {
 	return names
 }
 
-// marshalStrings serializes a string slice to a JSON string for DB storage.
 func marshalStrings(strs []string) string {
 	if len(strs) == 0 {
 		return "[]"
@@ -140,7 +127,6 @@ func marshalStrings(strs []string) string {
 	return string(b)
 }
 
-// unmarshalStrings deserializes a JSON string from the DB into a string slice.
 func unmarshalStrings(s string) []string {
 	if s == "" || s == "[]" {
 		return nil
@@ -160,9 +146,6 @@ const bookSelectSQL = `
 
 // ── Books ──────────────────────────────────────────────────────
 
-// UpsertBook inserts a new book or updates its title, source, file_mtime, metadata
-// columns, and clears missing_since. Status is excluded from the UPDATE so
-// user-set values are preserved across re-scans.
 func (s *Store) UpsertBook(b storage.Book) error {
 	_, err := s.db.Exec(`
 		INSERT INTO books (
@@ -204,9 +187,6 @@ func (s *Store) UpsertBook(b storage.Book) error {
 	return err
 }
 
-// UpdateBookMeta updates all editable metadata columns for a book.
-// Called after the bibliography page saves metadata. Source and file_mtime
-// are not touched; those are scan-managed. Status is not touched either.
 func (s *Store) UpdateBookMeta(id string, b storage.Book) error {
 	_, err := s.db.Exec(`
 		UPDATE books SET
@@ -239,9 +219,8 @@ func (s *Store) UpdateBookMeta(id string, b storage.Book) error {
 	return err
 }
 
-// MarkBookMissing sets missing_since to the current time for a book whose
-// CBZ was not found during a scan. It is a no-op if missing_since is already
-// set, preserving the original disappearance timestamp across repeated scans.
+// MarkBookMissing sets missing_since for a book whose CBZ was not found.
+// It is a no-op when missing_since is already set.
 func (s *Store) MarkBookMissing(id string) error {
 	_, err := s.db.Exec(`
 		UPDATE books SET missing_since = CURRENT_TIMESTAMP
@@ -250,25 +229,20 @@ func (s *Store) MarkBookMissing(id string) error {
 	return err
 }
 
-// UpdateBookTitle updates the title of an existing book.
 func (s *Store) UpdateBookTitle(id, title string) error {
 	_, err := s.db.Exec(`UPDATE books SET title = ? WHERE id = ?`, title, id)
 	return err
 }
 
-// ListBooks returns all books ordered by title, including missing ones.
 func (s *Store) ListBooks() ([]Book, error) {
 	rows, err := s.db.Query(`SELECT` + bookSelectSQL + `FROM books ORDER BY title`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	return scanBookRows(rows)
 }
 
-// ListBooksUnderPath returns books whose source path is under the given
-// directory. Used by partial scans to restrict missing-book detection.
 func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
 	rows, err := s.db.Query(
 		`SELECT`+bookSelectSQL+`FROM books WHERE source LIKE ? || '/%'`,
@@ -278,15 +252,12 @@ func (s *Store) ListBooksUnderPath(dirPath string) ([]Book, error) {
 		return nil, err
 	}
 	defer rows.Close()
-
 	return scanBookRows(rows)
 }
 
-// ListAllBooksInLibrary returns all books associated with the given library.
-// For Central Library (id=1), all books are returned. For other libraries,
-// only books that belong to at least one collection in that library are returned.
-// Both present and missing books are included; the caller separates them.
-func (s *Store) ListAllBooksInLibrary(libraryID int) ([]Book, error) {
+// ListAllBooksInLibrary returns books associated with the given library.
+// Central Library returns all books; other libraries return books from their collections.
+func (s *Store) ListAllBooksInLibrary(libraryID string) ([]Book, error) {
 	if libraryID == CentralLibraryID {
 		return s.ListBooks()
 	}
@@ -305,11 +276,9 @@ func (s *Store) ListAllBooksInLibrary(libraryID int) ([]Book, error) {
 		return nil, err
 	}
 	defer rows.Close()
-
 	return scanBookRows(rows)
 }
 
-// GetBook returns a single book by ID, or nil if not found.
 func (s *Store) GetBook(id string) (*Book, error) {
 	rows, err := s.db.Query(
 		`SELECT`+bookSelectSQL+`FROM books WHERE id = ?`, id,
@@ -318,7 +287,6 @@ func (s *Store) GetBook(id string) (*Book, error) {
 		return nil, err
 	}
 	defer rows.Close()
-
 	books, err := scanBookRows(rows)
 	if err != nil {
 		return nil, err
@@ -329,14 +297,12 @@ func (s *Store) GetBook(id string) (*Book, error) {
 	return &books[0], nil
 }
 
-// CountAllBooks returns the number of non-missing books in the library.
 func (s *Store) CountAllBooks() (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM books WHERE missing_since IS NULL`).Scan(&n)
 	return n, err
 }
 
-// scanBookRows scans all rows from a books query into a Book slice.
 func scanBookRows(rows *sql.Rows) ([]Book, error) {
 	var books []Book
 	for rows.Next() {
@@ -391,19 +357,7 @@ func scanBookRows(rows *sql.Rows) ([]Book, error) {
 // ── Pages ──────────────────────────────────────────────────────
 
 // UpsertPages merges the scanned image list into the pages table while
-// preserving stable page IDs. The merge runs in two passes:
-//
-//  1. Match by hash (content identity): a page that moved to a different
-//     position keeps its ID because its image content is unchanged.
-//  2. Match remaining entries by seq: a page whose content was replaced
-//     in-place keeps its ID; only its hash (and filename) is updated.
-//
-// Pages with no match are inserted as new rows.
-// Existing pages with no match are deleted; ON DELETE CASCADE propagates to
-// page_notes, page_status, page_drawings, page_ocr, and sections.
-//
-// page_number is never touched by this function; user-assigned values survive
-// re-scans as long as the page ID is preserved by the merge.
+// preserving stable page IDs via hash-first, then position matching.
 func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -411,7 +365,6 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 	}
 	defer tx.Rollback()
 
-	// Load existing pages for this book.
 	rows, err := tx.Query(
 		`SELECT id, seq, hash FROM pages WHERE book_id = ? ORDER BY seq`, bookID,
 	)
@@ -438,8 +391,7 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 
 	usedExisting := make([]bool, len(existing))
 	usedNew := make([]bool, len(entries))
-	// existingPage.id -> index into entries
-	matches := make(map[int]int, len(existing))
+	matches := make(map[int]int, len(existing)) // existingPage.id -> entries index
 
 	// Pass 1: match by hash (stable identity despite position change).
 	for newIdx, entry := range entries {
@@ -471,8 +423,6 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 		}
 	}
 
-	// Update matched pages: seq, filename, or hash may have changed.
-	// page_number is intentionally excluded; it is user-managed.
 	for exID, newIdx := range matches {
 		entry := entries[newIdx]
 		if _, err := tx.Exec(
@@ -483,7 +433,6 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 		}
 	}
 
-	// Insert truly new pages (no existing page matched by hash or seq).
 	for newIdx, entry := range entries {
 		if usedNew[newIdx] {
 			continue
@@ -496,7 +445,6 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 		}
 	}
 
-	// Delete unmatched existing pages. ON DELETE CASCADE handles dependent rows.
 	for exIdx, ex := range existing {
 		if usedExisting[exIdx] {
 			continue
@@ -509,7 +457,6 @@ func (s *Store) UpsertPages(bookID string, entries []storage.ImageEntry) error {
 	return tx.Commit()
 }
 
-// ListPages returns all pages for a book ordered by seq.
 func (s *Store) ListPages(bookID string) ([]Page, error) {
 	rows, err := s.db.Query(`
 		SELECT id, book_id, seq, filename, hash, page_number
@@ -531,7 +478,6 @@ func (s *Store) ListPages(bookID string) ([]Page, error) {
 	return pages, rows.Err()
 }
 
-// GetPage returns a single page by its stable ID, or nil if not found.
 func (s *Store) GetPage(pageID int) (*Page, error) {
 	var p Page
 	err := s.db.QueryRow(`
@@ -544,7 +490,6 @@ func (s *Store) GetPage(pageID int) (*Page, error) {
 	return &p, err
 }
 
-// GetCoverPage returns the first page (lowest seq) of a book, or nil if none exists.
 func (s *Store) GetCoverPage(bookID string) (*Page, error) {
 	var p Page
 	err := s.db.QueryRow(`
@@ -557,8 +502,6 @@ func (s *Store) GetCoverPage(bookID string) (*Page, error) {
 	return &p, err
 }
 
-// GetPageByNumber returns the page with the lowest seq whose page_number matches
-// within the given book. Returns nil if no page carries that number.
 func (s *Store) GetPageByNumber(bookID, pageNumber string) (*Page, error) {
 	var p Page
 	err := s.db.QueryRow(`
@@ -572,21 +515,17 @@ func (s *Store) GetPageByNumber(bookID, pageNumber string) (*Page, error) {
 	return &p, err
 }
 
-// UpdatePageNumber sets or clears the real book page number for a page.
-// Pass nil to clear an existing value.
 func (s *Store) UpdatePageNumber(pageID int, pageNumber *string) error {
 	_, err := s.db.Exec(`UPDATE pages SET page_number = ? WHERE id = ?`, pageNumber, pageID)
 	return err
 }
 
-// HasPages reports whether any pages are registered for the given book.
 func (s *Store) HasPages(bookID string) (bool, error) {
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&count)
 	return count > 0, err
 }
 
-// CountPages returns the total number of pages registered for a book.
 func (s *Store) CountPages(bookID string) (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE book_id = ?`, bookID).Scan(&n)
@@ -595,7 +534,6 @@ func (s *Store) CountPages(bookID string) (int, error) {
 
 // ── Page notes ─────────────────────────────────────────────────
 
-// GetPageNote returns the note for a page, or a zero-value PageNote if none exists.
 func (s *Store) GetPageNote(pageID int) (PageNote, error) {
 	var note PageNote
 	err := s.db.QueryRow(
@@ -607,7 +545,6 @@ func (s *Store) GetPageNote(pageID int) (PageNote, error) {
 	return note, err
 }
 
-// UpsertPageNote inserts or updates the note body for a page.
 func (s *Store) UpsertPageNote(pageID int, body string) error {
 	_, err := s.db.Exec(`
 		INSERT INTO page_notes (page_id, body, updated_at)
@@ -621,8 +558,6 @@ func (s *Store) UpsertPageNote(pageID int, body string) error {
 
 // ── Page drawings ──────────────────────────────────────────────
 
-// GetPageDrawing returns the SVG markup for a page's drawing, or an empty
-// string if no drawing has been saved.
 func (s *Store) GetPageDrawing(pageID int) (string, error) {
 	var svg string
 	err := s.db.QueryRow(`SELECT svg FROM page_drawings WHERE page_id = ?`, pageID).Scan(&svg)
@@ -632,8 +567,6 @@ func (s *Store) GetPageDrawing(pageID int) (string, error) {
 	return svg, err
 }
 
-// UpsertPageDrawing saves or replaces an SVG drawing for a page.
-// Passing nil removes any existing drawing.
 func (s *Store) UpsertPageDrawing(pageID int, svg *string) error {
 	if svg == nil {
 		_, err := s.db.Exec(`DELETE FROM page_drawings WHERE page_id = ?`, pageID)
@@ -651,8 +584,6 @@ func (s *Store) UpsertPageDrawing(pageID int, svg *string) error {
 
 // ── Page status ────────────────────────────────────────────────
 
-// ListPageStatuses returns a map of pageID → status for all pages in a book
-// that have an explicit status record. Pages absent from the map are 'unread'.
 func (s *Store) ListPageStatuses(bookID string) (map[int]string, error) {
 	rows, err := s.db.Query(`
 		SELECT ps.page_id, ps.status
@@ -677,7 +608,6 @@ func (s *Store) ListPageStatuses(bookID string) (map[int]string, error) {
 	return m, rows.Err()
 }
 
-// UpsertPageStatus sets the read status for a page by its stable ID.
 func (s *Store) UpsertPageStatus(pageID int, status string) error {
 	_, err := s.db.Exec(`
 		INSERT INTO page_status (page_id, status, updated_at)
@@ -691,7 +621,6 @@ func (s *Store) UpsertPageStatus(pageID int, status string) error {
 
 // ── Sections ───────────────────────────────────────────────────
 
-// ListSections returns all sections for a book in insertion order.
 func (s *Store) ListSections(bookID string) ([]Section, error) {
 	rows, err := s.db.Query(`
 		SELECT id, book_id, start_page_id, end_page_id, title, description, status
@@ -716,9 +645,6 @@ func (s *Store) ListSections(bookID string) ([]Section, error) {
 	return sections, rows.Err()
 }
 
-// GetTOC returns all sections for a book joined with their start/end page seq
-// values, ordered by start page seq. This is the primary data source for the
-// table of contents in the viewer and bibliography pages.
 func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	rows, err := s.db.Query(`
 		SELECT s.id, p_start.seq, p_end.seq, s.title, s.description, s.status
@@ -747,8 +673,6 @@ func (s *Store) GetTOC(bookID string) ([]TocEntry, error) {
 	return entries, rows.Err()
 }
 
-// ListSectionStartPageIDs returns the set of page IDs that are the start of
-// at least one section for the given book. Used to mark pages in overview grids.
 func (s *Store) ListSectionStartPageIDs(bookID string) (map[int]bool, error) {
 	rows, err := s.db.Query(`
 		SELECT DISTINCT start_page_id FROM sections WHERE book_id = ?
@@ -769,7 +693,6 @@ func (s *Store) ListSectionStartPageIDs(bookID string) (map[int]bool, error) {
 	return m, rows.Err()
 }
 
-// CreateSection inserts a new section and returns its ID.
 func (s *Store) CreateSection(bookID string, startPageID int, endPageID *int, title, description string) (int64, error) {
 	res, err := s.db.Exec(`
 		INSERT INTO sections (book_id, start_page_id, end_page_id, title, description)
@@ -781,7 +704,6 @@ func (s *Store) CreateSection(bookID string, startPageID int, endPageID *int, ti
 	return res.LastInsertId()
 }
 
-// UpdateSection replaces all mutable fields of an existing section.
 func (s *Store) UpdateSection(id int, startPageID int, endPageID *int, title, description, status string) error {
 	_, err := s.db.Exec(`
 		UPDATE sections
@@ -791,7 +713,6 @@ func (s *Store) UpdateSection(id int, startPageID int, endPageID *int, title, de
 	return err
 }
 
-// DeleteSection removes a section by ID.
 func (s *Store) DeleteSection(id int) error {
 	_, err := s.db.Exec(`DELETE FROM sections WHERE id = ?`, id)
 	return err
@@ -799,19 +720,16 @@ func (s *Store) DeleteSection(id int) error {
 
 // ── Libraries ─────────────────────────────────────────────────
 
-// ListLibraries returns all libraries ordered by name, with their collection
-// counts. Central Library count is the total number of all collections.
-// Other libraries count their explicit memberships in library_collection_members.
 func (s *Store) ListLibraries() ([]Library, error) {
 	rows, err := s.db.Query(`
 		SELECT l.id, l.name,
-		  CASE WHEN l.id = 1
+		  CASE WHEN l.id = ?
 		       THEN (SELECT COUNT(*) FROM book_collections)
 		       ELSE (SELECT COUNT(*) FROM library_collection_members m WHERE m.library_id = l.id)
 		  END AS collection_count
 		FROM libraries l
 		ORDER BY l.name
-	`)
+	`, CentralLibraryID)
 	if err != nil {
 		return nil, err
 	}
@@ -828,36 +746,37 @@ func (s *Store) ListLibraries() ([]Library, error) {
 	return libs, rows.Err()
 }
 
-// GetLibrary returns a single library by ID, or nil if not found.
-func (s *Store) GetLibrary(id int) (*Library, error) {
+func (s *Store) GetLibrary(id string) (*Library, error) {
 	var lib Library
 	err := s.db.QueryRow(`
 		SELECT l.id, l.name,
-		  CASE WHEN l.id = 1
+		  CASE WHEN l.id = ?
 		       THEN (SELECT COUNT(*) FROM book_collections)
 		       ELSE (SELECT COUNT(*) FROM library_collection_members m WHERE m.library_id = l.id)
 		  END AS collection_count
 		FROM libraries l
 		WHERE l.id = ?
-	`, id).Scan(&lib.ID, &lib.Name, &lib.CollectionCount)
+	`, CentralLibraryID, id).Scan(&lib.ID, &lib.Name, &lib.CollectionCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return &lib, err
 }
 
-// CreateLibrary inserts a new library and returns its ID.
-func (s *Store) CreateLibrary(name string) (int64, error) {
-	res, err := s.db.Exec(`INSERT INTO libraries (name) VALUES (?)`, name)
+// CreateLibrary inserts a new library with a generated UUID v7 and returns the ID.
+func (s *Store) CreateLibrary(name string) (string, error) {
+	id, err := uuid.NewV7()
 	if err != nil {
-		return 0, err
+		return "", fmt.Errorf("generate uuid: %w", err)
 	}
-	return res.LastInsertId()
+	idStr := id.String()
+	if _, err := s.db.Exec(`INSERT INTO libraries (id, name) VALUES (?, ?)`, idStr, name); err != nil {
+		return "", err
+	}
+	return idStr, nil
 }
 
-// RenameLibrary updates the name of a library.
-// Returns an error if attempting to rename Central Library.
-func (s *Store) RenameLibrary(id int, name string) error {
+func (s *Store) RenameLibrary(id string, name string) error {
 	if id == CentralLibraryID {
 		return errors.New("cannot rename Central Library")
 	}
@@ -865,9 +784,7 @@ func (s *Store) RenameLibrary(id int, name string) error {
 	return err
 }
 
-// DeleteLibrary removes a library. Returns an error if the library still has
-// collections assigned to it, or if it is Central Library.
-func (s *Store) DeleteLibrary(id int) error {
+func (s *Store) DeleteLibrary(id string) error {
 	if id == CentralLibraryID {
 		return errors.New("cannot delete Central Library")
 	}
@@ -884,15 +801,14 @@ func (s *Store) DeleteLibrary(id int) error {
 
 // ── Book collections ───────────────────────────────────────────
 
-// collectionSelectSQL is the SELECT column list used by all collection-returning queries.
-const collectionSelectSQL = `c.id, c.name, c.color, c.description, COUNT(m.book_id)`
+const collectionSelectSQL = `c.id, c.name, c.color, c.description, COUNT(DISTINCT m.book_id), COALESCE(GROUP_CONCAT(DISTINCT lcm.library_id), '')`
 
-// ListBookCollections returns all book collections ordered by name, with member counts.
 func (s *Store) ListBookCollections() ([]BookCollection, error) {
 	rows, err := s.db.Query(`
 		SELECT ` + collectionSelectSQL + `
 		FROM book_collections c
 		LEFT JOIN book_collection_members m ON m.collection_id = c.id
+		LEFT JOIN library_collection_members lcm ON lcm.collection_id = c.id
 		GROUP BY c.id
 		ORDER BY c.name
 	`)
@@ -900,15 +816,13 @@ func (s *Store) ListBookCollections() ([]BookCollection, error) {
 		return nil, err
 	}
 	defer rows.Close()
-
 	return scanBookCollectionRows(rows)
 }
 
-// ListBookCollectionsInLibrary returns collections belonging to the given library,
-// ordered by name, with member counts.
-// Central Library (id=1) returns all collections.
-// Other libraries return only collections with an explicit membership row.
-func (s *Store) ListBookCollectionsInLibrary(libraryID int) ([]BookCollection, error) {
+// ListBookCollectionsInLibrary returns collections belonging to the given library.
+// Central Library returns all collections.
+
+func (s *Store) ListBookCollectionsInLibrary(libraryID string) ([]BookCollection, error) {
 	if libraryID == CentralLibraryID {
 		return s.ListBookCollections()
 	}
@@ -916,6 +830,7 @@ func (s *Store) ListBookCollectionsInLibrary(libraryID int) ([]BookCollection, e
 		SELECT `+collectionSelectSQL+`
 		FROM book_collections c
 		LEFT JOIN book_collection_members m ON m.collection_id = c.id
+		LEFT JOIN library_collection_members lcm ON lcm.collection_id = c.id
 		WHERE c.id IN (
 		    SELECT collection_id FROM library_collection_members WHERE library_id = ?
 		)
@@ -926,16 +841,15 @@ func (s *Store) ListBookCollectionsInLibrary(libraryID int) ([]BookCollection, e
 		return nil, err
 	}
 	defer rows.Close()
-
 	return scanBookCollectionRows(rows)
 }
 
-// GetBookCollection returns a single collection by ID, or nil if not found.
-func (s *Store) GetBookCollection(id int) (*BookCollection, error) {
+func (s *Store) GetBookCollection(id string) (*BookCollection, error) {
 	rows, err := s.db.Query(`
 		SELECT `+collectionSelectSQL+`
 		FROM book_collections c
 		LEFT JOIN book_collection_members m ON m.collection_id = c.id
+		LEFT JOIN library_collection_members lcm ON lcm.collection_id = c.id
 		WHERE c.id = ?
 		GROUP BY c.id
 	`, id)
@@ -943,7 +857,6 @@ func (s *Store) GetBookCollection(id int) (*BookCollection, error) {
 		return nil, err
 	}
 	defer rows.Close()
-
 	cols, err := scanBookCollectionRows(rows)
 	if err != nil {
 		return nil, err
@@ -954,13 +867,11 @@ func (s *Store) GetBookCollection(id int) (*BookCollection, error) {
 	return &cols[0], nil
 }
 
-// scanBookCollectionRows scans rows from a book_collections query.
-// The SELECT must include: id, name, color, description, count.
 func scanBookCollectionRows(rows *sql.Rows) ([]BookCollection, error) {
 	var cols []BookCollection
 	for rows.Next() {
 		var c BookCollection
-		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Description, &c.BookCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Description, &c.BookCount, &c.LibraryIDs); err != nil {
 			return nil, err
 		}
 		cols = append(cols, c)
@@ -968,46 +879,41 @@ func scanBookCollectionRows(rows *sql.Rows) ([]BookCollection, error) {
 	return cols, rows.Err()
 }
 
-// CreateBookCollection inserts a new book collection and, when libraryID is
-// not Central Library, adds it to that library's membership.
-func (s *Store) CreateBookCollection(name string, libraryID int) (int64, error) {
-	res, err := s.db.Exec(`INSERT INTO book_collections (name) VALUES (?)`, name)
+// CreateBookCollection inserts a new collection with a generated UUID v7.
+// When libraryID is not Central Library, it is added to that library's membership.
+func (s *Store) CreateBookCollection(name string, libraryID string) (string, error) {
+	id, err := uuid.NewV7()
 	if err != nil {
-		return 0, err
+		return "", fmt.Errorf("generate uuid: %w", err)
 	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return 0, err
+	idStr := id.String()
+	if _, err := s.db.Exec(`INSERT INTO book_collections (id, name) VALUES (?, ?)`, idStr, name); err != nil {
+		return "", err
 	}
-	// Central Library implicitly contains all collections; no junction row needed.
-	if libraryID != CentralLibraryID {
+	if libraryID != CentralLibraryID && libraryID != "" {
 		if _, err := s.db.Exec(
 			`INSERT OR IGNORE INTO library_collection_members (library_id, collection_id) VALUES (?, ?)`,
-			libraryID, id,
+			libraryID, idStr,
 		); err != nil {
-			return 0, err
+			return "", err
 		}
 	}
-	return id, nil
+	return idStr, nil
 }
 
-// RenameBookCollection updates the name of an existing book collection.
-func (s *Store) RenameBookCollection(id int, name string) error {
+func (s *Store) RenameBookCollection(id string, name string) error {
 	_, err := s.db.Exec(`UPDATE book_collections SET name = ? WHERE id = ?`, name, id)
 	return err
 }
 
-// DeleteBookCollection removes a book collection and all its memberships.
-// ON DELETE CASCADE handles book_collection_members and library_collection_members.
-func (s *Store) DeleteBookCollection(id int) error {
+func (s *Store) DeleteBookCollection(id string) error {
 	_, err := s.db.Exec(`DELETE FROM book_collections WHERE id = ?`, id)
 	return err
 }
 
 // AddCollectionToLibrary adds a collection to a library's membership.
-// Returns whether the row was newly inserted (false = already a member).
 // Central Library is a no-op since it implicitly contains all collections.
-func (s *Store) AddCollectionToLibrary(libraryID, collectionID int) (bool, error) {
+func (s *Store) AddCollectionToLibrary(libraryID, collectionID string) (bool, error) {
 	if libraryID == CentralLibraryID {
 		return false, nil
 	}
@@ -1021,9 +927,7 @@ func (s *Store) AddCollectionToLibrary(libraryID, collectionID int) (bool, error
 	return n > 0, err
 }
 
-// RemoveCollectionFromLibrary removes a collection from a library's membership.
-// Central Library is a no-op since its membership is implicit.
-func (s *Store) RemoveCollectionFromLibrary(libraryID, collectionID int) error {
+func (s *Store) RemoveCollectionFromLibrary(libraryID, collectionID string) error {
 	if libraryID == CentralLibraryID {
 		return nil
 	}
@@ -1033,17 +937,12 @@ func (s *Store) RemoveCollectionFromLibrary(libraryID, collectionID int) error {
 	return err
 }
 
-// MoveCollectionToLibrary reassigns a collection to a different library by
-// updating the legacy library_id column. Kept for API compatibility.
-// Prefer AddCollectionToLibrary / RemoveCollectionFromLibrary for new code.
-func (s *Store) MoveCollectionToLibrary(collectionID, libraryID int) error {
+func (s *Store) MoveCollectionToLibrary(collectionID, libraryID string) error {
 	_, err := s.db.Exec(`UPDATE book_collections SET library_id = ? WHERE id = ?`, libraryID, collectionID)
 	return err
 }
 
-// AddBookToBookCollection adds a book to a book collection.
-// Returns whether the book was newly added (false means it was already a member).
-func (s *Store) AddBookToBookCollection(collectionID int, bookID string) (added bool, err error) {
+func (s *Store) AddBookToBookCollection(collectionID string, bookID string) (added bool, err error) {
 	res, err := s.db.Exec(`
 		INSERT OR IGNORE INTO book_collection_members (collection_id, book_id) VALUES (?, ?)
 	`, collectionID, bookID)
@@ -1054,17 +953,14 @@ func (s *Store) AddBookToBookCollection(collectionID int, bookID string) (added 
 	return n > 0, err
 }
 
-// RemoveBookFromBookCollection removes a book from a book collection.
-func (s *Store) RemoveBookFromBookCollection(collectionID int, bookID string) error {
+func (s *Store) RemoveBookFromBookCollection(collectionID string, bookID string) error {
 	_, err := s.db.Exec(`
 		DELETE FROM book_collection_members WHERE collection_id = ? AND book_id = ?
 	`, collectionID, bookID)
 	return err
 }
 
-// ListBooksInBookCollection returns books belonging to a book collection,
-// ordered by title.
-func (s *Store) ListBooksInBookCollection(collectionID int) ([]Book, error) {
+func (s *Store) ListBooksInBookCollection(collectionID string) ([]Book, error) {
 	rows, err := s.db.Query(
 		`SELECT`+bookSelectSQL+`FROM books b
 		 JOIN book_collection_members m ON m.book_id = b.id
@@ -1076,12 +972,9 @@ func (s *Store) ListBooksInBookCollection(collectionID int) ([]Book, error) {
 		return nil, err
 	}
 	defer rows.Close()
-
 	return scanBookRows(rows)
 }
 
-// ListUncategorizedBooks returns non-missing books that do not belong to any
-// book collection, ordered by title.
 func (s *Store) ListUncategorizedBooks() ([]Book, error) {
 	rows, err := s.db.Query(
 		`SELECT` + bookSelectSQL + `FROM books
@@ -1095,12 +988,9 @@ func (s *Store) ListUncategorizedBooks() ([]Book, error) {
 		return nil, err
 	}
 	defer rows.Close()
-
 	return scanBookRows(rows)
 }
 
-// CountUncategorizedBooks returns the number of non-missing books that do not
-// belong to any book collection.
 func (s *Store) CountUncategorizedBooks() (int, error) {
 	var n int
 	err := s.db.QueryRow(`

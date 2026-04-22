@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -14,42 +13,38 @@ type Store struct {
 	db *sql.DB
 }
 
-const schema = `
--- Enable foreign key enforcement. Must be set per connection.
-PRAGMA foreign_keys = ON;
+// centralLibraryUUID is the fixed UUID for Central Library.
+// Keep in sync with CentralLibraryID in queries.go.
+const centralLibraryUUID = "00000000-0000-7000-8000-000000000000"
 
--- WAL mode allows concurrent reads during writes.
+const schema = `
+PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
 -- ── Libraries ──────────────────────────────────────────────────
 
--- A library is a named group of book collections.
--- Central Library (id=1) is seeded by runMigrations and always present.
 CREATE TABLE IF NOT EXISTS libraries (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    id         TEXT PRIMARY KEY,
     name       TEXT NOT NULL UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ── Core entities ──────────────────────────────────────────────
 
--- Extended metadata columns mirror the fields in folio.json.
--- Array-valued fields (author, translator, keywords, links) are stored as JSON text.
 CREATE TABLE IF NOT EXISTS books (
-    id            TEXT PRIMARY KEY,            -- UUID from folio.json
+    id            TEXT PRIMARY KEY,
     title         TEXT NOT NULL,
-    source        TEXT NOT NULL,               -- absolute path to CBZ
+    source        TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'unread'
                   CHECK(status IN ('unread','reading','read','skip')),
-    file_mtime    INTEGER NOT NULL DEFAULT 0,  -- Unix timestamp; detects CBZ changes
-    missing_since DATETIME,                    -- set when CBZ not found on last scan
+    file_mtime    INTEGER NOT NULL DEFAULT 0,
+    missing_since DATETIME,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    -- Optional metadata fields mirrored from folio.json
     type          TEXT NOT NULL DEFAULT '',
     abstract      TEXT NOT NULL DEFAULT '',
     language      TEXT NOT NULL DEFAULT '',
-    author        TEXT NOT NULL DEFAULT '[]',  -- JSON: [{family,given}]
-    translator    TEXT NOT NULL DEFAULT '[]',  -- JSON: [{family,given}]
+    author        TEXT NOT NULL DEFAULT '[]',
+    translator    TEXT NOT NULL DEFAULT '[]',
     origtitle     TEXT NOT NULL DEFAULT '',
     edition       TEXT NOT NULL DEFAULT '',
     volume        TEXT NOT NULL DEFAULT '',
@@ -58,16 +53,11 @@ CREATE TABLE IF NOT EXISTS books (
     publisher     TEXT NOT NULL DEFAULT '',
     year          TEXT NOT NULL DEFAULT '',
     note          TEXT NOT NULL DEFAULT '',
-    keywords      TEXT NOT NULL DEFAULT '[]',  -- JSON: [string]
+    keywords      TEXT NOT NULL DEFAULT '[]',
     isbn          TEXT NOT NULL DEFAULT '',
-    links         TEXT NOT NULL DEFAULT '[]'   -- JSON: [string]
+    links         TEXT NOT NULL DEFAULT '[]'
 );
 
--- pages holds scan-derived data plus the user-assigned real book page number.
--- seq is the 1-based position of the image within the CBZ (filename sort order).
--- page_number is the real book page number as printed (TEXT to support roman
--- numerals such as "i", "ii", "iii" used in front matter); NULL when not set.
--- pages.id is stable across re-scans thanks to the merge algorithm in UpsertPages.
 CREATE TABLE IF NOT EXISTS pages (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id     TEXT    NOT NULL REFERENCES books(id),
@@ -80,21 +70,18 @@ CREATE TABLE IF NOT EXISTS pages (
 
 -- ── Per-page annotations ───────────────────────────────────────
 
--- One text note per page. Absence of a row means no note has been written.
 CREATE TABLE IF NOT EXISTS page_notes (
     page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
     body       TEXT    NOT NULL DEFAULT '',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- SVG annotation drawing per page. Absence of a row means no drawing exists.
 CREATE TABLE IF NOT EXISTS page_drawings (
     page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
     svg        TEXT    NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Per-page read status.
 CREATE TABLE IF NOT EXISTS page_status (
     page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
     status     TEXT    NOT NULL DEFAULT 'unread'
@@ -102,7 +89,6 @@ CREATE TABLE IF NOT EXISTS page_status (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- OCR text per page.
 CREATE TABLE IF NOT EXISTS page_ocr (
     page_id    INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
     body       TEXT    NOT NULL DEFAULT '',
@@ -111,12 +97,6 @@ CREATE TABLE IF NOT EXISTS page_ocr (
 
 -- ── Sections ───────────────────────────────────────────────────
 
--- A section is a named range within a book. start_page_id and end_page_id are
--- both references to pages.id. end_page_id is nullable (NULL means the user has
--- not set an explicit end). Sections may overlap or nest; no uniqueness constraint
--- is enforced. ON DELETE CASCADE for start_page_id removes the section if its
--- starting page disappears; ON DELETE SET NULL for end_page_id clears the end
--- boundary rather than removing the whole section.
 CREATE TABLE IF NOT EXISTS sections (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id       TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
@@ -130,19 +110,19 @@ CREATE TABLE IF NOT EXISTS sections (
 
 -- ── Collections ────────────────────────────────────────────────
 
--- Named groups of books. library_id is kept for schema compatibility but
--- library membership is now managed via library_collection_members.
+-- library_id is a legacy column kept for schema compatibility.
+-- Library membership is managed via library_collection_members.
 CREATE TABLE IF NOT EXISTS book_collections (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
     color       TEXT NOT NULL DEFAULT '#888888',
     description TEXT NOT NULL DEFAULT '',
+    library_id  TEXT NOT NULL DEFAULT '00000000-0000-7000-8000-000000000000' REFERENCES libraries(id),
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Named groups of pages (for cross-book page organization).
 CREATE TABLE IF NOT EXISTS page_collections (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
     color       TEXT NOT NULL DEFAULT '#888888',
     description TEXT NOT NULL DEFAULT '',
@@ -152,25 +132,22 @@ CREATE TABLE IF NOT EXISTS page_collections (
 -- ── Collection members ─────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS book_collection_members (
-    collection_id INTEGER NOT NULL REFERENCES book_collections(id) ON DELETE CASCADE,
-    book_id       TEXT    NOT NULL REFERENCES books(id),
+    collection_id TEXT NOT NULL REFERENCES book_collections(id) ON DELETE CASCADE,
+    book_id       TEXT NOT NULL REFERENCES books(id),
     PRIMARY KEY(collection_id, book_id)
 );
 
 CREATE TABLE IF NOT EXISTS page_collection_members (
-    collection_id INTEGER NOT NULL REFERENCES page_collections(id) ON DELETE CASCADE,
+    collection_id TEXT    NOT NULL REFERENCES page_collections(id) ON DELETE CASCADE,
     page_id       INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
     PRIMARY KEY(collection_id, page_id)
 );
 
 -- ── Library-collection membership (many-to-many) ───────────────
 
--- A book collection can belong to multiple libraries, mirroring how a book
--- can belong to multiple book collections. Central Library (id=1) implicitly
--- contains all collections and does not require explicit rows here.
 CREATE TABLE IF NOT EXISTS library_collection_members (
-    library_id    INTEGER NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
-    collection_id INTEGER NOT NULL REFERENCES book_collections(id) ON DELETE CASCADE,
+    library_id    TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+    collection_id TEXT NOT NULL REFERENCES book_collections(id) ON DELETE CASCADE,
     PRIMARY KEY(library_id, collection_id)
 );
 
@@ -194,8 +171,6 @@ func Open(dataPath string) (*Store, error) {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 
-	// SQLite only supports one concurrent writer. Limiting to a single
-	// connection avoids "database is locked" errors under concurrent requests.
 	db.SetMaxOpenConns(1)
 
 	if _, err := db.Exec(schema); err != nil {
@@ -211,32 +186,14 @@ func Open(dataPath string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-// runMigrations applies incremental schema changes that cannot be expressed
-// as CREATE TABLE IF NOT EXISTS. It is safe to run on every startup.
 func runMigrations(db *sql.DB) error {
-	// Seed Central Library (id=1) as the immutable default library.
-	if _, err := db.Exec(`INSERT OR IGNORE INTO libraries (id, name) VALUES (1, 'Central Library')`); err != nil {
+	// Seed Central Library with a fixed UUID so it always exists.
+	if _, err := db.Exec(
+		`INSERT OR IGNORE INTO libraries (id, name) VALUES (?, 'Central Library')`,
+		centralLibraryUUID,
+	); err != nil {
 		return fmt.Errorf("seed central library: %w", err)
 	}
-
-	// Add library_id to book_collections (legacy column kept for schema compat).
-	// Library membership is now managed via library_collection_members.
-	if _, err := db.Exec(`ALTER TABLE book_collections ADD COLUMN library_id INTEGER NOT NULL DEFAULT 1 REFERENCES libraries(id)`); err != nil {
-		if !strings.Contains(err.Error(), "duplicate column name") {
-			return fmt.Errorf("add library_id to book_collections: %w", err)
-		}
-	}
-
-	// Migrate existing single-library assignments into the junction table.
-	// Rows with library_id = 1 (Central Library) are skipped because Central
-	// Library implicitly contains all collections.
-	if _, err := db.Exec(`
-		INSERT OR IGNORE INTO library_collection_members (library_id, collection_id)
-		SELECT library_id, id FROM book_collections WHERE library_id != 1
-	`); err != nil {
-		return fmt.Errorf("migrate library_collection_members: %w", err)
-	}
-
 	return nil
 }
 

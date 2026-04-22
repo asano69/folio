@@ -3,14 +3,13 @@ package handlers
 import (
 	"html/template"
 	"net/http"
-	"strconv"
 
 	"folio/internal/storage"
 	"folio/internal/store"
 )
 
 // bookView is the template model for a single book card.
-// Shared by HomeHandler, CollectionPageHandler, and UncategorizedPageHandler.
+// Shared by AllBooksHandler, CollectionPageHandler, and UncategorizedPageHandler.
 type bookView struct {
 	ID           string
 	Title        string
@@ -18,27 +17,32 @@ type bookView struct {
 	MissingSince string // empty means present; non-empty is the missing-since timestamp
 }
 
-// HomeHandler serves GET / — the all-books library page.
-// It accepts a ?lib= query parameter to filter collections and books by library.
-// Defaults to Central Library when the parameter is absent or invalid.
-type HomeHandler struct {
+// shelfPageData is the common template model for all book-listing pages.
+type shelfPageData struct {
+	PageTitle          string
+	Books              []bookView
+	MissingBooks       []bookView
+	EmptyMessage       string
+	Collections        []store.BookCollection
+	ActiveCollectionID string
+	CollectionID       string
+	TotalBookCount     int
+	UncategorizedCount int
+	Libraries          []store.Library
+	CentralLibraryID   string // used by sidebar to mark initial selection
+}
+
+// AllBooksHandler serves GET /collections/all — all books regardless of collection.
+type AllBooksHandler struct {
 	Store     *store.Store
 	CachePath string
 	Template  *template.Template
 }
 
-func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
+func (h *AllBooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/collections/all" {
 		http.NotFound(w, r)
 		return
-	}
-
-	// Determine active library from ?lib= query parameter.
-	activeLibraryID := store.CentralLibraryID
-	if libStr := r.URL.Query().Get("lib"); libStr != "" {
-		if id, err := strconv.Atoi(libStr); err == nil && id > 0 {
-			activeLibraryID = id
-		}
 	}
 
 	libraries, err := h.Store.ListLibraries()
@@ -47,27 +51,13 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify the requested library exists; fall back to Central Library if not.
-	validLibrary := false
-	for _, lib := range libraries {
-		if lib.ID == activeLibraryID {
-			validLibrary = true
-			break
-		}
-	}
-	if !validLibrary {
-		activeLibraryID = store.CentralLibraryID
-	}
-
-	// Load collections filtered to the active library for the sidebar.
-	collections, err := h.Store.ListBookCollectionsInLibrary(activeLibraryID)
+	collections, err := h.Store.ListBookCollections()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Load books for the active library.
-	dbBooks, err := h.Store.ListAllBooksInLibrary(activeLibraryID)
+	dbBooks, err := h.Store.ListBooks()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -85,7 +75,6 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read the cache directory once to avoid N individual stat calls.
 	thumbnailSet, err := storage.ListBookThumbnailIDs(h.CachePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -107,26 +96,17 @@ func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data := struct {
-		Books               []bookView
-		MissingBooks        []bookView
-		Collections         []store.BookCollection
-		Libraries           []store.Library
-		ActiveLibraryID     int
-		ActiveCollectionID  int
-		TotalBookCount      int
-		UncategorizedCount  int
-		IsUncategorizedPage bool
-	}{
-		Books:               present,
-		MissingBooks:        missing,
-		Collections:         collections,
-		Libraries:           libraries,
-		ActiveLibraryID:     activeLibraryID,
-		ActiveCollectionID:  0,
-		TotalBookCount:      totalCount,
-		UncategorizedCount:  uncategorizedCount,
-		IsUncategorizedPage: false,
+	data := shelfPageData{
+		PageTitle:          "All Books",
+		Books:              present,
+		MissingBooks:       missing,
+		EmptyMessage:       "No books in your library yet.",
+		Collections:        collections,
+		ActiveCollectionID: "all",
+		TotalBookCount:     totalCount,
+		UncategorizedCount: uncategorizedCount,
+		Libraries:          libraries,
+		CentralLibraryID:   store.CentralLibraryID,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {

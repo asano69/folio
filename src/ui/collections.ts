@@ -14,25 +14,61 @@ let selectionBadge: HTMLElement | null = null;
 // Suppresses the click event that fires after a rubber-band drag ends.
 let suppressNextClick = false;
 
+// ── Sidebar filter state ───────────────────────────────────────
+// Both filters are applied together so they don't override each other.
+let activeLibraryID = '';   // '' = Central Library (show all)
+let collectionTextQuery = '';
+
 export function initCollections(): void {
-  setupLibrarySwitcher();
   setupCollectionFilter();
+  setupLibrarySwitcher();
   setupMultiSelect();
   setupDragAndDrop();
   setupEditMode();
   setupRemoveFromCollection();
 }
 
-// ── Library switcher ───────────────────────────────────────────
+// ── Collection filter ──────────────────────────────────────────
 
-// When the user selects a different library from the listbox, navigate to
-// the home page for that library so the sidebar collections update.
+function applyCollectionFilters(): void {
+  document.querySelectorAll<HTMLElement>('.collection-drop-zone').forEach(item => {
+    const title = (item.querySelector('.collection-title')?.textContent ?? '').toLowerCase();
+    const libIds = (item.dataset.libraryIds ?? '').split(',').filter(Boolean);
+
+    const matchesText = !collectionTextQuery || title.includes(collectionTextQuery);
+    const matchesLib  = !activeLibraryID || libIds.includes(activeLibraryID);
+
+    item.style.display = (matchesText && matchesLib) ? '' : 'none';
+  });
+
+  // All Books and Uncategorized belong to Central Library only.
+  document.querySelectorAll<HTMLElement>('[data-central-only]').forEach(item => {
+    item.style.display = activeLibraryID ? 'none' : '';
+  });
+}
+
+function setupCollectionFilter(): void {
+  const input = document.getElementById('collection-search') as HTMLInputElement | null;
+  if (!input) return;
+
+  input.addEventListener('input', () => {
+    collectionTextQuery = input.value.trim().toLowerCase();
+    applyCollectionFilters();
+  });
+  input.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Escape') { input.value = ''; collectionTextQuery = ''; applyCollectionFilters(); }
+  });
+}
+
 function setupLibrarySwitcher(): void {
-  const libSelect = document.getElementById('library-select') as HTMLSelectElement | null;
-  if (!libSelect) return;
+  const select = document.getElementById('library-select') as HTMLSelectElement | null;
+  if (!select) return;
 
-  libSelect.addEventListener('change', () => {
-    window.location.href = `/?lib=${libSelect.value}`;
+  const centralID = select.querySelector<HTMLOptionElement>('[data-is-central]')?.value ?? '';
+
+  select.addEventListener('change', () => {
+    activeLibraryID = select.value === centralID ? '' : select.value;
+    applyCollectionFilters();
   });
 }
 
@@ -42,7 +78,6 @@ function setupMultiSelect(): void {
   const grid = document.querySelector<HTMLElement>('.books-grid:not(.missing-grid)');
   if (!grid) return;
 
-  // Badge showing the count of currently selected books.
   selectionBadge = document.createElement('div');
   selectionBadge.className = 'selection-badge';
   selectionBadge.hidden = true;
@@ -52,19 +87,17 @@ function setupMultiSelect(): void {
   document.querySelectorAll<HTMLElement>('.book-card[data-book-id]').forEach(card => {
     card.addEventListener('click', (e: MouseEvent) => {
       if (suppressNextClick) {
-        // Discard the click that fires immediately after a rubber-band drag ends.
         e.preventDefault();
         suppressNextClick = false;
         return;
       }
-      if (!!document.querySelector('.shelf--edit')) return; // rename mode owns clicks
+      if (!!document.querySelector('.shelf--edit')) return;
       if (!(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       toggleCardSelection(card);
     });
   });
 
-  // Escape clears the selection.
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Escape') clearSelection();
   });
@@ -99,8 +132,7 @@ function updateSelectionBadge(): void {
   if (n > 0) selectionBadge.textContent = `${n} book${n === 1 ? '' : 's'} selected`;
 }
 
-// setupRubberBand enables click-drag on the grid background to select multiple
-// cards by drawing a selection rectangle.
+// setupRubberBand enables click-drag on the grid background to select multiple cards.
 function setupRubberBand(grid: HTMLElement): void {
   const booksMain = grid.closest<HTMLElement>('.books-main') ?? document.documentElement;
   let band: HTMLElement | null = null;
@@ -110,11 +142,10 @@ function setupRubberBand(grid: HTMLElement): void {
 
   booksMain.addEventListener('mousedown', (e: MouseEvent) => {
     if (e.button !== 0) return;
-    if (e.ctrlKey || e.metaKey) return; // Ctrl+click is handled per-card above
+    if (e.ctrlKey || e.metaKey) return;
     if (!!document.querySelector('.shelf--edit')) return;
 
     const target = e.target as HTMLElement;
-    // Only start rubber-band on the background — not on interactive elements.
     if (target.closest('.book-card') || target.closest('button') || target.closest('input')) return;
 
     startX = e.clientX;
@@ -124,7 +155,6 @@ function setupRubberBand(grid: HTMLElement): void {
     const onMove = (e: MouseEvent): void => {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      // Wait for a small movement threshold before activating.
       if (!active && Math.hypot(dx, dy) < 6) return;
 
       if (!active) {
@@ -141,7 +171,6 @@ function setupRubberBand(grid: HTMLElement): void {
       const h = Math.abs(dy);
       band!.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
 
-      // Select cards whose bounding boxes intersect the rubber-band rectangle.
       const sel = { left: x, top: y, right: x + w, bottom: y + h };
       document.querySelectorAll<HTMLElement>(
         '.books-grid:not(.missing-grid) .book-card[data-book-id]'
@@ -161,8 +190,6 @@ function setupRubberBand(grid: HTMLElement): void {
       if (band) {
         band.remove();
         band = null;
-        // Suppress the click event that the browser fires after mouseup when
-        // the pointer happens to land on a card.
         if (active) {
           suppressNextClick = true;
           setTimeout(() => { suppressNextClick = false; }, 100);
@@ -173,30 +200,9 @@ function setupRubberBand(grid: HTMLElement): void {
       document.removeEventListener('mouseup', onUp);
     };
 
-    // Prevent the browser from starting a text-selection drag.
     e.preventDefault();
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  });
-}
-
-// ── Collection filter ──────────────────────────────────────────
-
-function setupCollectionFilter(): void {
-  const input = document.getElementById('collection-search') as HTMLInputElement | null;
-  if (!input) return;
-
-  const applyFilter = (): void => {
-    const query = input.value.trim().toLowerCase();
-    document.querySelectorAll<HTMLElement>('.collection-drop-zone').forEach(item => {
-      const title = item.querySelector<HTMLElement>('.collection-title')?.textContent ?? '';
-      item.style.display = (!query || title.toLowerCase().includes(query)) ? '' : 'none';
-    });
-  };
-
-  input.addEventListener('input', applyFilter);
-  input.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'Escape') { input.value = ''; applyFilter(); }
   });
 }
 
@@ -232,17 +238,14 @@ function setupDragAndDrop(): void {
       e.preventDefault();
       zone.classList.remove('drag-over');
       const bookId = e.dataTransfer!.getData('text/plain');
-      // Parse to number immediately on extraction from the DOM so the type
-      // matches the api.ts signature and BookCollection.id throughout.
-      const collectionId = parseInt(zone.dataset.collectionId!, 10);
-      if (bookId && !isNaN(collectionId)) handleDrop(zone, collectionId, bookId);
+      const collectionId = zone.dataset.collectionId;
+      if (bookId && collectionId) handleDrop(zone, collectionId, bookId);
     });
   });
 }
 
-// handleDrop adds the dragged book — or all selected books when the dragged
-// card belongs to the current selection — to the target collection.
-async function handleDrop(zone: HTMLElement, collectionId: number, bookId: string): Promise<void> {
+// handleDrop adds the dragged book — or all selected books — to the target collection.
+async function handleDrop(zone: HTMLElement, collectionId: string, bookId: string): Promise<void> {
   const idsToAdd =
     selectedBookIds.has(bookId) && selectedBookIds.size > 0
       ? [...selectedBookIds]
@@ -298,9 +301,8 @@ function setupEditMode(): void {
       e.preventDefault();
       const titleEl = zone.querySelector<HTMLElement>('.collection-title');
       if (!titleEl) return;
-      // Parse to number immediately on extraction from the DOM.
-      const collectionId = parseInt(zone.dataset.collectionId!, 10);
-      if (!isNaN(collectionId)) startRenameCollection(collectionId, titleEl);
+      const collectionId = zone.dataset.collectionId;
+      if (collectionId) startRenameCollection(collectionId, titleEl);
     });
   });
 
@@ -310,14 +312,12 @@ function setupEditMode(): void {
       e.stopPropagation();
       const item = btn.closest<HTMLElement>('.collection-drop-zone');
       if (!item) return;
-      // Parse to number immediately on extraction from the DOM.
-      const collectionId = parseInt(item.dataset.collectionId!, 10);
-      if (isNaN(collectionId)) return;
+      const collectionId = item.dataset.collectionId;
+      if (!collectionId) return;
       try {
         await deleteCollection(collectionId);
-        // If we are currently viewing this collection, redirect to home.
         if (window.location.pathname === `/collections/${collectionId}`) {
-          window.location.href = '/';
+          window.location.href = '/collections/all';
         } else {
           item.remove();
         }
@@ -334,11 +334,6 @@ async function startCreateCollection(addItem: HTMLElement): Promise<void> {
   const label = addItem.querySelector<HTMLElement>('.collection-add-label');
   if (!label) return;
 
-  // Read the active library from the sidebar's data attribute so new
-  // collections are created in the currently displayed library.
-  const sidebar = document.querySelector<HTMLElement>('.collection-sidebar');
-  const activeLibraryId = parseInt(sidebar?.dataset.activeLibraryId ?? '1', 10);
-
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'collection-new-input';
@@ -354,7 +349,7 @@ async function startCreateCollection(addItem: HTMLElement): Promise<void> {
     const name = input.value.trim();
     if (name) {
       try {
-        await createCollection(name, activeLibraryId);
+        await createCollection(name);
         window.location.reload();
         return;
       } catch (err) {
@@ -371,7 +366,7 @@ async function startCreateCollection(addItem: HTMLElement): Promise<void> {
   });
 }
 
-async function startRenameCollection(collectionId: number, titleEl: HTMLElement): Promise<void> {
+async function startRenameCollection(collectionId: string, titleEl: HTMLElement): Promise<void> {
   const currentName = titleEl.textContent ?? '';
 
   const input = document.createElement('input');
@@ -414,10 +409,8 @@ function setupRemoveFromCollection(): void {
     btn.addEventListener('click', async (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-      const { bookId } = btn.dataset;
-      // Parse to number immediately on extraction from the DOM.
-      const collectionId = parseInt(btn.dataset.collectionId!, 10);
-      if (!bookId || isNaN(collectionId)) return;
+      const { bookId, collectionId } = btn.dataset;
+      if (!bookId || !collectionId) return;
       try {
         await removeBookFromCollection(collectionId, bookId);
         btn.closest<HTMLElement>('.book-card')?.remove();

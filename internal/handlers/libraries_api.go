@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"folio/internal/store"
@@ -15,7 +14,7 @@ import (
 //
 //	POST   /api/libraries/                              — create a library
 //	PUT    /api/libraries/{id}                          — rename a library
-//	DELETE /api/libraries/{id}                          — delete a library (fails if it has collections)
+//	DELETE /api/libraries/{id}                          — delete a library
 //	POST   /api/libraries/{id}/collections/{collID}     — add a collection to a library
 //	DELETE /api/libraries/{id}/collections/{collID}     — remove a collection from a library
 type LibrariesAPIHandler struct {
@@ -37,24 +36,16 @@ func (h *LibrariesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	parts := strings.SplitN(path, "/", 3)
-	id, err := strconv.Atoi(parts[0])
-	if err != nil {
-		http.Error(w, "invalid library ID", http.StatusBadRequest)
-		return
-	}
+	libraryID := parts[0]
 
 	// /api/libraries/{id}/collections/{collectionID} — add or remove collection
 	if len(parts) == 3 && parts[1] == "collections" {
-		collectionID, err := strconv.Atoi(parts[2])
-		if err != nil {
-			http.Error(w, "invalid collection ID", http.StatusBadRequest)
-			return
-		}
+		collectionID := parts[2]
 		switch r.Method {
 		case http.MethodPost:
-			h.addCollection(w, r, id, collectionID)
+			h.addCollection(w, r, libraryID, collectionID)
 		case http.MethodDelete:
-			h.removeCollection(w, r, id, collectionID)
+			h.removeCollection(w, r, libraryID, collectionID)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -65,9 +56,9 @@ func (h *LibrariesAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	if len(parts) == 1 {
 		switch r.Method {
 		case http.MethodPut:
-			h.renameLibrary(w, r, id)
+			h.renameLibrary(w, r, libraryID)
 		case http.MethodDelete:
-			h.deleteLibrary(w, r, id)
+			h.deleteLibrary(w, r, libraryID)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -100,12 +91,12 @@ func (h *LibrariesAPIHandler) createLibrary(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(struct {
-		ID   int64  `json:"id"`
+		ID   string `json:"id"`
 		Name string `json:"name"`
 	}{ID: id, Name: name})
 }
 
-func (h *LibrariesAPIHandler) renameLibrary(w http.ResponseWriter, r *http.Request, id int) {
+func (h *LibrariesAPIHandler) renameLibrary(w http.ResponseWriter, r *http.Request, id string) {
 	var body struct {
 		Name string `json:"name"`
 	}
@@ -126,12 +117,12 @@ func (h *LibrariesAPIHandler) renameLibrary(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(struct {
-		ID   int    `json:"id"`
+		ID   string `json:"id"`
 		Name string `json:"name"`
 	}{ID: id, Name: name})
 }
 
-func (h *LibrariesAPIHandler) deleteLibrary(w http.ResponseWriter, r *http.Request, id int) {
+func (h *LibrariesAPIHandler) deleteLibrary(w http.ResponseWriter, r *http.Request, id string) {
 	if err := h.Store.DeleteLibrary(id); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -139,8 +130,7 @@ func (h *LibrariesAPIHandler) deleteLibrary(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// addCollection handles POST /api/libraries/{id}/collections/{collectionID}.
-func (h *LibrariesAPIHandler) addCollection(w http.ResponseWriter, r *http.Request, libraryID, collectionID int) {
+func (h *LibrariesAPIHandler) addCollection(w http.ResponseWriter, r *http.Request, libraryID, collectionID string) {
 	added, err := h.Store.AddCollectionToLibrary(libraryID, collectionID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -153,8 +143,7 @@ func (h *LibrariesAPIHandler) addCollection(w http.ResponseWriter, r *http.Reque
 	}{Added: added})
 }
 
-// removeCollection handles DELETE /api/libraries/{id}/collections/{collectionID}.
-func (h *LibrariesAPIHandler) removeCollection(w http.ResponseWriter, r *http.Request, libraryID, collectionID int) {
+func (h *LibrariesAPIHandler) removeCollection(w http.ResponseWriter, r *http.Request, libraryID, collectionID string) {
 	if err := h.Store.RemoveCollectionFromLibrary(libraryID, collectionID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

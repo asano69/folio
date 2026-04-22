@@ -1,4 +1,4 @@
-{{define "title"}}{{.Collection.Name}} - folio{{end}}
+{{define "title"}}{{.PageTitle}} - folio{{end}}
 
 {{define "content"}}
 <div class="library-layout">
@@ -7,7 +7,7 @@
     <div class="books-main">
         <div class="books-container">
             <div class="library-header">
-                <h2>{{.Collection.Name}}</h2>
+                <h2>{{.PageTitle}}</h2>
                 {{if .Books}}
                 <div class="search-bar">
                     <input
@@ -34,10 +34,12 @@
                             {{else}}
                             <div class="thumbnail-placeholder">No thumbnail</div>
                             {{end}}
+                            {{if $.CollectionID}}
                             <button class="collection-remove-btn"
                                     data-book-id="{{.ID}}"
-                                    data-collection-id="{{$.Collection.ID}}"
+                                    data-collection-id="{{$.CollectionID}}"
                                     title="Remove from collection">✕</button>
+                            {{end}}
                         </div>
                     </a>
                     <div class="book-info">
@@ -50,7 +52,7 @@
             </div>
             <p id="search-no-results" class="no-books" hidden>No books match your search.</p>
             {{else}}
-            <p class="no-books">No books in this collection yet. Drag books here from All Books.</p>
+            <p class="no-books">{{.EmptyMessage}}</p>
             {{end}}
 
             {{if .MissingBooks}}

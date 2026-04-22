@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"folio/internal/store"
@@ -15,7 +14,7 @@ import (
 //
 //	POST   /api/collections/                        — create a collection
 //	PUT    /api/collections/{id}                    — rename
-//	DELETE /api/collections/{id}                    — delete (removes memberships too)
+//	DELETE /api/collections/{id}                    — delete
 //	PUT    /api/collections/{id}/library            — move to a different library
 //	POST   /api/collections/{id}/books/{bookID}     — add a book
 //	DELETE /api/collections/{id}/books/{bookID}     — remove a book
@@ -38,11 +37,7 @@ func (h *CollectionsAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	parts := strings.SplitN(path, "/", 3)
-	collectionID, err := strconv.Atoi(parts[0])
-	if err != nil {
-		http.Error(w, "invalid collection ID", http.StatusBadRequest)
-		return
-	}
+	collectionID := parts[0]
 
 	// /api/collections/{id} — rename or delete
 	if len(parts) == 1 {
@@ -87,7 +82,7 @@ func (h *CollectionsAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 func (h *CollectionsAPIHandler) createCollection(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name      string `json:"name"`
-		LibraryID int    `json:"library_id"`
+		LibraryID string `json:"library_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -99,9 +94,8 @@ func (h *CollectionsAPIHandler) createCollection(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Default to Central Library when no library_id is provided.
 	libraryID := body.LibraryID
-	if libraryID == 0 {
+	if libraryID == "" {
 		libraryID = store.CentralLibraryID
 	}
 
@@ -114,13 +108,12 @@ func (h *CollectionsAPIHandler) createCollection(w http.ResponseWriter, r *http.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(struct {
-		ID        int64  `json:"id"`
-		Name      string `json:"name"`
-		LibraryID int    `json:"library_id"`
-	}{ID: id, Name: name, LibraryID: libraryID})
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}{ID: id, Name: name})
 }
 
-func (h *CollectionsAPIHandler) renameCollection(w http.ResponseWriter, r *http.Request, id int) {
+func (h *CollectionsAPIHandler) renameCollection(w http.ResponseWriter, r *http.Request, id string) {
 	var body struct {
 		Name string `json:"name"`
 	}
@@ -141,12 +134,12 @@ func (h *CollectionsAPIHandler) renameCollection(w http.ResponseWriter, r *http.
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(struct {
-		ID   int    `json:"id"`
+		ID   string `json:"id"`
 		Name string `json:"name"`
 	}{ID: id, Name: name})
 }
 
-func (h *CollectionsAPIHandler) deleteCollection(w http.ResponseWriter, r *http.Request, id int) {
+func (h *CollectionsAPIHandler) deleteCollection(w http.ResponseWriter, r *http.Request, id string) {
 	if err := h.Store.DeleteBookCollection(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -154,16 +147,15 @@ func (h *CollectionsAPIHandler) deleteCollection(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// moveCollectionToLibrary handles PUT /api/collections/{id}/library.
-func (h *CollectionsAPIHandler) moveCollectionToLibrary(w http.ResponseWriter, r *http.Request, collectionID int) {
+func (h *CollectionsAPIHandler) moveCollectionToLibrary(w http.ResponseWriter, r *http.Request, collectionID string) {
 	var body struct {
-		LibraryID int `json:"library_id"`
+		LibraryID string `json:"library_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if body.LibraryID == 0 {
+	if body.LibraryID == "" {
 		http.Error(w, "library_id is required", http.StatusBadRequest)
 		return
 	}
@@ -176,14 +168,12 @@ func (h *CollectionsAPIHandler) moveCollectionToLibrary(w http.ResponseWriter, r
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *CollectionsAPIHandler) addBook(w http.ResponseWriter, _ *http.Request, collectionID int, bookID string) {
+func (h *CollectionsAPIHandler) addBook(w http.ResponseWriter, _ *http.Request, collectionID string, bookID string) {
 	added, err := h.Store.AddBookToBookCollection(collectionID, bookID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// Return whether the book was newly added so the client can decide
-	// whether to increment the displayed count.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(struct {
@@ -191,7 +181,7 @@ func (h *CollectionsAPIHandler) addBook(w http.ResponseWriter, _ *http.Request, 
 	}{Added: added})
 }
 
-func (h *CollectionsAPIHandler) removeBook(w http.ResponseWriter, _ *http.Request, collectionID int, bookID string) {
+func (h *CollectionsAPIHandler) removeBook(w http.ResponseWriter, _ *http.Request, collectionID string, bookID string) {
 	if err := h.Store.RemoveBookFromBookCollection(collectionID, bookID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

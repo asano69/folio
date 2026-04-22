@@ -1,56 +1,59 @@
 {{define "sidebar"}}
-<aside class="collection-sidebar" data-active-library-id="{{.ActiveLibraryID}}">
+<aside class="collection-sidebar">
     <div class="collection-toolbar">
-        <button id="collection-edit-btn" class="collection-edit-btn" title="Edit collections">✎ Edit</button>
+        <button id="collection-edit-btn" class="collection-edit-btn">✎ Edit</button>
     </div>
-    {{/* Library switcher — only shown when multiple libraries exist */}}
-    {{if gt (len .Libraries) 1}}
+
+    {{if .Libraries}}
     <div class="library-switcher-wrap">
         <select id="library-select" class="library-select">
             {{range .Libraries}}
-            <option value="{{.ID}}"{{if eq .ID $.ActiveLibraryID}} selected{{end}}>{{.Name}}</option>
+            <option value="{{.ID}}"
+                {{if eq .ID $.CentralLibraryID}}selected data-is-central="true"{{end}}>
+                {{.Name}}
+            </option>
             {{end}}
         </select>
     </div>
     {{end}}
+
     <div class="collection-search-wrap">
-        <input
-            type="search"
-            id="collection-search"
-            class="collection-search-input"
-            placeholder="Filter collections…"
-            autocomplete="off"
-            aria-label="Filter collections">
+        <input type="search" id="collection-search" class="collection-search-input"
+               placeholder="Filter collections…" autocomplete="off">
     </div>
+
     <nav class="collection-nav">
-        {{/* All Books and Uncategorized are virtual entries shown only for Central Library (id=1) */}}
-        {{if eq .ActiveLibraryID 1}}
-        <a href="/?lib=1" class="collection-item{{if and (not .IsUncategorizedPage) (eq .ActiveCollectionID 0)}} collection-item--active{{end}}">
+        {{/* All Books — Central Library only */}}
+        <a href="/collections/all"
+           class="collection-item{{if eq .ActiveCollectionID "all"}} collection-item--active{{end}}"
+           data-central-only="true">
+            <span class="collection-title">All Books</span>
             <span class="collection-count">({{.TotalBookCount}})</span>
-            <span class="collection-title">All Books</span>
         </a>
-        {{if gt .UncategorizedCount 0}}
-        <a href="/books/uncategorized" class="collection-item{{if .IsUncategorizedPage}} collection-item--active{{end}}">
-            <span class="collection-count">({{.UncategorizedCount}})</span>
-            <span class="collection-title">Uncategorized</span>
-        </a>
-        {{end}}
-        {{else}}
-        {{/* For non-Central libraries, show an "All Books" link for that library */}}
-        <a href="/?lib={{.ActiveLibraryID}}" class="collection-item{{if eq .ActiveCollectionID 0}} collection-item--active{{end}}">
-            <span class="collection-title">All Books</span>
-        </a>
-        {{end}}
+
+        {{/* Named collections */}}
         {{range .Collections}}
         <div class="collection-item collection-drop-zone{{if eq .ID $.ActiveCollectionID}} collection-item--active{{end}}"
-             data-collection-id="{{.ID}}">
-            <button class="collection-delete-btn" title="Delete" hidden>✕</button>
+             data-collection-id="{{.ID}}"
+             data-library-ids="{{.LibraryIDs}}">
+            <button class="collection-delete-btn" hidden title="Delete collection">✕</button>
             <a href="/collections/{{.ID}}" class="collection-link">
-                <span class="collection-count">({{.BookCount}})</span>
                 <span class="collection-title">{{.Name}}</span>
+                <span class="collection-count">({{.BookCount}})</span>
             </a>
         </div>
         {{end}}
+
+        {{/* Uncategorized — Central Library only */}}
+        {{if gt .UncategorizedCount 0}}
+        <a href="/collections/uncategorized"
+           class="collection-item{{if eq .ActiveCollectionID "uncategorized"}} collection-item--active{{end}}"
+           data-central-only="true">
+            <span class="collection-title">Uncategorized</span>
+            <span class="collection-count">({{.UncategorizedCount}})</span>
+        </a>
+        {{end}}
+
         <div id="collection-add-item" class="collection-item collection-add-item" hidden>
             <span class="collection-add-label">＋ Add Collection</span>
         </div>

@@ -11,12 +11,11 @@
         <nav class="library-admin-nav">
             {{range .Libraries}}
             <div class="library-item{{if eq .ID $.ActiveLibraryID}} library-item--active{{end}} library-drop-zone"
-                 data-library-id="{{.ID}}">
-                {{/* Central Library (id=1) cannot be renamed or deleted */}}
-                {{if ne .ID 1}}
+                 data-library-id="{{.ID}}"{{if .IsCentral}} data-is-central="true"{{end}}>
+                {{if not .IsCentral}}
                 <button class="library-delete-btn" title="Delete library" hidden>✕</button>
                 {{end}}
-                <a href="/library?lib={{.ID}}" class="library-link">
+                <a href="{{.URL}}" class="library-link">
                     <span class="library-item-name">{{.Name}}</span>
                     <span class="library-item-count">({{.CollectionCount}})</span>
                 </a>
@@ -37,14 +36,12 @@
         {{if .Collections}}
         <div class="collection-tiles">
             {{range .Collections}}
-            <div class="collection-tile" draggable="true"
-                 data-collection-id="{{.ID}}">
-                <a href="/collections/{{.ID}}" class="collection-tile-link">
+            <div class="collection-tile" draggable="true" data-collection-id="{{.ID}}">
+                <a href="{{.URL}}" class="collection-tile-link">
                     <div class="collection-tile-name">{{.Name}}</div>
                     <div class="collection-tile-count">{{.BookCount}} books</div>
                 </a>
-                {{/* Remove button shown in edit mode for non-Central-Library views */}}
-                {{if ne $.ActiveLibraryID 1}}
+                {{if not $.IsCentralLibrary}}
                 <button class="collection-tile-remove-btn" title="Remove from library"
                         data-collection-id="{{.ID}}" data-library-id="{{$.ActiveLibraryID}}" hidden>✕</button>
                 {{end}}
@@ -53,8 +50,8 @@
         </div>
         {{else}}
         <p class="library-admin-empty">
-            {{if eq .ActiveLibraryID 1}}
-            No collections yet. Create one from the All Books page.
+            {{if .IsCentralLibrary}}
+            No collections yet. Create one from <a href="/collections/all">All Books</a>.
             {{else}}
             No collections in this library yet. Drag collections here from Central Library.
             {{end}}

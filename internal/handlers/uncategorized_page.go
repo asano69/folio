@@ -8,9 +8,7 @@ import (
 	"folio/internal/store"
 )
 
-// UncategorizedPageHandler serves GET /books/uncategorized — books that do not
-// belong to any book collection. Uncategorized books are always presented under
-// Central Library context.
+// UncategorizedPageHandler serves GET /collections/uncategorized.
 type UncategorizedPageHandler struct {
 	Store     *store.Store
 	CachePath string
@@ -24,12 +22,7 @@ func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Uncategorized always lives under Central Library.
-	collections, err := h.Store.ListBookCollectionsInLibrary(store.CentralLibraryID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	collections, err := h.Store.ListBookCollections()
 
 	dbBooks, err := h.Store.ListUncategorizedBooks()
 	if err != nil {
@@ -49,7 +42,6 @@ func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Read the cache directory once to avoid N individual stat calls.
 	thumbnailSet, err := storage.ListBookThumbnailIDs(h.CachePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -65,26 +57,16 @@ func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		})
 	}
 
-	data := struct {
-		Books               []bookView
-		MissingBooks        []bookView
-		Collections         []store.BookCollection
-		Libraries           []store.Library
-		ActiveCollectionID  int
-		ActiveLibraryID     int
-		TotalBookCount      int
-		UncategorizedCount  int
-		IsUncategorizedPage bool
-	}{
-		Books:               books,
-		MissingBooks:        nil,
-		Collections:         collections,
-		Libraries:           libraries,
-		ActiveCollectionID:  0,
-		ActiveLibraryID:     store.CentralLibraryID,
-		TotalBookCount:      totalCount,
-		UncategorizedCount:  uncategorizedCount,
-		IsUncategorizedPage: true,
+	data := shelfPageData{
+		PageTitle:          "Uncategorized",
+		Books:              books,
+		EmptyMessage:       "No uncategorized books.",
+		Collections:        collections,
+		ActiveCollectionID: "uncategorized",
+		TotalBookCount:     totalCount,
+		UncategorizedCount: uncategorizedCount,
+		Libraries:          libraries,
+		CentralLibraryID:   store.CentralLibraryID,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {
