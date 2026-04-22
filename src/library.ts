@@ -45,8 +45,8 @@ function setupLibraryEditMode(): void {
 
   // Rename library on link click in edit mode.
   document.querySelectorAll<HTMLElement>('.library-item').forEach(item => {
-    const libraryID = parseInt(item.dataset.libraryId ?? '0', 10);
-    if (isNaN(libraryID) || libraryID === 1) return; // Central Library cannot be renamed
+    const libraryID = item.dataset.libraryId ?? '';
+    if (!libraryID || item.dataset.isCentral === 'true') return; // Central Library cannot be renamed
 
     const link = item.querySelector<HTMLElement>('.library-link');
     link?.addEventListener('click', (e: Event) => {
@@ -65,11 +65,11 @@ function setupLibraryEditMode(): void {
       e.stopPropagation();
       const item = btn.closest<HTMLElement>('.library-item');
       if (!item) return;
-      const libraryID = parseInt(item.dataset.libraryId ?? '0', 10);
-      if (isNaN(libraryID) || libraryID === 0) return;
+      const libraryID = item.dataset.libraryId ?? '';
+      if (!libraryID) return;
       try {
         await deleteLibrary(libraryID);
-        window.location.href = '/library';
+        window.location.href = '/libraries/all';
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         alert(`Could not delete library: ${msg}`);
@@ -81,7 +81,7 @@ function setupLibraryEditMode(): void {
   addItem?.addEventListener('click', () => startCreateLibrary(addItem));
 }
 
-async function startRenameLibrary(libraryID: number, nameEl: HTMLElement): Promise<void> {
+async function startRenameLibrary(libraryID: string, nameEl: HTMLElement): Promise<void> {
   const currentName = nameEl.textContent ?? '';
 
   const input = document.createElement('input');
@@ -137,7 +137,7 @@ async function startCreateLibrary(addItem: HTMLElement): Promise<void> {
     if (name) {
       try {
         const result = await createLibrary(name);
-        window.location.href = `/library?lib=${result.id}`;
+        window.location.href = `/libraries/${result.id}`;
         return;
       } catch (err) {
         console.error(err);
@@ -154,14 +154,8 @@ async function startCreateLibrary(addItem: HTMLElement): Promise<void> {
 }
 
 // ── Drag-and-drop: collection tiles → library items ────────────
-//
-// Collection tiles in the right pane are draggable. Library items in the
-// left pane are drop zones. Dropping a tile onto a library adds that
-// collection to the library — mirroring how book cards are dropped onto
-// collection items in the main library page.
 
 function setupCollectionDragAndDrop(): void {
-  // Make collection tiles draggable.
   document.querySelectorAll<HTMLElement>('.collection-tile[data-collection-id]').forEach(tile => {
     tile.addEventListener('dragstart', (e: DragEvent) => {
       e.dataTransfer!.setData('text/plain', tile.dataset.collectionId!);
@@ -176,7 +170,6 @@ function setupCollectionDragAndDrop(): void {
     });
   });
 
-  // Make library items drop zones.
   document.querySelectorAll<HTMLElement>('.library-drop-zone').forEach(zone => {
     zone.addEventListener('dragover', (e: DragEvent) => {
       e.preventDefault();
@@ -191,9 +184,9 @@ function setupCollectionDragAndDrop(): void {
     zone.addEventListener('drop', (e: DragEvent) => {
       e.preventDefault();
       zone.classList.remove('drag-over');
-      const collectionId = parseInt(e.dataTransfer!.getData('text/plain'), 10);
-      const libraryId    = parseInt(zone.dataset.libraryId!, 10);
-      if (!isNaN(collectionId) && !isNaN(libraryId)) {
+      const collectionId = e.dataTransfer!.getData('text/plain');
+      const libraryId    = zone.dataset.libraryId!;
+      if (collectionId && libraryId) {
         handleCollectionDrop(zone, libraryId, collectionId);
       }
     });
@@ -202,13 +195,12 @@ function setupCollectionDragAndDrop(): void {
 
 async function handleCollectionDrop(
   zone: HTMLElement,
-  libraryId: number,
-  collectionId: number,
+  libraryId: string,
+  collectionId: string,
 ): Promise<void> {
   try {
     const { added } = await addCollectionToLibrary(libraryId, collectionId);
     if (added) {
-      // Update the count badge on the target library item.
       const countEl = zone.querySelector<HTMLElement>('.library-item-count');
       if (countEl) {
         const n = parseInt(countEl.textContent?.match(/\d+/)?.[0] ?? '0', 10);
@@ -229,13 +221,12 @@ function setupRemoveCollectionFromLibrary(): void {
     btn.addEventListener('click', async (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-      const collectionId = parseInt(btn.dataset.collectionId!, 10);
-      const libraryId    = parseInt(btn.dataset.libraryId!, 10);
-      if (isNaN(collectionId) || isNaN(libraryId)) return;
+      const collectionId = btn.dataset.collectionId!;
+      const libraryId    = btn.dataset.libraryId!;
+      if (!collectionId || !libraryId) return;
       try {
         await removeCollectionFromLibrary(libraryId, collectionId);
         btn.closest<HTMLElement>('.collection-tile')?.remove();
-        // Update the count badge on the matching library sidebar item.
         const zone = document.querySelector<HTMLElement>(
           `.library-drop-zone[data-library-id="${libraryId}"]`,
         );
