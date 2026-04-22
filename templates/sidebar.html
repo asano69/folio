@@ -6,14 +6,16 @@
 
     {{if .Libraries}}
     <div class="library-switcher-wrap">
-        <select class="library-select" onchange="window.location.href=window.location.pathname+'?lib='+this.value">
+        <select id="library-select" class="library-select">
             {{range .Libraries}}
-            <option value="{{.ID}}"{{if eq .ID $.ActiveLibraryID}} selected{{end}}>{{.Name}}</option>
+            <option value="{{.ID}}"
+                {{if eq .ID $.CentralLibraryID}}selected data-is-central="true"{{end}}>
+                {{.Name}}
+            </option>
             {{end}}
         </select>
     </div>
     {{end}}
-
 
     <div class="collection-search-wrap">
         <input type="search" id="collection-search" class="collection-search-input"
@@ -21,9 +23,10 @@
     </div>
 
     <nav class="collection-nav">
-        {{/* All Books */}}
+        {{/* All Books — Central Library only */}}
         <a href="/collections/all"
-           class="collection-item{{if eq .ActiveCollectionID "all"}} collection-item--active{{end}}">
+           class="collection-item{{if eq .ActiveCollectionID "all"}} collection-item--active{{end}}"
+           data-central-only="true">
             <span class="collection-title">All Books</span>
             <span class="collection-count">({{.TotalBookCount}})</span>
         </a>
@@ -31,7 +34,8 @@
         {{/* Named collections */}}
         {{range .Collections}}
         <div class="collection-item collection-drop-zone{{if eq .ID $.ActiveCollectionID}} collection-item--active{{end}}"
-             data-collection-id="{{.ID}}">
+             data-collection-id="{{.ID}}"
+             data-library-ids="{{.LibraryIDs}}">
             <button class="collection-delete-btn" hidden title="Delete collection">✕</button>
             <a href="/collections/{{.ID}}" class="collection-link">
                 <span class="collection-title">{{.Name}}</span>
@@ -40,10 +44,11 @@
         </div>
         {{end}}
 
-        {{/* Uncategorized — shown only when there are uncategorized books */}}
+        {{/* Uncategorized — Central Library only */}}
         {{if gt .UncategorizedCount 0}}
         <a href="/collections/uncategorized"
-           class="collection-item{{if eq .ActiveCollectionID "uncategorized"}} collection-item--active{{end}}">
+           class="collection-item{{if eq .ActiveCollectionID "uncategorized"}} collection-item--active{{end}}"
+           data-central-only="true">
             <span class="collection-title">Uncategorized</span>
             <span class="collection-count">({{.UncategorizedCount}})</span>
         </a>

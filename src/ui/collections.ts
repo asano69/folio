@@ -14,8 +14,14 @@ let selectionBadge: HTMLElement | null = null;
 // Suppresses the click event that fires after a rubber-band drag ends.
 let suppressNextClick = false;
 
+// ── Sidebar filter state ───────────────────────────────────────
+// Both filters are applied together so they don't override each other.
+let activeLibraryID = '';   // '' = Central Library (show all)
+let collectionTextQuery = '';
+
 export function initCollections(): void {
   setupCollectionFilter();
+  setupLibrarySwitcher();
   setupMultiSelect();
   setupDragAndDrop();
   setupEditMode();
@@ -24,21 +30,45 @@ export function initCollections(): void {
 
 // ── Collection filter ──────────────────────────────────────────
 
+function applyCollectionFilters(): void {
+  document.querySelectorAll<HTMLElement>('.collection-drop-zone').forEach(item => {
+    const title = (item.querySelector('.collection-title')?.textContent ?? '').toLowerCase();
+    const libIds = (item.dataset.libraryIds ?? '').split(',').filter(Boolean);
+
+    const matchesText = !collectionTextQuery || title.includes(collectionTextQuery);
+    const matchesLib  = !activeLibraryID || libIds.includes(activeLibraryID);
+
+    item.style.display = (matchesText && matchesLib) ? '' : 'none';
+  });
+
+  // All Books and Uncategorized belong to Central Library only.
+  document.querySelectorAll<HTMLElement>('[data-central-only]').forEach(item => {
+    item.style.display = activeLibraryID ? 'none' : '';
+  });
+}
+
 function setupCollectionFilter(): void {
   const input = document.getElementById('collection-search') as HTMLInputElement | null;
   if (!input) return;
 
-  const applyFilter = (): void => {
-    const query = input.value.trim().toLowerCase();
-    document.querySelectorAll<HTMLElement>('.collection-drop-zone').forEach(item => {
-      const title = item.querySelector<HTMLElement>('.collection-title')?.textContent ?? '';
-      item.style.display = (!query || title.toLowerCase().includes(query)) ? '' : 'none';
-    });
-  };
-
-  input.addEventListener('input', applyFilter);
+  input.addEventListener('input', () => {
+    collectionTextQuery = input.value.trim().toLowerCase();
+    applyCollectionFilters();
+  });
   input.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'Escape') { input.value = ''; applyFilter(); }
+    if (e.key === 'Escape') { input.value = ''; collectionTextQuery = ''; applyCollectionFilters(); }
+  });
+}
+
+function setupLibrarySwitcher(): void {
+  const select = document.getElementById('library-select') as HTMLSelectElement | null;
+  if (!select) return;
+
+  const centralID = select.querySelector<HTMLOptionElement>('[data-is-central]')?.value ?? '';
+
+  select.addEventListener('change', () => {
+    activeLibraryID = select.value === centralID ? '' : select.value;
+    applyCollectionFilters();
   });
 }
 

@@ -16,11 +16,13 @@ type UncategorizedPageHandler struct {
 }
 
 func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	collections, err := h.Store.ListBookCollections()
+	libraries, err := h.Store.ListLibraries()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	collections, err := h.Store.ListBookCollections()
 
 	dbBooks, err := h.Store.ListUncategorizedBooks()
 	if err != nil {
@@ -63,6 +65,8 @@ func (h *UncategorizedPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		ActiveCollectionID: "uncategorized",
 		TotalBookCount:     totalCount,
 		UncategorizedCount: uncategorizedCount,
+		Libraries:          libraries,
+		CentralLibraryID:   store.CentralLibraryID,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {

@@ -97,6 +97,7 @@ type BookCollection struct {
 	Color       string
 	Description string
 	BookCount   int
+	LibraryIDs  string // comma-separated IDs from library_collection_members; empty = Central only
 }
 
 // ── JSON helpers for array columns ────────────────────────────
@@ -800,13 +801,14 @@ func (s *Store) DeleteLibrary(id string) error {
 
 // ── Book collections ───────────────────────────────────────────
 
-const collectionSelectSQL = `c.id, c.name, c.color, c.description, COUNT(m.book_id)`
+const collectionSelectSQL = `c.id, c.name, c.color, c.description, COUNT(DISTINCT m.book_id), COALESCE(GROUP_CONCAT(DISTINCT lcm.library_id), '')`
 
 func (s *Store) ListBookCollections() ([]BookCollection, error) {
 	rows, err := s.db.Query(`
 		SELECT ` + collectionSelectSQL + `
 		FROM book_collections c
 		LEFT JOIN book_collection_members m ON m.collection_id = c.id
+		LEFT JOIN library_collection_members lcm ON lcm.collection_id = c.id
 		GROUP BY c.id
 		ORDER BY c.name
 	`)
@@ -819,6 +821,7 @@ func (s *Store) ListBookCollections() ([]BookCollection, error) {
 
 // ListBookCollectionsInLibrary returns collections belonging to the given library.
 // Central Library returns all collections.
+
 func (s *Store) ListBookCollectionsInLibrary(libraryID string) ([]BookCollection, error) {
 	if libraryID == CentralLibraryID {
 		return s.ListBookCollections()
@@ -827,6 +830,7 @@ func (s *Store) ListBookCollectionsInLibrary(libraryID string) ([]BookCollection
 		SELECT `+collectionSelectSQL+`
 		FROM book_collections c
 		LEFT JOIN book_collection_members m ON m.collection_id = c.id
+		LEFT JOIN library_collection_members lcm ON lcm.collection_id = c.id
 		WHERE c.id IN (
 		    SELECT collection_id FROM library_collection_members WHERE library_id = ?
 		)
@@ -845,6 +849,7 @@ func (s *Store) GetBookCollection(id string) (*BookCollection, error) {
 		SELECT `+collectionSelectSQL+`
 		FROM book_collections c
 		LEFT JOIN book_collection_members m ON m.collection_id = c.id
+		LEFT JOIN library_collection_members lcm ON lcm.collection_id = c.id
 		WHERE c.id = ?
 		GROUP BY c.id
 	`, id)
@@ -866,7 +871,7 @@ func scanBookCollectionRows(rows *sql.Rows) ([]BookCollection, error) {
 	var cols []BookCollection
 	for rows.Next() {
 		var c BookCollection
-		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Description, &c.BookCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Description, &c.BookCount, &c.LibraryIDs); err != nil {
 			return nil, err
 		}
 		cols = append(cols, c)

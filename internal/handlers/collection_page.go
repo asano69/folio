@@ -46,7 +46,7 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	collections, err := h.Store.ListBookCollectionsInLibrary(libID)
+	collections, err := h.Store.ListBookCollections()
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -102,8 +102,8 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		CollectionID:       collectionID,
 		TotalBookCount:     totalCount,
 		UncategorizedCount: uncategorizedCount,
-		Libraries:       libraries,
-		ActiveLibraryID: libID,
+		Libraries:          libraries,
+		CentralLibraryID:   store.CentralLibraryID,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {
