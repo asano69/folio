@@ -4,6 +4,17 @@
         <button id="collection-edit-btn" class="collection-edit-btn">✎ Edit</button>
     </div>
 
+    {{if .Libraries}}
+    <div class="library-switcher-wrap">
+        <select class="library-select" onchange="window.location.href=window.location.pathname+'?lib='+this.value">
+            {{range .Libraries}}
+            <option value="{{.ID}}"{{if eq .ID $.ActiveLibraryID}} selected{{end}}>{{.Name}}</option>
+            {{end}}
+        </select>
+    </div>
+    {{end}}
+
+
     <div class="collection-search-wrap">
         <input type="search" id="collection-search" class="collection-search-input"
                placeholder="Filter collections…" autocomplete="off">

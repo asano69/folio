@@ -28,6 +28,8 @@ type shelfPageData struct {
 	CollectionID       string                 // non-empty on collection pages (remove-from-collection button)
 	TotalBookCount     int
 	UncategorizedCount int
+	Libraries          []store.Library // for sidebar library switcher
+	ActiveLibraryID    string
 }
 
 // AllBooksHandler serves GET /collections/all — all books regardless of collection.
@@ -43,7 +45,18 @@ func (h *AllBooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	collections, err := h.Store.ListBookCollections()
+	libID := r.URL.Query().Get("lib")
+	if libID == "" {
+		libID = store.CentralLibraryID
+	}
+
+	libraries, err := h.Store.ListLibraries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	collections, err := h.Store.ListBookCollectionsInLibrary(libID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -97,6 +110,8 @@ func (h *AllBooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ActiveCollectionID: "all",
 		TotalBookCount:     totalCount,
 		UncategorizedCount: uncategorizedCount,
+		Libraries:          libraries,
+		ActiveLibraryID:    libID,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {

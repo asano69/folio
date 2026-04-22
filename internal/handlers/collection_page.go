@@ -35,7 +35,19 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	collections, err := h.Store.ListBookCollections()
+	libID := r.URL.Query().Get("lib")
+	if libID == "" {
+		libID = store.CentralLibraryID
+	}
+
+	libraries, err := h.Store.ListLibraries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	collections, err := h.Store.ListBookCollectionsInLibrary(libID)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -90,6 +102,8 @@ func (h *CollectionPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		CollectionID:       collectionID,
 		TotalBookCount:     totalCount,
 		UncategorizedCount: uncategorizedCount,
+		Libraries:       libraries,
+		ActiveLibraryID: libID,
 	}
 
 	if err := h.Template.Execute(w, data); err != nil {
