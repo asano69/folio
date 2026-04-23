@@ -54,6 +54,17 @@ func main() {
 			fmt.Fprintf(os.Stderr, "hash: %v\n", err)
 			os.Exit(1)
 		}
+
+	case "inject":
+		bookID := ""
+		if len(os.Args) >= 3 {
+			bookID = os.Args[2]
+		}
+		if err := runInject(cfg, bookID); err != nil {
+			fmt.Fprintf(os.Stderr, "inject: %v\n", err)
+			os.Exit(1)
+		}
+
 	case "backup":
 		if err := runBackup(cfg); err != nil {
 			fmt.Fprintf(os.Stderr, "backup: %v\n", err)
@@ -81,6 +92,8 @@ Subcommands:
   serve                      Start the HTTP server
   scan [path]                Scan CBZ files and sync the database
                              (default path: FOLIO_LIBRARY_PATH)
+  inject [uuid]              Write DB metadata to folio.json inside CBZ files
+                             (all books if omitted; only changed books are rewritten)
   thumbnail <uuid>           Regenerate the book-level thumbnail for one book
   page-thumbnails [uuid]     Generate page-level thumbnails (all books if omitted)
   hash <uuid>                Recompute image hashes for one book

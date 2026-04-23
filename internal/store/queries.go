@@ -937,11 +937,6 @@ func (s *Store) RemoveCollectionFromLibrary(libraryID, collectionID string) erro
 	return err
 }
 
-func (s *Store) MoveCollectionToLibrary(collectionID, libraryID string) error {
-	_, err := s.db.Exec(`UPDATE book_collections SET library_id = ? WHERE id = ?`, libraryID, collectionID)
-	return err
-}
-
 func (s *Store) AddBookToBookCollection(collectionID string, bookID string) (added bool, err error) {
 	res, err := s.db.Exec(`
 		INSERT OR IGNORE INTO book_collection_members (collection_id, book_id) VALUES (?, ?)

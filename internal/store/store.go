@@ -117,7 +117,6 @@ CREATE TABLE IF NOT EXISTS book_collections (
     name        TEXT NOT NULL UNIQUE,
     color       TEXT NOT NULL DEFAULT '#888888',
     description TEXT NOT NULL DEFAULT '',
-    library_id  TEXT NOT NULL DEFAULT '00000000-0000-7000-8000-000000000000' REFERENCES libraries(id),
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
