@@ -52,16 +52,6 @@ func (h *CollectionsAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// /api/collections/{id}/library — move to different library
-	if len(parts) == 2 && parts[1] == "library" {
-		if r.Method != http.MethodPut {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		h.moveCollectionToLibrary(w, r, collectionID)
-		return
-	}
-
 	// /api/collections/{id}/books/{bookID} — add or remove book
 	if len(parts) == 3 && parts[1] == "books" {
 		bookID := parts[2]
@@ -144,27 +134,6 @@ func (h *CollectionsAPIHandler) deleteCollection(w http.ResponseWriter, r *http.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (h *CollectionsAPIHandler) moveCollectionToLibrary(w http.ResponseWriter, r *http.Request, collectionID string) {
-	var body struct {
-		LibraryID string `json:"library_id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-	if body.LibraryID == "" {
-		http.Error(w, "library_id is required", http.StatusBadRequest)
-		return
-	}
-
-	if err := h.Store.MoveCollectionToLibrary(collectionID, body.LibraryID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	w.WriteHeader(http.StatusNoContent)
 }
 
