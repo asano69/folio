@@ -408,3 +408,54 @@ func hashEntry(f *zip.File) (string, error) {
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
+
+// InjectBookMeta writes book metadata from b into folio.json inside the CBZ,
+// but only if the stored metadata differs from b. Returns true when the file
+// was rewritten, false when it was already up to date.
+func InjectBookMeta(cbzPath string, b Book) (bool, error) {
+	r, err := zip.OpenReader(cbzPath)
+	if err != nil {
+		return false, fmt.Errorf("open cbz %s: %w", cbzPath, err)
+	}
+
+	existing, err := readMeta(r)
+	if err != nil {
+		r.Close()
+		return false, err
+	}
+
+	newMeta := bookToMeta(b)
+
+	if folioMetaEqual(existing, newMeta) {
+		r.Close()
+		return false, nil
+	}
+
+	newMeta.Version = metaVersion
+	newMeta.UpdatedAt = time.Now().Format(time.RFC3339)
+	if existing != nil && existing.CreatedAt != "" {
+		newMeta.CreatedAt = existing.CreatedAt
+	} else {
+		newMeta.CreatedAt = newMeta.UpdatedAt
+	}
+
+	// writeMeta closes r before overwriting the file.
+	return true, writeMeta(cbzPath, r, newMeta)
+}
+
+// folioMetaEqual reports whether two folioMeta values have identical metadata
+// fields, ignoring version and timestamp fields (version, created_at, updated_at).
+func folioMetaEqual(a, b *folioMeta) bool {
+	if a == nil {
+		return false
+	}
+	// Zero out timestamps so they don't affect the comparison.
+	normalize := func(m *folioMeta) folioMeta {
+		c := *m
+		c.Version, c.CreatedAt, c.UpdatedAt = "", "", ""
+		return c
+	}
+	aj, _ := json.Marshal(normalize(a))
+	bj, _ := json.Marshal(normalize(b))
+	return string(aj) == string(bj)
+}

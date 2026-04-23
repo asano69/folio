@@ -13,8 +13,8 @@ import (
 //
 // Routes:
 //
-//	PUT  /api/books/{id}           — rename a book (updates folio.json + DB title)
-//	PUT  /api/books/{id}/meta      — save all book metadata (updates folio.json + DB)
+//	PUT  /api/books/{id}           — rename a book (DB only; use folio inject to sync CBZ)
+//	PUT  /api/books/{id}/meta      — save all book metadata (DB only; use folio inject to sync CBZ)
 //	POST /api/books/{id}/thumbnail — regenerate book-level thumbnail
 type BooksAPIHandler struct {
 	Store     *store.Store
@@ -90,12 +90,6 @@ func (h *BooksAPIHandler) renameBook(w http.ResponseWriter, r *http.Request, boo
 		return
 	}
 
-	// Update folio.json inside the CBZ first; if this fails the DB is not touched.
-	if err := storage.UpdateTitle(book.Source, title); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	if err := h.Store.UpdateBookTitle(bookID, title); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -131,7 +125,7 @@ type bookMetaRequest struct {
 }
 
 // saveBookMeta handles PUT /api/books/{id}/meta.
-// It writes all metadata fields to both folio.json inside the CBZ and the DB.
+// Writes metadata to the DB only. Run "folio inject" to sync changes back to CBZ.
 func (h *BooksAPIHandler) saveBookMeta(w http.ResponseWriter, r *http.Request, bookID string) {
 	var req bookMetaRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -170,12 +164,6 @@ func (h *BooksAPIHandler) saveBookMeta(w http.ResponseWriter, r *http.Request, b
 		Keywords:     req.Keywords,
 		ISBN:         req.ISBN,
 		Links:        req.Links,
-	}
-
-	// Update folio.json inside the CBZ first; if this fails the DB is not touched.
-	if err := storage.UpdateFolioMeta(book.Source, meta); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	if err := h.Store.UpdateBookMeta(bookID, meta); err != nil {
