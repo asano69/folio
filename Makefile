@@ -56,13 +56,24 @@ typecheck:
 # ─────────────────────────────────────────
 # Docker
 # ─────────────────────────────────────────
-.PHONY: docker-up
-docker-up:
-	docker compose up --build --force-recreate
+.PHONY: build-container
+build-container:
+	docker compose -f compose.yaml up -d --build --force-recreate
 
-.PHONY: docker-build
-docker-build:
-	docker build -t folio:latest .
+# 開発中は、Komodoを使う必要はない
+#.PHONY: build-image
+#build-image: ## Build Docker image
+#	docker build -t registry.internal/folio:latest .
+#
+#.PHONY: push-image
+#push-image: ## Push Docker image
+#	docker push registry.internal/folio:latest
+#
+#.PHONY: deploy
+#deploy: build-image push-image ## (*) Deploy stack via Komodo
+#	docker exec -it komodo km x -y destroy-stack folio
+#	docker exec -it komodo km x -y pull-stack   folio
+#	docker exec -it komodo km x -y deploy-stack folio
 
 
 # ─────────────────────────────────────────
