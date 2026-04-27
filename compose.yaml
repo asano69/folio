@@ -1,0 +1,42 @@
+services:
+  folio:
+    build: .
+    #image: registry.internal/folio:latest
+    container_name: folio
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - /mnt/200g_ssd500g/output:/mnt/200g_ssd500g/output
+      - ./data:/folio/data
+      - ./cache:/folio/cache
+      - ./backup:/folio/backup
+    environment:
+      - FOLIO_HOST=0.0.0.0
+      - FOLIO_PORT=3000
+      - FOLIO_LIBRARY_PATH=/mnt/200g_ssd500g/output
+      - FOLIO_DATA_PATH=./data
+      - FOLIO_CACHE_PATH=./cache
+      - FOLIO_BACKUP_PATH=./backup
+      - TZ=Azia/Tokyo
+    networks:
+      - traefik_br
+    labels:
+      - "traefik.enable=true" ###
+      - "traefik.docker.network=traefik_br"
+      - "traefik.http.routers.folio-in-http.rule=Host(`folio.app.internal`)"
+      - "traefik.http.routers.folio-in-http.entrypoints=web"
+      - "traefik.http.routers.folio-in-http.middlewares=force-https@file" ###
+      - "traefik.http.routers.folio-in.rule=Host(`folio.app.internal`)"
+      - "traefik.http.routers.folio-in.entrypoints=websecure"
+      - "traefik.http.routers.folio-in.tls=true"
+      - "traefik.http.routers.folio-in.service=folio"
+      - "traefik.http.routers.folio-in.middlewares=hsts@file" ###
+      - "traefik.http.services.folio.loadbalancer.server.port=3000"
+#volumes:
+#  cache:
+#  backup:
+#  data:
+networks:
+  traefik_br:
+    external: true

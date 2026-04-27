@@ -1,0 +1,10 @@
+*
+
+!go.mod
+!go.sum
+!*.go
+!internal/
+!cmd/
+!static/
+!templates/
+
