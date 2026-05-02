@@ -4,8 +4,8 @@ services:
     #image: registry.internal/folio:latest
     container_name: folio
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    #ports:
+    #  - "3000:3000"
     volumes:
       - /mnt/200g_ssd500g/output:/mnt/200g_ssd500g/output
       - ./data:/folio/data
